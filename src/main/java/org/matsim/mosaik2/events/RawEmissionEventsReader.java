@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Events reader for emissions wich doesn't bother with events manager and all.
  */
-class RawEmissionEventsReader extends MatsimXmlParser {
+public class RawEmissionEventsReader extends MatsimXmlParser {
 
     private static final String EVENT = "event";
     private static final String TYPE = "type";
@@ -32,7 +32,7 @@ class RawEmissionEventsReader extends MatsimXmlParser {
     private final AtomicInteger eventsCounter = new AtomicInteger();
     private final HandleEmissionEvent handler;
 
-    RawEmissionEventsReader(HandleEmissionEvent handler) {
+    public RawEmissionEventsReader(HandleEmissionEvent handler) {
         this.handler = handler;
         // events don't have dtd. Therefore validation is not possible
         this.setValidating(false);

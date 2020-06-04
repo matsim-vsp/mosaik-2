@@ -4,6 +4,7 @@ import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
@@ -36,12 +37,12 @@ public class EmissionsToRasterHandlerTest {
         final var network = NetworkUtils.createNetwork();
         var from = network.getFactory().createNode(Id.createNodeId("from"), new Coord(0, 0));
         network.addNode(from);
-        var to = network.getFactory().createNode(Id.createNodeId("to"), new Coord(cellSize * emissionValue, 0));
+        var to = network.getFactory().createNode(Id.createNodeId("to"), new Coord(cellSize * emissionValue - 1, 0));
         network.addNode(to);
         network.addLink(network.getFactory().createLink(Id.createLinkId("link"), from, to));
 
-        var rasteredNetwork = new RasteredNetwork(network, cellSize);
-        var handler = new EmissionsToRasterHandler(rasteredNetwork, 1);
+        var rasteredNetwork = Bresenham.rasterizeNetwork(network, getBounds(network, cellSize), cellSize);
+        var handler = new EmissionsToRasterHandler(rasteredNetwork, 1, cellSize);
 
         var emissions = Map.of(Pollutant.NOx, emissionValue);
 
@@ -65,15 +66,15 @@ public class EmissionsToRasterHandlerTest {
         final var network = NetworkUtils.createNetwork();
         var from = network.getFactory().createNode(Id.createNodeId("from"), new Coord(0, 0));
         network.addNode(from);
-        var to1 = network.getFactory().createNode(Id.createNodeId("to1"), new Coord(cellSize * emissionValue, 0));
+        var to1 = network.getFactory().createNode(Id.createNodeId("to1"), new Coord(cellSize * emissionValue - 1, 0));
         network.addNode(to1);
-        var to2 = network.getFactory().createNode(Id.createNodeId("to2"), new Coord(0, cellSize * emissionValue));
+        var to2 = network.getFactory().createNode(Id.createNodeId("to2"), new Coord(0, cellSize * emissionValue - 1));
         network.addNode(to2);
         network.addLink(network.getFactory().createLink(Id.createLinkId("link1"), from, to1));
         network.addLink(network.getFactory().createLink(Id.createLinkId("link2"), from, to2));
 
-        var rasteredNetwork = new RasteredNetwork(network, cellSize);
-        var handler = new EmissionsToRasterHandler(rasteredNetwork, 1);
+        var rasteredNetwork = Bresenham.rasterizeNetwork(network, getBounds(network, cellSize), cellSize);
+        var handler = new EmissionsToRasterHandler(rasteredNetwork, 1, cellSize);
 
         var emissions = Map.of(Pollutant.NOx, emissionValue);
 
@@ -81,7 +82,7 @@ public class EmissionsToRasterHandlerTest {
         handler.handleEvent(new WarmEmissionEvent(0, Id.createLinkId("link2"), Id.createVehicleId("some-vehicle"), emissions));
 
         var result = handler.getPalmChemistryInput();
-        var origin = new Coord(-5, -5); // raster starts with link as center point of cells
+        var origin = new Coord(0, 0); // raster starts with link as center point of cells
         for (var cellEntry : result.getData().getTimeBin(0).getValue().entrySet()) {
 
             if (cellEntry.getKey().equals(origin)) {
@@ -103,9 +104,9 @@ public class EmissionsToRasterHandlerTest {
 
         Network network = NetworkUtils.readNetwork("./scenarios/sampleScenario/sample_network.xml");
 
-        var rasteredNetwork = new RasteredNetwork(network, 20);
+        var rasteredNetwork = Bresenham.rasterizeNetwork(network, getBounds(network, 20), 20);
 
-        var handler = new EmissionsToRasterHandler(rasteredNetwork, 100);
+        var handler = new EmissionsToRasterHandler(rasteredNetwork, 100, 20);
         var manager = EventsUtils.createEventsManager();
         manager.addHandler(handler);
         new EmissionEventsReader(manager).readFile(testUtils.getInputDirectory() + "/output_events.emissions.xml.gz");
@@ -136,9 +137,8 @@ public class EmissionsToRasterHandlerTest {
 
         var network = NetworkUtils.readNetwork("https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/berlin/berlin-v5.4-1pct/output-berlin-v5.4-1pct/berlin-v5.4-1pct.output_network.xml.gz");
 
-        var rasteredNetwork = new RasteredNetwork(network, bounds, 10);
-
-        var handler = new EmissionsToRasterHandler(rasteredNetwork, 3600);
+        var rasteredNetwork = Bresenham.rasterizeNetwork(network, bounds, 10);
+        var handler = new EmissionsToRasterHandler(rasteredNetwork, 3600, 10);
         var manager = EventsUtils.createEventsManager();
         manager.addHandler(handler);
 
@@ -147,5 +147,16 @@ public class EmissionsToRasterHandlerTest {
         var result = handler.getPalmChemistryInput();
         result.writeToFile(Paths.get(testUtils.getOutputDirectory() + "ernst-reuter_chemistry.nc"));
         PalmChemistryInput.writeToCsv(Paths.get(testUtils.getOutputDirectory() + "rastered-emissions.csv"), result);
+    }
+
+    private static Geometry getBounds(Network network, double cellSize) {
+        var bounds = NetworkUtils.getBoundingBox(network.getNodes().values());
+        return new GeometryFactory().createPolygon(new Coordinate[] {
+                new Coordinate(bounds[0], bounds[1]),
+                new Coordinate(bounds[2] + cellSize, bounds[1] - cellSize),
+                new Coordinate(bounds[2] + cellSize, bounds[3] + cellSize),
+                new Coordinate(bounds[0], bounds[3] + cellSize),
+                new Coordinate(bounds[0], bounds[1])
+        });
     }
 }

@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import org.locationtech.jts.geom.Geometry;
 import org.matsim.api.core.v01.Coord;
 
 import java.util.Set;
@@ -192,6 +193,13 @@ public class Raster {
                 if (coord.getX() > maxX) maxX = coord.getX();
                 if (coord.getY() > maxY) maxY = coord.getY();
             }
+        }
+
+        Bounds(Geometry geometry) {
+            this.minX = geometry.getEnvelopeInternal().getMinX();
+            this.minY = geometry.getEnvelopeInternal().getMinY();
+            this.maxX = geometry.getEnvelopeInternal().getMaxX();
+            this.maxY = geometry.getEnvelopeInternal().getMaxY();
         }
 
         public double getMinX() {

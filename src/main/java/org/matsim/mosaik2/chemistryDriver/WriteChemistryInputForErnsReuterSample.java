@@ -36,17 +36,6 @@ public class WriteChemistryInputForErnsReuterSample {
     private static final Logger logger = Logger.getLogger(WriteChemistryInputForErnsReuterSample.class);
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
 
-    private static final String TIME = "time";
-    private static final String Z = "z";
-    private static final String X = "x";
-    private static final String Y = "y";
-    private static final String SPECIES = "nspecies";
-    private static final String FIELD_LEN = "field_length";
-    private static final String EMISSION_NAME = "emission_name";
-    private static final String EMISSION_INDEX = "emission_index";
-    private static final String TIMESTAMP = "timestamp";
-    private static final String EMISSION_VALUES = "emission_values";
-
     private static final double cellSize = 10;
     private static final double timeBinSize = 3600;
 
@@ -79,7 +68,7 @@ public class WriteChemistryInputForErnsReuterSample {
                 .collect(NetworkUtils.getCollector());
 
         // read emissions into time bins sorted by pollutant and link id
-        TimeBinMap<Map<Pollutant, TObjectDoubleMap<Id<Link>>>> timeBinMap = new TimeBinMap<>(3600);
+        TimeBinMap<Map<Pollutant, TObjectDoubleMap<Id<Link>>>> timeBinMap = new TimeBinMap<>(timeBinSize);
         new RawEmissionEventsReader((time, linkId, vehicleId, pollutant, value) -> {
 
             var id = Id.createLinkId(linkId);
@@ -91,12 +80,12 @@ public class WriteChemistryInputForErnsReuterSample {
                 }
                 var emissionsByPollutant = timeBin.getValue();
                 var linkEmissions = emissionsByPollutant.computeIfAbsent(pollutant, p -> new TObjectDoubleHashMap<>());
-                linkEmissions.adjustOrPutValue(id, value, value);
+                linkEmissions.adjustOrPutValue(id, value * 100, value * 100); // we are currently running 1pct samples. Therefore scale it by 100
             }
         }).readFile(emissionEventsFile);
 
         // transform emissions by link into emissions on a raster
-        TimeBinMap<Map<Pollutant, Raster>> rasterTimeBinMap = new TimeBinMap<>(3600);
+        TimeBinMap<Map<Pollutant, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
         for (var bin : timeBinMap.getTimeBins()) {
 
             Map<Pollutant, Raster> rasterByPollutant = new HashMap<>();
@@ -110,43 +99,6 @@ public class WriteChemistryInputForErnsReuterSample {
         }
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasterTimeBinMap);
-    }
-
-    private void write() {
-
-        var network = NetworkUtils.readNetwork(networkFile);
-        var bounds = createBoundingBox();
-        var filteredNetwork = network.getLinks().values().parallelStream()
-                .map(link -> {
-
-                    var from = link.getFromNode();
-                    var to = link.getToNode();
-                    var fromCoordTransformed = transformation.transform(from.getCoord());
-                    var toCoordTransformed = transformation.transform(to.getCoord());
-
-                    var fromTransformed = NetworkUtils.createNode(from.getId(), fromCoordTransformed);
-                    var toTransformed = NetworkUtils.createNode(to.getId(), toCoordTransformed);
-                    var linkTransformed = network.getFactory().createLink(link.getId(), fromTransformed, toTransformed);
-                    linkTransformed.setAllowedModes(link.getAllowedModes());
-                    linkTransformed.setCapacity(link.getCapacity());
-                    linkTransformed.setFreespeed(link.getFreespeed());
-                    linkTransformed.setLength(link.getLength());
-                    linkTransformed.setNumberOfLanes(link.getNumberOfLanes());
-                    // not copying attributes
-                    return linkTransformed;
-                })
-                .filter(link -> isCoveredBy(link, bounds))
-                .collect(NetworkUtils.getCollector());
-
-        var rasteredNetwork = Bresenham.rasterizeNetwork(filteredNetwork, bounds, cellSize);
-        var handler = new EmissionsToRasterHandler(rasteredNetwork, timeBinSize, cellSize);
-
-        var manager = EventsUtils.createEventsManager();
-        manager.addHandler(handler);
-        new EmissionEventsReader(manager).readFile(emissionEventsFile);
-
-        var chemistryInput = handler.getPalmChemistryInput();
-        chemistryInput.writeToFile(Paths.get(outputFile));
     }
 
     private static boolean isCoveredBy(Link link, Geometry geometry) {
@@ -187,10 +139,5 @@ public class WriteChemistryInputForErnsReuterSample {
         linkTransformed.setNumberOfLanes(link.getNumberOfLanes());
         // not copying attributes
         return linkTransformed;
-    }
-
-    private static Coord getCoordRelativeToOrigin(Coord coord, Coord origin) {
-
-        return CoordUtils.minus(coord, origin);
     }
 }

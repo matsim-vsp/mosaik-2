@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.groupingBy;
+
 @RequiredArgsConstructor
 public class NetworkUnsimplifier {
 
@@ -40,10 +42,11 @@ public class NetworkUnsimplifier {
         // find some stützstellen
         var originalIds = network.getLinks().values().stream()
                 .map(link -> {
-                    var origId = (String)link.getAttributes().getAttribute("origId");
-                    return Tuple.of(Long.parseLong(origId), link.getId());
+                    var origId = (long)link.getAttributes().getAttribute("origid");
+                    return Tuple.of(origId, link.getId());
                 })
-                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+                .collect(groupingBy(Tuple::getFirst, Collectors.mapping(Tuple::getSecond, Collectors.toSet())));
+                //.collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
 
         // set up first pass for ways
         var reader = new PbfReader(file, false);
@@ -81,7 +84,7 @@ public class NetworkUnsimplifier {
         @Getter
         private final Map<Long, Set<Id<Link>>> nodesReferencingWays = new HashMap<>();
 
-        private final Map<Long, Id<Link>> originalIds;
+        private final Map<Long, Set<Id<Link>>> originalIds;
 
 
         @Override
@@ -99,11 +102,11 @@ public class NetworkUnsimplifier {
 
             if (originalIds.containsKey(way.getId())) {
 
-                var linkId = originalIds.get(way.getId());
+                var linkIds = originalIds.get(way.getId());
                 for (int i = 0; i < way.getNumberOfNodes(); i++) {
 
                     var nodeId = way.getNodeId(i);
-                    nodesReferencingWays.computeIfAbsent(nodeId, id -> new HashSet<>()).add(linkId);
+                    nodesReferencingWays.computeIfAbsent(nodeId, id -> new HashSet<>()).addAll(linkIds);
                 }
             }
         }
@@ -139,7 +142,7 @@ public class NetworkUnsimplifier {
 
             if (nodesReferencingWays.containsKey(node.getId())) {
 
-                var coord = transformation.transform(new Coord(node.getLatitude(), node.getLongitude()));
+                var coord = transformation.transform(new Coord(node.getLongitude(), node.getLatitude()));
                 var matsimNode = NetworkUtils.createNode(Id.createNodeId(node.getId()), coord);
 
                 for (var linkId : nodesReferencingWays.get(node.getId())) {

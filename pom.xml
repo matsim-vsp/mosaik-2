@@ -52,6 +52,15 @@
             <artifactId>osm</artifactId>
             <version>${matsim.version}</version>
         </dependency>
+
+        <!-- netcdf support -->
+        <dependency>
+            <groupId>edu.ucar</groupId>
+            <artifactId>cdm</artifactId>
+            <version>5.0.0</version>
+            <scope>compile</scope>
+        </dependency>
+
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>

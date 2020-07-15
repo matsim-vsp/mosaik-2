@@ -62,18 +62,57 @@ public class NetworkUnsimplifier {
 
         Map<Id<Link>, List<Link>> result = new HashMap<>();
         for (var linkEntry : nodesCollector.getOrigIdToNodes().entrySet()) {
+
+            if (linkEntry.getKey().equals(Id.createLinkId("61657210001f"))) {
+                var stop = "it";
+            }
             var nodesForLink = linkEntry.getValue();
-            for (var i = 1; i < nodesForLink.size(); i++) {
+            var originalLink = network.getLinks().get(linkEntry.getKey());
 
-                var from = nodesForLink.get(i - 1);
-                var to = nodesForLink.get(i);
+            // ways might be longer thant the matsim link. Therefore we must find out which osm node is the matsim
+            // link's start and end node.
+            var startIndex = -1;
+            var endIndex = -1;
+            for (var i = 0; i < nodesForLink.size(); i++) {
 
-                var link = network.getFactory().createLink(Id.createLinkId(linkEntry.getKey().toString() + "_" + i), from, to);
-                result.computeIfAbsent(linkEntry.getKey(), id -> new ArrayList<>()).add(link);
+                var node = nodesForLink.get(i);
+
+                if (node.getId().equals(originalLink.getFromNode().getId())) {
+                    startIndex = i;
+                    if (endIndex >= 0) break; // stop searching if end index was already found
+                }
+                if (node.getId().equals(originalLink.getToNode().getId())) {
+                    endIndex = i;
+                    if (startIndex >= 0) break; // stop searching if start index was already found
+                }
+            }
+
+            // determine the direction we have to iterate. The matsim network contains foreward and backwards links for
+            // the same way
+            var direction = endIndex - startIndex > 0 ? 1 : -1;
+
+
+            // iterate over all nodes between start and end index
+            // depending on the direction iteration is conducted for- or backwards
+            // the terminal condition will stop one iteration before i is equal to end index
+            for (var i = startIndex; i != endIndex; i += direction) {
+
+                try {
+                    var from = nodesForLink.get(i);
+                    var to = nodesForLink.get(i + direction);
+                    var link = network.getFactory().createLink(Id.createLinkId(linkEntry.getKey().toString() + "_" + i), from, to);
+                    result.computeIfAbsent(linkEntry.getKey(), id -> new ArrayList<>()).add(link);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
             }
         }
 
         return result;
+    }
+
+    private static boolean matchesAnyNodeOnLink(Node node, Link link) {
+        return node.getId().equals(link.getFromNode().getId()) || node.getId().equals(link.getToNode().getId());
     }
 
 

@@ -25,7 +25,7 @@ public class NetworkUnsimplifierTest {
                 .build()
                 .read(inputFile);
 
-        //NetworkUtils.writeNetwork(network, "C:/Users/Janekdererste/Desktop/simplified-network.xml.gz");
+        NetworkUtils.writeNetwork(network, "C:/Users/Janekdererste/Desktop/simplified-andorra.xml.gz");
 
         var result = NetworkUnsimplifier.filterNodesFromOsmFile(inputFile, network, "EPSG:25833");
 
@@ -33,7 +33,7 @@ public class NetworkUnsimplifierTest {
                 .flatMap(Collection::stream)
                 .collect(NetworkUtils.getCollector());
 
-        NetworkUtils.writeNetwork(unsimplifiedNetwork, "C:/Users/Janekdererste/Desktop/unsimplified-network.xml.gz");
+        NetworkUtils.writeNetwork(unsimplifiedNetwork, "C:/Users/Janekdererste/Desktop/unsimplified-andorra.xml.gz");
     }
 
     @Test

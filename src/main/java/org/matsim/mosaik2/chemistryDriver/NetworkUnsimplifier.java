@@ -6,32 +6,25 @@ import de.topobyte.osm4j.core.model.iface.OsmBounds;
 import de.topobyte.osm4j.core.model.iface.OsmNode;
 import de.topobyte.osm4j.core.model.iface.OsmRelation;
 import de.topobyte.osm4j.core.model.iface.OsmWay;
-import de.topobyte.osm4j.core.model.impl.Way;
 import de.topobyte.osm4j.pbf.seq.PbfReader;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.geotools.referencing.CRS;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.NetworkFactory;
 import org.matsim.api.core.v01.network.Node;
-import org.matsim.core.network.LinkFactory;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.operation.MathTransform;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static java.util.stream.Collectors.collectingAndThen;
 import static java.util.stream.Collectors.groupingBy;
 
 @RequiredArgsConstructor
@@ -72,10 +65,9 @@ public class NetworkUnsimplifier {
             var link = network.getLinks().get(linkId2OsmWay.getKey());
             var way = linkId2OsmWay.getValue();
 
-            if (linkId2OsmWay.getKey().equals(Id.createLinkId("1819242340021f"))) {
-                var stop = "it";
-            }
-
+            if ((long) link.getAttributes().getAttribute("origid") == 6185090) {
+				var stop = "it";
+			}
             var startIndex = getNodeIndex(link.getFromNode().getId(), way);
             var endIndex = getNodeIndex(link.getToNode().getId(), way);
 
@@ -113,8 +105,22 @@ public class NetworkUnsimplifier {
     }
 
     private static boolean isLoop(OsmWay way) {
-        return way.getNodeId(0) == way.getNodeId(way.getNumberOfNodes() - 1);
-    }
+
+		if (way.getNodeId(0) == way.getNodeId(way.getNumberOfNodes() - 1)) {
+			var stop = "it";
+		}
+		for (var a = 0; a < way.getNumberOfNodes(); a++) {
+			var nodeId = way.getNodeId(a);
+			for (var b = a + 1; b < way.getNumberOfNodes(); b++) {
+				var toCompare = way.getNodeId(b);
+				if (nodeId == toCompare) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
 
     private static List<Link> createLinks(Link simpleLink, OsmWay osmWay, int startIndex, int endIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
 
@@ -134,24 +140,51 @@ public class NetworkUnsimplifier {
     private static List<Link> createLinksWithWrapAround(Link simpleLink, OsmWay osmWay, int startIndex, int endIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
 
         List<Link> result = new ArrayList<>();
-        for (var i = startIndex; keepGoingWithWrapAround(i, startIndex, endIndex, direction); i += direction) {
+		for (var i = initializeIndexWithWrapAround(startIndex, osmWay.getNumberOfNodes(), direction); keepGoingWithWrapAround(i, startIndex, endIndex, direction); i = increaseIndexWithWrapAround(i, osmWay.getNumberOfNodes(), direction)) {
 
-            if (i + direction >= osmWay.getNumberOfNodes()) i = 0;
-            else if (i + direction < 0) i = osmWay.getNumberOfNodes() - 1;
+			// if (i + direction >= osmWay.getNumberOfNodes()) i = 0;
+			// else if (i + direction < 0) i = osmWay.getNumberOfNodes() - 1;
 
-            var newLink = createLinkFromWay(osmWay, simpleLink, i, direction, nodes, factory);
-            result.add(newLink);
-        }
-        return result;
-    }
+			var newLink = createLinkFromWay(osmWay, simpleLink, i, direction, nodes, factory);
+			result.add(newLink);
+		}
+		return result;
+	}
 
-    private static Link createLinkFromWay(OsmWay osmWay, Link simpleLink, int fromIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
+	private static int increaseIndexWithWrapAround(int current, int size, int direction) {
 
-        var fromNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex)));
-        var toNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex + direction)));
+		// first increase counter
+		int next = current + direction;
 
-        return factory.createLink(Id.createLinkId(simpleLink.getId().toString() + "_" + fromIndex), fromNode, toNode);
-    }
+		if (direction > 0 && next >= size - 1) {
+			return 0; // skip last node and use the first in the array, because first and last are included twice
+		} else if (direction < 0 && next == 0) {
+			next = size - 1; // don't use the zeroth node but the last because first and last are included twice
+		}
+
+		return next;
+	}
+
+	private static int initializeIndexWithWrapAround(int startIndex, int size, int direction) {
+
+		if (startIndex == 0 && direction < 0) {
+			return size - 1;
+		}
+		return startIndex;
+	}
+
+	private static Link createLinkFromWay(OsmWay osmWay, Link simpleLink, int fromIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
+
+		var fromNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex)));
+		var toNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex + direction)));
+
+		var link = factory.createLink(Id.createLinkId(simpleLink.getId().toString() + "_" + fromIndex), fromNode, toNode);
+
+		// this comes in handy for testing eventually copy other values as well
+
+		link.getAttributes().putAttribute("origid", simpleLink.getAttributes().getAttribute("origid"));
+		return link;
+	}
 
     private static boolean keepGoingWithWrapAround(int currentIndex, int startIndex, int endIndex, int direction) {
 

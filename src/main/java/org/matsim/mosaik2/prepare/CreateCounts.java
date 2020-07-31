@@ -3,32 +3,77 @@ package org.matsim.mosaik2.prepare;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import org.apache.log4j.Logger;
+import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.counts.Count;
+import org.matsim.counts.Counts;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
 
 public class CreateCounts {
 
     private static final Logger logger = Logger.getLogger(CreateCounts.class);
 
-    private static final Path networkPath = Paths.get("projects/mosaik-2/matsim-input-files/stuttgartPLZ70173/optimizedNetwork.xml.gz");
+    //  private static final Path networkPath = Paths.get("projects/mosaik-2/matsim-input-files/stuttgartPLZ70173/optimizedNetwork.xml.gz");
     private static final Path longTermCountsRoot = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts.txt");
     private static final Path longTermCountsIdMapping = Paths.get("projects/mosaik-2/raw-data/calibration-data/countstation-osm-node-matching.csv");
 
-
     public static void main(String[] args) throws IOException {
+
+        logger.info("Program starts!");
 
         var input = new InputArguments();
         JCommander.newBuilder().addObject(input).build().parse(args);
 
-        var creator = new NodeMatcher();
+        var matching = new NodeMatcher();
+        var matchingResult = matching.parseNodeMatching(input.sharedSvn + longTermCountsIdMapping);
 
-        var result = creator.parseNodeMatching(input.sharedSvn + longTermCountsIdMapping);
+        logger.info("Finished with matching nodes.");
 
-        var longTerm = new ReadBAStCount();
+        if (true) {
 
-        var resultLongTerm = longTerm.readBAStData(input.sharedSvn + longTermCountsRoot);
+            // GetCountDataAndCreateCounts()
+            var getCounts = new GetCountDataAndCreateCounts();
+            var getCountsResult = getCounts.countData(input.sharedSvn + longTermCountsRoot, (HashMap) matchingResult);
+
+            logger.info("Finish");
+
+        } else {
+
+            // GetCountData()
+            var longTerm = new GetCountData();
+            var longTermResult = longTerm.countData(input.sharedSvn + longTermCountsRoot, (HashMap) matchingResult);
+
+            Map<String, Count<Link>> countsResult = new HashMap<>();
+
+            for (Map.Entry<String, GetCountData.CountingData> longTermBAStCounts : longTermResult.entrySet()) {
+
+                Count<Link> count;
+                var counts = new Counts<Link>();
+                counts.setYear(2018);
+
+                String stationID = longTermBAStCounts.getKey();
+                GetCountData.CountingData value = longTermBAStCounts.getValue();
+
+                count = counts.createAndAddCount(Id.createLinkId(value.getLinkID()), stationID);
+
+                for (int i = 0; i < 24; i++) {
+
+                    count.createVolume((i + 1), value.getSpecificHour(i));
+
+                }
+
+                countsResult.put(stationID, count);
+
+            }
+
+            logger.info("All Counts were imported!");
+
+        }
 
     }
 
@@ -38,25 +83,5 @@ public class CreateCounts {
         private final String sharedSvn = "";
 
     }
-
-/*
-    private void run() {
-
-        var svnPath = Paths.get(sharedSvn);
-        var network = NetworkUtils.readNetwork(svnPath.resolve(networkPath).toString());
-
-
-        var longTermCounts = new LongTermCountsCreator.Builder()
-                .withNetwork(network)
-                .withRootDir(svnPath.resolve(longTermCountsRoot).toString())
-                .withIdMapping(svnPath.resolve(longTermCountsIdMapping).toString())
-                .build()
-                .run();
-
-    }
-
-
- */
-
 
 }

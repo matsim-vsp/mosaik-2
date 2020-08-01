@@ -24,12 +24,28 @@ public class GetCountData {
     private final String[] R2 = {"PLZ_R2", "K_PLZ_R2", "Pkw_R2", "K_Pkw_R2", "Lfw_R2", "K_Lfw_R2", "Mot_R2", "K_Mot_R2",
             "PmA_R2", "K_PmA_R2", "Bus_R2", "K_Bus_R2", "LoA_R2"};
 
-    Map<String, CountingData> countData(String filePath, HashMap nodeMatcher) throws IOException {
+    Map<String, CountingData> countData(String filePath1, String filePath2, HashMap nodeMatcher) throws IOException {
 
         CountingData countingData_R1 = new CountingData("", emptyHours.clone(), 0, "");
         CountingData countingData_R2 = new CountingData("", emptyHours.clone(), 0, "");
 
         Map<String, CountingData> countHashMap = new HashMap<>();
+
+        readData(filePath2, nodeMatcher, countingData_R1, countingData_R2, countHashMap);
+
+        readData(filePath1, nodeMatcher, countingData_R1, countingData_R2, countHashMap);
+
+        logger.info("###############################################");
+        logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
+        logger.info("#\t\t\t All Counts were imported! \t\t\t#");
+        logger.info("#\t\t\t  " + countHashMap.keySet().size() + " stations were found!\t\t\t#");
+        logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
+        logger.info("###############################################");
+        return countHashMap;
+
+    }
+
+    private void readData(String filePath, HashMap nodeMatcher, CountingData countingData_R1, CountingData countingData_R2, Map<String, CountingData> countHashMap) {
 
         try (var reader = new FileReader(filePath)) {
 
@@ -144,6 +160,9 @@ public class GetCountData {
                     // Last day
                     if ((index + 1) % 8760 == 0) {
 
+                        countingData_R1.countHour = countingData_R1.countHour / 24;
+                        countingData_R2.countHour = countingData_R2.countHour / 24;
+
                         for (int i = 0; i < 24; i++) {
 
                             countingData_R1.hour[i] = (countingData_R1.hour[i] / countingData_R1.countHour);
@@ -151,7 +170,7 @@ public class GetCountData {
 
                         }
 
-                        if (!countingData_R1.checksumIsEmpty()) {
+                        if (countingData_R1.checksumIsNotEmpty()) {
 
                             countHashMap.put(countingData_R1.stationID, new CountingData(countingData_R1.stationID, countingData_R1.hour.clone(), countingData_R1.countHour, countingData_R1.linkID));
                             logger.info("Added " + countingData_R1.stationID + " with the Link ID " + countingData_R1.linkID + " to the countHashMap.");
@@ -166,8 +185,9 @@ public class GetCountData {
                         countingData_R1.hour = emptyHours.clone();
                         countingData_R1.countHour = 0;
 
-                        if (!countingData_R2.checksumIsEmpty()) {
+                        if (countingData_R2.checksumIsNotEmpty()) {
 
+                            System.out.println("Test: " + countingData_R2);
                             countHashMap.put(countingData_R2.stationID, new CountingData(countingData_R2.stationID, countingData_R2.hour.clone(), countingData_R2.countHour, countingData_R2.linkID));
                             logger.info("Added " + countingData_R2.stationID + " with the Link ID " + countingData_R2.linkID + " to the countHashMap.");
 
@@ -183,22 +203,17 @@ public class GetCountData {
 
                     }
 
-                    index += 1;
-
                 }
+
+                index += 1;
 
             }
 
+        } catch (IOException e) {
+
+            e.printStackTrace();
+
         }
-
-
-        logger.info("##################################################");
-        logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
-        logger.info("#\t\t\t All Counts were imported! \t\t\t#");
-        logger.info("#\t\t\t  " + countHashMap.keySet().size() + " stations were found!\t\t\t#");
-        logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
-        logger.info("##################################################");
-        return countHashMap;
 
     }
 
@@ -211,7 +226,7 @@ public class GetCountData {
 
             if (checkIsCount(record, R1, i)) {
 
-                countingData_R1.hour[hour] += Integer.parseInt(trim(record.get(R1[i])));
+                countingData_R1.hour[hour] = countingData_R1.hour[hour] + Integer.parseInt(trim(record.get(R1[i])));
 
             }
 
@@ -231,7 +246,7 @@ public class GetCountData {
 
     private boolean checkIsCount(CSVRecord record, String[] types, Integer i) {
 
-        return !trim(record.get(types[i])).equals("s") && !trim(record.get(types[i])).equals("-") && !trim(record.get(types[i])).equals("a") && !trim(record.get(types[i])).equals("x") && !trim(record.get(types[i])).equals("u");
+        return !trim(record.get(types[i])).equals("s") && !trim(record.get(types[i])).equals("-") && !trim(record.get(types[i])).equals("a") && !trim(record.get(types[i])).equals("x") && !trim(record.get(types[i])).equals("u") && !trim(record.get(types[i])).equals("-1");
 
     }
 
@@ -251,7 +266,7 @@ public class GetCountData {
 
         }
 
-        private boolean checksumIsEmpty() {
+        private boolean checksumIsNotEmpty() {
 
             Integer result = 0;
 
@@ -261,13 +276,25 @@ public class GetCountData {
 
             }
 
-            return result == 0;
+            return result != 0;
 
         }
 
         public String getLinkID() {
 
             return linkID;
+
+        }
+
+        public String getStationID() {
+
+            return stationID;
+
+        }
+
+        public Integer getCountHour() {
+
+            return countHour;
 
         }
 
@@ -280,11 +307,11 @@ public class GetCountData {
         @Override
         public String toString() {
 
-            String result = "";
+            StringBuilder result = new StringBuilder();
 
-            for (int i = 0; i < hour.length; i++) {
+            for (Integer integer : hour) {
 
-                result += hour[i] + ", ";
+                result.append(integer).append(", ");
 
             }
 

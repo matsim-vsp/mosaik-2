@@ -18,8 +18,8 @@ public class CreateCounts {
 
     private static final Logger logger = Logger.getLogger(CreateCounts.class);
 
-    //  private static final Path networkPath = Paths.get("projects/mosaik-2/matsim-input-files/stuttgartPLZ70173/optimizedNetwork.xml.gz");
-    private static final Path longTermCountsRoot = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts.txt");
+    private static final Path longTermCountsRootFederalRoad = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-federal-road.txt");
+    private static final Path longTermCountsRootHighway = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-highway.txt");
     private static final Path longTermCountsIdMapping = Paths.get("projects/mosaik-2/raw-data/calibration-data/countstation-osm-node-matching.csv");
 
     public static void main(String[] args) throws IOException {
@@ -34,11 +34,11 @@ public class CreateCounts {
 
         logger.info("Finished with matching nodes.");
 
-        if (true) {
+        if (false) {
 
             // GetCountDataAndCreateCounts()
             var getCounts = new GetCountDataAndCreateCounts();
-            var getCountsResult = getCounts.countData(input.sharedSvn + longTermCountsRoot, (HashMap) matchingResult);
+            var getCountsResult = getCounts.countData(input.sharedSvn + longTermCountsRootFederalRoad, input.sharedSvn + longTermCountsRootHighway, (HashMap) matchingResult);
 
             logger.info("Finish");
 
@@ -46,7 +46,7 @@ public class CreateCounts {
 
             // GetCountData()
             var longTerm = new GetCountData();
-            var longTermResult = longTerm.countData(input.sharedSvn + longTermCountsRoot, (HashMap) matchingResult);
+            var longTermResult = longTerm.countData(input.sharedSvn + longTermCountsRootFederalRoad, input.sharedSvn + longTermCountsRootHighway, (HashMap) matchingResult);
 
             Map<String, Count<Link>> countsResult = new HashMap<>();
 
@@ -68,6 +68,8 @@ public class CreateCounts {
                 }
 
                 countsResult.put(stationID, count);
+
+                System.out.println(longTermBAStCounts.getValue());
 
             }
 

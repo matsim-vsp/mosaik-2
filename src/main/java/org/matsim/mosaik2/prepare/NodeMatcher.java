@@ -58,7 +58,6 @@ public class NodeMatcher {
 
         private final String fromID;
         private final String toID;
-
         private final String linkID;
 
         public matchedLinkID(String fromID, String toID, String linkID) {
@@ -72,6 +71,18 @@ public class NodeMatcher {
         public String getLinkID() {
 
             return linkID;
+
+        }
+
+        public String getFromID() {
+
+            return fromID;
+
+        }
+
+        public String getToID() {
+
+            return toID;
 
         }
 

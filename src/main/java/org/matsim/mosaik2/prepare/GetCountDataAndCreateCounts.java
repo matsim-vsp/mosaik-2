@@ -28,7 +28,7 @@ public class GetCountDataAndCreateCounts {
     private final String[] R2 = {"PLZ_R2", "K_PLZ_R2", "Pkw_R2", "K_Pkw_R2", "Lfw_R2", "K_Lfw_R2", "Mot_R2", "K_Mot_R2",
             "PmA_R2", "K_PmA_R2", "Bus_R2", "K_Bus_R2", "LoA_R2"};
 
-    Map<String, Count<Link>> countData(String filePath, HashMap nodeMatcher) throws IOException {
+    Map<String, Count<Link>> countData(String filePath1, String filePath2, HashMap nodeMatcher) throws IOException {
 
         CountingData countingData_R1 = new CountingData("", emptyHours.clone(), 0, "");
         CountingData countingData_R2 = new CountingData("", emptyHours.clone(), 0, "");
@@ -36,6 +36,24 @@ public class GetCountDataAndCreateCounts {
         Map<String, Count<Link>> countsResult = new HashMap<>();
 
         int allStations = 0;
+
+        allStations = readData(filePath1, nodeMatcher, countingData_R1, countingData_R2, countsResult, allStations);
+
+        allStations = readData(filePath2, nodeMatcher, countingData_R1, countingData_R2, countsResult, allStations);
+
+        logger.info("################################################");
+        logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
+        logger.info("#\t\t\t All Counts were imported! \t\t\t#");
+        logger.info("#  The dataset  contains " + allStations + " countinstations\t#");
+        logger.info("#\t\t\t  " + countsResult.keySet().size() + " stations were valid!\t\t\t#");
+        logger.info("#\t\t\t " + (allStations - countsResult.keySet().size()) + " stations were invalid!\t\t\t#");
+        logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
+        logger.info("################################################");
+        return countsResult;
+
+    }
+
+    private int readData(String filePath, HashMap nodeMatcher, CountingData countingData_R1, CountingData countingData_R2, Map<String, Count<Link>> countsResult, int allStations) {
 
         try (var reader = new FileReader(filePath)) {
 
@@ -152,6 +170,9 @@ public class GetCountDataAndCreateCounts {
                     // Last day
                     if ((index + 1) % 8760 == 0) {
 
+                        countingData_R1.countHour = countingData_R1.countHour / 24;
+                        countingData_R2.countHour = countingData_R2.countHour / 24;
+
                         for (int i = 0; i < 24; i++) {
 
                             countingData_R1.hour[i] = (countingData_R1.hour[i] / countingData_R1.countHour);
@@ -159,7 +180,7 @@ public class GetCountDataAndCreateCounts {
 
                         }
 
-                        if (!countingData_R1.checksumIsEmpty()) {
+                        if (countingData_R1.checksumIsNotEmpty()) {
 
                             Count<Link> count;
                             var counts = new Counts<Link>();
@@ -186,7 +207,7 @@ public class GetCountDataAndCreateCounts {
                         countingData_R1.hour = emptyHours.clone();
                         countingData_R1.countHour = 0;
 
-                        if (!countingData_R2.checksumIsEmpty()) {
+                        if (countingData_R2.checksumIsNotEmpty()) {
 
                             Count<Link> count;
                             var counts = new Counts<Link>();
@@ -221,17 +242,13 @@ public class GetCountDataAndCreateCounts {
 
             }
 
+        } catch (IOException e) {
+
+            e.printStackTrace();
+
         }
 
-        logger.info("###############################################");
-        logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
-        logger.info("#\t\t\t All Counts were imported! \t\t\t#");
-        logger.info("#\t The dataset  contains " + allStations + "  countinstations\t#");
-        logger.info("#\t\t\t  " + countsResult.keySet().size() + " stations were valid!\t\t\t#");
-        logger.info("#\t\t\t " + (allStations - countsResult.keySet().size()) + " stations were invalid!\t\t\t#");
-        logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
-        logger.info("###############################################");
-        return countsResult;
+        return allStations;
 
     }
 
@@ -284,7 +301,7 @@ public class GetCountDataAndCreateCounts {
 
         }
 
-        private boolean checksumIsEmpty() {
+        private boolean checksumIsNotEmpty() {
 
             Integer result = 0;
 
@@ -294,7 +311,7 @@ public class GetCountDataAndCreateCounts {
 
             }
 
-            return result == 0;
+            return result != 0;
 
         }
 
@@ -307,15 +324,15 @@ public class GetCountDataAndCreateCounts {
         @Override
         public String toString() {
 
-            String result = "";
+            StringBuilder result = new StringBuilder();
 
-            for (int i = 0; i < hour.length; i++) {
+            for (Integer integer : hour) {
 
-                result += hour[i] + ", ";
+                result.append(integer).append(", ");
 
             }
 
-            return "Link ID:\t" + this.linkID + "\tStunden:\t" + result;
+            return "Station ID:   " + this.stationID + "   Link ID:   " + this.linkID + "\t\tCounts per hour:   [" + result.substring(0, (result.length() - 2)) + "]";
 
         }
 

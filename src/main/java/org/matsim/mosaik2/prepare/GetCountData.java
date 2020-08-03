@@ -17,11 +17,11 @@ public class GetCountData {
     private static final Logger logger = Logger.getLogger(CreateCounts.class);
 
     private final Integer[] emptyHours = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    private final String[] R1 = {"KFZ_R1", "K_KFZ_R1", "Lkw_R1", "K_Lkw_R1", "Pkw_R1", "K_Pkw_R1", "Lfw_R1", "K_Lfw_R1",
+    private final String[] R1 = {"KFZ_R1", "K_KFZ_R1", "Lkw_R1", "K_Lkw_R1", "PLZ_R1", "K_PLZ_R1", "Pkw_R1", "K_Pkw_R1", "Lfw_R1", "K_Lfw_R1",
             "Mot_R1", "K_Mot_R1", "PmA_R1", "K_PmA_R1", "Bus_R1", "K_Bus_R1", "LoA_R1", "K_LoA_R1",
             "Lzg_R1", "K_Lzg_R1", "Sat_R1", "K_Sat_R1", "Son_R1", "K_Son_R1"};
 
-    private final String[] R2 = {"PLZ_R2", "K_PLZ_R2", "Pkw_R2", "K_Pkw_R2", "Lfw_R2", "K_Lfw_R2", "Mot_R2", "K_Mot_R2",
+    private final String[] R2 = {"KFZ_R2", "K_KFZ_R2", "Lkw_R2", "K_Lkw_R2", "PLZ_R2", "K_PLZ_R2", "Pkw_R2", "K_Pkw_R2", "Lfw_R2", "K_Lfw_R2", "Mot_R2", "K_Mot_R2",
             "PmA_R2", "K_PmA_R2", "Bus_R2", "K_Bus_R2", "LoA_R2"};
 
     Map<String, CountingData> countData(String filePath1, String filePath2, HashMap nodeMatcher) throws IOException {
@@ -31,9 +31,9 @@ public class GetCountData {
 
         Map<String, CountingData> countHashMap = new HashMap<>();
 
-        readData(filePath2, nodeMatcher, countingData_R1, countingData_R2, countHashMap);
-
         readData(filePath1, nodeMatcher, countingData_R1, countingData_R2, countHashMap);
+
+        readData(filePath2, nodeMatcher, countingData_R1, countingData_R2, countHashMap);
 
         logger.info("###############################################");
         logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
@@ -80,7 +80,10 @@ public class GetCountData {
 
                         switch (record.get("Stunde")) {
                             case ("01"):
+                                countingData_R1.countHour += 1;
+                                countingData_R2.countHour += 1;
                                 addCounts(record, countingData_R1, countingData_R2, 0);
+
                                 break;
                             case ("02"):
                                 addCounts(record, countingData_R1, countingData_R2, 1);
@@ -160,9 +163,6 @@ public class GetCountData {
                     // Last day
                     if ((index + 1) % 8760 == 0) {
 
-                        countingData_R1.countHour = countingData_R1.countHour / 24;
-                        countingData_R2.countHour = countingData_R2.countHour / 24;
-
                         for (int i = 0; i < 24; i++) {
 
                             countingData_R1.hour[i] = (countingData_R1.hour[i] / countingData_R1.countHour);
@@ -187,7 +187,6 @@ public class GetCountData {
 
                         if (countingData_R2.checksumIsNotEmpty()) {
 
-                            System.out.println("Test: " + countingData_R2);
                             countHashMap.put(countingData_R2.stationID, new CountingData(countingData_R2.stationID, countingData_R2.hour.clone(), countingData_R2.countHour, countingData_R2.linkID));
                             logger.info("Added " + countingData_R2.stationID + " with the Link ID " + countingData_R2.linkID + " to the countHashMap.");
 
@@ -219,9 +218,6 @@ public class GetCountData {
 
     private void addCounts(CSVRecord record, CountingData countingData_R1, CountingData countingData_R2, Integer hour) {
 
-        countingData_R1.countHour += 1;
-        countingData_R2.countHour += 1;
-
         for (int i = 0; i <= R1.length - 1; i++) {
 
             if (checkIsCount(record, R1, i)) {
@@ -246,7 +242,7 @@ public class GetCountData {
 
     private boolean checkIsCount(CSVRecord record, String[] types, Integer i) {
 
-        return !trim(record.get(types[i])).equals("s") && !trim(record.get(types[i])).equals("-") && !trim(record.get(types[i])).equals("a") && !trim(record.get(types[i])).equals("x") && !trim(record.get(types[i])).equals("u") && !trim(record.get(types[i])).equals("-1");
+        return !trim(record.get(types[i])).equals("s") && !trim(record.get(types[i])).equals("-") && !trim(record.get(types[i])).equals("a") && !trim(record.get(types[i])).equals("x") && !trim(record.get(types[i])).equals("u") && !trim(record.get(types[i])).equals("-1") && !trim(record.get(types[i])).equals("z");
 
     }
 
@@ -301,6 +297,20 @@ public class GetCountData {
         public Integer getSpecificHour(Integer index) {
 
             return hour[index];
+
+        }
+
+        public Integer dtv() {
+
+            Integer temp = 0;
+
+            for (int i = 0; i < 24; i++) {
+
+                temp += hour[i];
+
+            }
+
+            return temp;
 
         }
 

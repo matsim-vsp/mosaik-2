@@ -86,31 +86,6 @@ public class GetCountDataAndCreateCountsTest extends GetCountDataAndCreateCounts
         assertEquals(Integer.valueOf(2449), resultTest8018_R2.getVolume(4));
          */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     }
 
 }

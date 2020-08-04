@@ -1,6 +1,5 @@
 package org.matsim.mosaik2.prepare;
 
-import org.apache.log4j.Logger;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -8,9 +7,12 @@ import java.util.HashMap;
 
 import static org.junit.Assert.assertEquals;
 
-public class GetCountDataTest {
+/*
+To check the count values, you can use the R project file in the svn repo (.../mosaik-2/raw-data/calibration-data).
+The R project count the average vehicles per direction for a single count station per hour.
+ */
 
-    private static final Logger logger = Logger.getLogger(NodeMatcherTest.class);
+public class GetCountDataTest {
 
     @Test
     public void countData() throws IOException {

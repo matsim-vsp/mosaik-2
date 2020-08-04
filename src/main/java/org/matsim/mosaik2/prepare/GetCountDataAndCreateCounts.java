@@ -35,25 +35,20 @@ public class GetCountDataAndCreateCounts {
 
         Map<String, Count<Link>> countsResult = new HashMap<>();
 
-        int allStations = 0;
+        readData(filePath1, nodeMatcher, countingData_R1, countingData_R2, countsResult);
 
-        allStations = readData(filePath1, nodeMatcher, countingData_R1, countingData_R2, countsResult, allStations);
-
-        allStations = readData(filePath2, nodeMatcher, countingData_R1, countingData_R2, countsResult, allStations);
+        readData(filePath2, nodeMatcher, countingData_R1, countingData_R2, countsResult);
 
         logger.info("################################################");
         logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
         logger.info("#\t\t\t All Counts were imported! \t\t\t#");
-        logger.info("#  The dataset  contains " + allStations + " countinstations\t#");
-        logger.info("#\t\t\t  " + countsResult.keySet().size() + " stations were valid!\t\t\t#");
-        logger.info("#\t\t\t " + (allStations - countsResult.keySet().size()) + " stations were invalid!\t\t\t#");
         logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
         logger.info("################################################");
         return countsResult;
 
     }
 
-    private int readData(String filePath, HashMap nodeMatcher, CountingData countingData_R1, CountingData countingData_R2, Map<String, Count<Link>> countsResult, int allStations) {
+    private void readData(String filePath, HashMap nodeMatcher, CountingData countingData_R1, CountingData countingData_R2, Map<String, Count<Link>> countsResult) {
 
         try (var reader = new FileReader(filePath)) {
 
@@ -79,8 +74,6 @@ public class GetCountDataAndCreateCounts {
                         countingData_R2.stationID = record.get("Zst");
                         countingData_R2.stationID = countingData_R2.stationID + "_R2";
                         countingData_R2.linkID = nodeMatcher.get(countingData_R2.stationID).toString();
-
-                        allStations += 2;
 
                         logger.info("Found new countstaion: " + record.get("Zst"));
 
@@ -246,8 +239,6 @@ public class GetCountDataAndCreateCounts {
             e.printStackTrace();
 
         }
-
-        return allStations;
 
     }
 

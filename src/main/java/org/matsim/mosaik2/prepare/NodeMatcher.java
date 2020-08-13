@@ -12,9 +12,9 @@ import java.util.Map;
 
 public class NodeMatcher {
 
-    Map<String, matchedLinkID> parseNodeMatching(String filePath) throws IOException {
+    Map<String, MatchedLinkID> parseNodeMatching(String filePath) throws IOException {
 
-        Map<String, matchedLinkID> hashMap = new HashMap<>();
+        Map<String, MatchedLinkID> hashMap = new HashMap<>();
 
         try (var reader = new FileReader(filePath)) {
 
@@ -33,7 +33,7 @@ public class NodeMatcher {
                     var toID_1 = record.get("Node_to_R1");
                     var linkID_1 = record.get("Link_ID_R1");
 
-                    var matchedCount1 = new matchedLinkID(fromID_1, toID_1, linkID_1);
+                    var matchedCount1 = new MatchedLinkID(fromID_1, toID_1, linkID_1);
 
                     hashMap.put(dzNumber_1, matchedCount1);
 
@@ -42,7 +42,7 @@ public class NodeMatcher {
                     var toID_2 = record.get("Node_to_R2");
                     var linkID_2 = record.get("Link_ID_R2");
 
-                    var matchedCount2 = new matchedLinkID(fromID_2, toID_2, linkID_2);
+                    var matchedCount2 = new MatchedLinkID(fromID_2, toID_2, linkID_2);
 
                     hashMap.put(dzNumber_2, matchedCount2);
 
@@ -51,16 +51,15 @@ public class NodeMatcher {
         }
 
         return hashMap;
-
     }
 
-    static class matchedLinkID {
+    static class MatchedLinkID {
 
         private final String fromID;
         private final String toID;
         private final String linkID;
 
-        public matchedLinkID(String fromID, String toID, String linkID) {
+        public MatchedLinkID(String fromID, String toID, String linkID) {
 
             this.fromID = fromID;
             this.toID = toID;

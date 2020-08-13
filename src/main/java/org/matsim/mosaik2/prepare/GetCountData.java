@@ -5,9 +5,12 @@ import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.log4j.Logger;
 
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.apache.commons.lang3.StringUtils.trim;
@@ -24,16 +27,46 @@ public class GetCountData {
     private final String[] R2 = {"KFZ_R2", "K_KFZ_R2", "Lkw_R2", "K_Lkw_R2", "PLZ_R2", "K_PLZ_R2", "Pkw_R2", "K_Pkw_R2", "Lfw_R2", "K_Lfw_R2", "Mot_R2", "K_Mot_R2",
             "PmA_R2", "K_PmA_R2", "Bus_R2", "K_Bus_R2", "LoA_R2"};
 
-    Map<String, CountingData> countData(String filePath1, String filePath2, HashMap nodeMatcher) throws IOException {
+    Map<String, CountingData> countData(String filePath1, String filePath2, Map<String, NodeMatcher.MatchedLinkID> nodeMatcher) throws IOException {
 
         CountingData countingData_R1 = new CountingData("", emptyHours.clone(), 0, "");
         CountingData countingData_R2 = new CountingData("", emptyHours.clone(), 0, "");
 
         Map<String, CountingData> countHashMap = new HashMap<>();
 
-        readData(filePath1, nodeMatcher, countingData_R1, countingData_R2, countHashMap);
+        var result1 = readData(filePath1, nodeMatcher);
 
-        readData(filePath2, nodeMatcher, countingData_R1, countingData_R2, countHashMap);
+        var result2 = readData(filePath2, nodeMatcher);
+
+        // merge two datasets
+        for (Map.Entry<String, CountingData2> entry : result1.entrySet()) {
+
+            var countData = result2.get(entry.getKey());
+            for (var hourEntry : entry.getValue().values.entrySet()) {
+                var hour = hourEntry.getKey();
+
+                for (var value : hourEntry.getValue()) {
+                    countData.addValue(hour, value);
+                }
+            }
+        }
+
+      // convert into counts now
+        for (var entry : result1.entrySet()) {
+            
+            var id = entry.getKey();
+
+            // create a counting station with this id
+
+            for (var hourEntry: entry.getValue().values.entrySet()) {
+                var hour = hourEntry.getKey();
+                var average = entry.getValue().averageForHour(hour);
+
+                // add average value to counting station
+            }
+        }
+
+        // do something to merge those counts
 
         logger.info("###############################################");
         logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
@@ -45,7 +78,42 @@ public class GetCountData {
 
     }
 
-    private void readData(String filePath, HashMap nodeMatcher, CountingData countingData_R1, CountingData countingData_R2, Map<String, CountingData> countHashMap) {
+    private Map<String, CountingData2> readData(String filePath, Map<String, NodeMatcher.MatchedLinkID> nodeMatcher) throws IOException {
+
+        Map<String, CountingData2> data = new HashMap<>();
+
+        try (var reader = new FileReader(filePath)) {
+            try(var parser = CSVFormat.newFormat(';').withAllowMissingColumnNames().withFirstRecordAsHeader().parse(reader)) {
+
+                for (var record: parser) {
+
+                    var idR1 = record.get("Zst") + "_R1";
+                    var idR2 = record.get("Zst") + "_R2";
+                    if (nodeMatcher.containsKey(idR1) || nodeMatcher.containsKey(idR2) &&
+                            record.get("Wotag").trim().equals("2") || record.get("Wotag").trim().equals("3") || record.get("Wotag").trim().equals("4")){
+
+                        // direction 1
+                        var linkId = nodeMatcher.get(idR1).getLinkID();
+                        var countData = data.computeIfAbsent(idR1 + "_R1", key -> new CountingData2(key, linkId));
+
+                        // get the hourly count value
+                        var day = record.get("Wotag");
+                        var hour = record.get("Stunde");
+                        var value = Integer.parseInt(record.get("PLZ_R1"));
+
+                        countData.addValue(hour, value);
+                    }
+                }
+            }
+        }
+
+        return data;
+
+
+
+
+
+/*
 
         try (var reader = new FileReader(filePath)) {
 
@@ -213,6 +281,8 @@ public class GetCountData {
             e.printStackTrace();
 
         }
+        */
+
 
     }
 
@@ -244,6 +314,35 @@ public class GetCountData {
 
         return !trim(record.get(types[i])).equals("s") && !trim(record.get(types[i])).equals("-") && !trim(record.get(types[i])).equals("a") && !trim(record.get(types[i])).equals("x") && !trim(record.get(types[i])).equals("u") && !trim(record.get(types[i])).equals("-1") && !trim(record.get(types[i])).equals("z");
 
+    }
+
+    static class CountingData2 {
+
+        private final String stationId;
+        private final String linkId;
+        private final Map<String,  List<Integer>> values = new HashMap<>();
+
+        public CountingData2(String stationId, String linkId) {
+            this.stationId = stationId;
+            this.linkId = linkId;
+        }
+
+        void addValue(String hour, int value) {
+            values.computeIfAbsent(hour, k -> new ArrayList<>()).add(value);
+        }
+
+        double averageForHour(String hour) {
+
+            var numberOfValues = 0;
+            var sum = 0.0;
+
+            for (var value : values.get(hour)) {
+                sum += value;
+                numberOfValues++;
+            }
+
+            return sum / numberOfValues;
+        }
     }
 
     static class CountingData {

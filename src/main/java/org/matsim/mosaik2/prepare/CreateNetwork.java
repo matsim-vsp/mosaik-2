@@ -39,7 +39,7 @@ public class CreateNetwork {
 				new Coordinate(395063.25, 5564101.5),
 				new Coordinate(395063.25, 5348301),
 				new Coordinate(660442.25, 5348301),
-				new Coordinate(660442.25, 395063.25),
+				new Coordinate(660442.25, 5564101.5),
 				new Coordinate(395063.25, 5564101.5)
 		});
 

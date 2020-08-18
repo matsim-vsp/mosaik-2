@@ -36,7 +36,11 @@ public class CreateNetwork {
 
 		var gFactory = new GeometryFactory();
 		var geometry = gFactory.createPolygon(new Coordinate[]{
-				new Coordinate(0, 0)
+				new Coordinate(395063.25, 5564101.5),
+				new Coordinate(395063.25, 5348301),
+				new Coordinate(660442.25, 5348301),
+				new Coordinate(660442.25, 5564101.5),
+				new Coordinate(395063.25, 5564101.5)
 		});
 
 		var pFactory = new PreparedGeometryFactory();
@@ -46,9 +50,9 @@ public class CreateNetwork {
 	private static class InputArgs {
 
 		@Parameter(names = {"-input"}, required = true)
-		String inputFile = "";
+		String inputFile = "Input/europe-latest.osm.pbf";
 
 		@Parameter(names = {"-output"}, required = true)
-		String outputFile = "";
+		String outputFile = "Output/Network.xml.gz";
 	}
 }

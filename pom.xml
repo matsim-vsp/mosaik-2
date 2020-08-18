@@ -53,6 +53,14 @@
             <version>${matsim.version}</version>
         </dependency>
 
+        <!-- gtfs parsing: replace with release when possible -->
+        <dependency>
+            <groupId>com.github.matsim-org</groupId>
+            <artifactId>gtfs2matsim</artifactId>
+            <version>-SNAPSHOT</version>
+        </dependency>
+
+
         <!-- netcdf support -->
         <dependency>
             <groupId>edu.ucar</groupId>
@@ -143,6 +151,7 @@
             <url>https://oss.jfrog.org/libs-snapshot</url>
         </repository>
 
+        <!-- network reader dependencies -->
         <repository>
             <id>topobyte</id>
             <url>http://mvn.topobyte.de</url>
@@ -150,6 +159,12 @@
         <repository>
             <id>slimjars</id>
             <url>http://mvn.slimjars.com</url>
+        </repository>
+
+        <!-- stuff from github -->
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
     </repositories>
 

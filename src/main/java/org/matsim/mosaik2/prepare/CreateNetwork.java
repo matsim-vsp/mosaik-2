@@ -2,18 +2,14 @@ package org.matsim.mosaik2.prepare;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
-import lombok.Getter;
-import lombok.ToString;
 import lombok.extern.log4j.Log4j2;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
-import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.NetworkWriter;
-import org.matsim.api.core.v01.network.Node;
 import org.matsim.contrib.osm.networkReader.SupersonicOsmNetworkReader;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.network.io.MatsimNetworkReader;
@@ -22,18 +18,13 @@ import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 
 import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import java.util.stream.Collector;
 
 @Log4j2
 public class CreateNetwork {
 
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:4326", "EPSG:25832");
     private static final String senozonNetworkPath = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland\\optimizedNetwork.xml.gz";
-    private static final String outputNetwork = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\stuttgart-network-xml.gz";
+    private static final String outputNetwork = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\network-stuttgart.xml.gz";
     private static final String osmFile = "projects\\mosaik-2\\raw-data\\osm\\germany-20200715.osm.pbf";
 
     public static void main(String[] args) {
@@ -100,23 +91,6 @@ public class CreateNetwork {
 
         var pFactory = new PreparedGeometryFactory();
         return pFactory.create(geometry);
-    }
-
-    @Getter
-    @ToString
-    public static class BoundingBox {
-
-        private double minX = Double.POSITIVE_INFINITY;
-        private double minY = Double.POSITIVE_INFINITY;
-        private double maxX = Double.NEGATIVE_INFINITY;
-        private double maxY = Double.NEGATIVE_INFINITY;
-
-        public synchronized void adjust(Coord coord) {
-            if (minX > coord.getX()) minX = coord.getX();
-            if (minY > coord.getY()) minY = coord.getY();
-            if (maxX < coord.getX()) maxX = coord.getX();
-            if (maxY < coord.getY()) maxY = coord.getY();
-        }
     }
 
     private static class InputArgs {

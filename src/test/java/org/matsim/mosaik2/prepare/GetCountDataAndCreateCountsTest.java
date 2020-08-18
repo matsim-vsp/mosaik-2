@@ -1,16 +1,12 @@
 package org.matsim.mosaik2.prepare;
 
 import org.junit.Test;
-import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.counts.Count;
-import org.matsim.counts.Counts;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-
-import static org.junit.Assert.*;
 
 public class GetCountDataAndCreateCountsTest extends GetCountDataAndCreateCounts {
 
@@ -40,7 +36,8 @@ public class GetCountDataAndCreateCountsTest extends GetCountDataAndCreateCounts
 
         Map<String, Count<Link>> countsResult = new HashMap<>();
 
-        for (Map.Entry<String, GetCountData.CountingData> longTermBAStCounts : longTermResult.entrySet()) {
+        /*
+        for (Object longTermBAStCounts : longTermResult.entrySet()) {
 
             Count<Link> count;
             var counts = new Counts<Link>();
@@ -60,6 +57,8 @@ public class GetCountDataAndCreateCountsTest extends GetCountDataAndCreateCounts
             countsResult.put(stationID, count);
 
         }
+
+         */
 
         // Überprüfen
         /*

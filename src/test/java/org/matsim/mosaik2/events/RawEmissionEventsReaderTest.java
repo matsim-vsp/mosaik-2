@@ -43,7 +43,7 @@ public class RawEmissionEventsReaderTest {
             fail();
         }).readFile(eventsUrl.toString());
 
-        // this test passes if the in the callback 'fail()' is not reached.
+        // this test passes if the 'fail()' in the callback  is not reached.
     }
 
     @Test

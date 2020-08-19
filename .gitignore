@@ -29,5 +29,11 @@ hs_err_pid*
 *.iml
 .idea
 
+#eclipse
+.settings
+/bin
+.project
+.classpath
+
 # test files
 /test/output

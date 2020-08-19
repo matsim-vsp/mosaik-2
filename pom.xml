@@ -9,7 +9,7 @@
     <version>0.0.1-SNAPSHOT</version>
 
     <properties>
-        <matsim.version>12.0-SNAPSHOT</matsim.version>
+        <matsim.version>13.0-SNAPSHOT</matsim.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.source>11</maven.compiler.source>
@@ -48,21 +48,45 @@
             <version>${matsim.version}</version>
         </dependency>
         <dependency>
+            <groupId>org.matsim.contrib</groupId>
+            <artifactId>osm</artifactId>
+            <version>${matsim.version}</version>
+        </dependency>
+
+        <!-- gtfs parsing: replace with release when possible -->
+        <dependency>
+            <groupId>com.github.matsim-org</groupId>
+            <artifactId>gtfs2matsim</artifactId>
+            <version>12.2</version>
+        </dependency>
+
+
+        <!-- netcdf support -->
+        <dependency>
+            <groupId>edu.ucar</groupId>
+            <artifactId>cdm</artifactId>
+            <version>5.0.0</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
             <version>4.12</version>
             <scope>test</scope>
         </dependency>
+
+        <!-- convenience -->
         <dependency>
             <groupId>com.beust</groupId>
             <artifactId>jcommander</artifactId>
             <version>1.71</version>
         </dependency>
         <dependency>
-            <groupId>org.jetbrains</groupId>
-            <artifactId>annotations</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
-            <scope>compile</scope>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.12</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -125,6 +149,22 @@
             <!-- For MATSim snapshots: -->
             <id>ojo-snapshots</id>
             <url>https://oss.jfrog.org/libs-snapshot</url>
+        </repository>
+
+        <!-- network reader dependencies -->
+        <repository>
+            <id>topobyte</id>
+            <url>http://mvn.topobyte.de</url>
+        </repository>
+        <repository>
+            <id>slimjars</id>
+            <url>http://mvn.slimjars.com</url>
+        </repository>
+
+        <!-- stuff from github -->
+        <repository>
+            <id>jitpack.io</id>
+            <url>https://jitpack.io</url>
         </repository>
     </repositories>
 

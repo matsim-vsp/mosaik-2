@@ -2,6 +2,13 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import de.topobyte.osm4j.core.access.OsmHandler;
+import de.topobyte.osm4j.core.access.OsmInputException;
+import de.topobyte.osm4j.core.model.iface.OsmBounds;
+import de.topobyte.osm4j.core.model.iface.OsmNode;
+import de.topobyte.osm4j.core.model.iface.OsmRelation;
+import de.topobyte.osm4j.core.model.iface.OsmWay;
+import de.topobyte.osm4j.pbf.seq.PbfReader;
 import gnu.trove.map.TObjectDoubleMap;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
 import org.apache.log4j.Logger;
@@ -26,8 +33,14 @@ import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.mosaik2.events.RawEmissionEventsReader;
 
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -48,14 +61,14 @@ public class WriteChemistryInputForErnsReuterSample {
     @Parameter(names = "-o", required = true)
     private String outputFile = "";
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws FileNotFoundException, OsmInputException {
 
         var writer = new WriteChemistryInputForErnsReuterSample();
         JCommander.newBuilder().addObject(writer).build().parse(args);
         writer.write2();
     }
 
-    private void write2() {
+    private void write2() throws FileNotFoundException, OsmInputException {
 
         var network = NetworkUtils.readNetwork(networkFile);
         var bounds = createBoundingBox();
@@ -66,6 +79,9 @@ public class WriteChemistryInputForErnsReuterSample {
                 .map(link -> transformLink(link, originUTM33, network.getFactory()))
                 .filter(link -> isCoveredBy(link, bounds))
                 .collect(NetworkUtils.getCollector());
+
+        var linkToOriginalWay = NetworkUnsimplifier.filterNodesFromOsmFile("", filteredNetwork, "EPSG:25833");
+
 
         // read emissions into time bins sorted by pollutant and link id
         TimeBinMap<Map<Pollutant, TObjectDoubleMap<Id<Link>>>> timeBinMap = new TimeBinMap<>(timeBinSize);

@@ -2,87 +2,77 @@ package org.matsim.mosaik2.prepare;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
-import org.matsim.counts.Count;
 import org.matsim.counts.Counts;
+import org.matsim.counts.CountsWriter;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
 
 public class CreateCounts {
 
-    private static final Logger logger = Logger.getLogger(CreateCounts.class);
+	private static final Logger logger = Logger.getLogger(CreateCounts.class);
 
-    // Windows path: "projects\mosaik-2\raw-data\calibration-data\"
-    // private static final Path longTermCountsRootFederalRoad = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\long-term-counts-federal-road.txt");
-    // private static final Path longTermCountsRootHighway = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\long-term-counts-highway.txt");
-    // private static final Path longTermCountsIdMapping = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\countstation-osm-node-matching.csv");
+	// Windows path: "projects\mosaik-2\raw-data\calibration-data\"
+	// private static final Path longTermCountsRootFederalRoad = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\long-term-counts-federal-road.txt");
+	// private static final Path longTermCountsRootHighway = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\long-term-counts-highway.txt");
+	// private static final Path longTermCountsIdMapping = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\countstation-osm-node-matching.csv");
 
-    private static final Path longTermCountsRootFederalRoad = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-federal-road.txt");
-    private static final Path longTermCountsRootHighway = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-highway.txt");
-    private static final Path longTermCountsIdMapping = Paths.get("projects/mosaik-2/raw-data/calibration-data/countstation-osm-node-matching.csv");
+	private static final Path longTermCountsRootFederalRoad = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-federal-road.txt");
+	private static final Path longTermCountsRootHighway = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-highway.txt");
+	private static final Path longTermCountsIdMapping = Paths.get("projects/mosaik-2/raw-data/calibration-data/countstation-osm-node-matching.csv");
 
-    public static void main(String[] args) throws IOException {
+	private static final Path outputCounts = Paths.get("projects/mosaik-2/matsim-input-filesstuttgart-inkl-umland/counts-stuttgart.xml.gz");
 
-        logger.info("Program starts!");
+	public static void main(String[] args) throws IOException {
 
-        var input = new InputArguments();
-        JCommander.newBuilder().addObject(input).build().parse(args);
+		logger.info("Program starts!");
 
-        if (Files.exists(Paths.get((input.sharedSvn + longTermCountsIdMapping))) && Files.exists(Paths.get((input.sharedSvn + longTermCountsRootHighway))) && Files.exists(Paths.get((input.sharedSvn + longTermCountsRootFederalRoad)))) {
+		var input = new InputArguments();
+		JCommander.newBuilder().addObject(input).build().parse(args);
 
-            var matching = new NodeMatcher();
-            var matchingResult = matching.parseNodeMatching(input.sharedSvn + longTermCountsIdMapping);
+		if (!testInputFiles(input)) {
+			throw new RuntimeException("NO!");
+		}
 
-            logger.info("Finished with matching nodes.");
+		var matching = new NodeMatcher();
+		var matchingResult = matching.parseNodeMatching(input.sharedSvn + longTermCountsIdMapping);
 
-            var longTerm = new GetCountData();
-            var longTermResult = longTerm.countData(input.sharedSvn + longTermCountsRootFederalRoad, input.sharedSvn + longTermCountsRootHighway, (HashMap) matchingResult);
+		logger.info("Finished with matching nodes.");
 
-            Map<String, Count<Link>> countsResult = new HashMap<>();
+		var longTerm = new GetCountData();
+		var longTermResult = longTerm.countData(input.sharedSvn + longTermCountsRootFederalRoad, input.sharedSvn + longTermCountsRootHighway, matchingResult);
 
-            for (Object data : longTermResult.entrySet()) {
+		var counts = new Counts<Link>();
+		counts.setYear(2018);
 
-                Count<Link> count;
-                var counts = new Counts<Link>();
-                counts.setYear(2018);
+		for (var data : longTermResult.entrySet()) {
 
-                String stationID = data.getKey();
-                GetCountData.CountingData value = data.getValue();
+			GetCountData.CountingData value = data.getValue();
 
-                count = counts.createAndAddCount(Id.createLinkId(value.getLinkID()), stationID);
+			var count = counts.createAndAddCount(Id.createLinkId(value.getLinkId()), data.getValue().getStationId());
 
+			for (var hour : data.getValue().getObvservedHours()) {
 
-                for (Object station : data.result.entrySet()) {
+				var hourlyValue = data.getValue().averageForHour(hour);
+				count.createVolume(Integer.parseInt(hour), hourlyValue);
+			}
+		}
 
-                    count.createVolume(Integer.parseInt(StringUtils.stripStart(station.getKey(), "0")), station.getValue());
+		new CountsWriter(counts).write(input.sharedSvn + outputCounts);
+	}
 
-                }
+	private static boolean testInputFiles(InputArguments input) {
+		return Files.exists(Paths.get((input.sharedSvn + longTermCountsIdMapping))) && Files.exists(Paths.get((input.sharedSvn + longTermCountsRootHighway))) && Files.exists(Paths.get((input.sharedSvn + longTermCountsRootFederalRoad)));
+	}
 
-                countsResult.put(stationID, count);
+	static class InputArguments {
 
-            }
-
-        } else {
-
-            logger.error("One of the specified paths does not exists!");
-
-        }
-
-    }
-
-    static class InputArguments {
-
-        @Parameter(names = {"-sharedsvn", "-s"}, description = "Path to the sharedSVN folder", required = true)
-        private final String sharedSvn = "";
-
-    }
-
+		@Parameter(names = {"-sharedsvn", "-s"}, description = "Path to the sharedSVN folder", required = true)
+		private final String sharedSvn = "";
+	}
 }

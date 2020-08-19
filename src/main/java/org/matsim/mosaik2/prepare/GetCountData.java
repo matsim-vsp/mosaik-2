@@ -1,11 +1,18 @@
 package org.matsim.mosaik2.prepare;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVRecord;
 import org.apache.log4j.Logger;
 
 import java.io.FileReader;
 import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class GetCountData {
 
@@ -17,9 +24,7 @@ public class GetCountData {
 		var result2 = readData(filePath2, nodeMatcher);
 
 		for (var entry : result1.entrySet()) {
-
 			result2.put(entry.getKey(), entry.getValue());
-
 		}
 
 		logger.info("###############################################");
@@ -29,7 +34,6 @@ public class GetCountData {
 		logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
 		logger.info("###############################################");
 		return result2;
-
 	}
 
 	private Map<String, CountingData> readData(String filePath, Map<String, NodeMatcher.MatchedLinkID> nodeMatcher) throws IOException {
@@ -43,10 +47,9 @@ public class GetCountData {
 
 					var idR1 = record.get("Zst") + "_R1";
 					var idR2 = record.get("Zst") + "_R2";
-					if (nodeMatcher.containsKey(idR1) && nodeMatcher.containsKey(idR2) &&
-							(record.get("Wotag").trim().equals("2") || record.get("Wotag").trim().equals("3") || record.get("Wotag").trim().equals("4"))) {
+					if (containsNode(nodeMatcher, idR1, idR2) && isIntresstingWeekday(record)) {
 
-						if (!record.get("PLZ_R1").trim().equals("-1") && !record.get("PLZ_R1").trim().equals("0")) {
+						if (isValid(record, "PLZ_R1")) {
 
 							var linkId1 = nodeMatcher.get(idR1).getLinkID();
 							var countData1 = data.computeIfAbsent(idR1, key -> new CountingData(key, linkId1));
@@ -58,7 +61,7 @@ public class GetCountData {
 
 						}
 
-						if (!record.get("PLZ_R2").trim().equals("-1") && !record.get("PLZ_R2").trim().equals("0")) {
+						if (isValid(record, "PLZ_R2")) {
 
 							var linkId2 = nodeMatcher.get(idR2).getLinkID();
 							var countData2 = data.computeIfAbsent(idR2, key -> new CountingData(key, linkId2));
@@ -69,13 +72,9 @@ public class GetCountData {
 							countData2.addValue(hour, value2);
 
 						}
-
 					}
-
 				}
-
 			}
-
 		}
 
 		for (Map.Entry<String, CountingData> value : data.entrySet()) {
@@ -85,40 +84,33 @@ public class GetCountData {
 				value.getValue().result.put(count.getKey(), value.getValue().averageForHour(count.getKey()));
 
 			}
-
 		}
 
 		return data;
 
 	}
 
+	private boolean isIntresstingWeekday(CSVRecord record) {
+		return record.get("Wotag").trim().equals("2") || record.get("Wotag").trim().equals("3") || record.get("Wotag").trim().equals("4");
+	}
+
+	private boolean containsNode(Map<String, NodeMatcher.MatchedLinkID> nodeMatcher, String idR1, String idR2) {
+		return nodeMatcher.containsKey(idR1) && nodeMatcher.containsKey(idR2);
+	}
+
+	private boolean isValid(CSVRecord record, String plz_r2) {
+		return !record.get(plz_r2).trim().equals("-1") && !record.get(plz_r2).trim().equals("0");
+	}
+
+	@Getter
+	@RequiredArgsConstructor
+	@ToString
 	static class CountingData {
 
 		private final String stationId;
 		private final String linkId;
 		private final Map<String, List<Integer>> values = new HashMap<>();
 		private final Map<String, Integer> result = new HashMap<>();
-
-		public CountingData(String stationId, String linkId) {
-			this.stationId = stationId;
-			this.linkId = linkId;
-		}
-
-		public String getLinkId() {
-			return linkId;
-		}
-
-		public String getStationId() {
-			return stationId;
-		}
-
-		public Set<String> getObvservedHours() {
-			return values.keySet();
-		}
-
-		public Map<String, List<Integer>> getValues() {
-			return values;
-		}
 
 		void addValue(String hour, int value) {
 			values.computeIfAbsent(hour, k -> new ArrayList<>()).add(value);
@@ -132,13 +124,7 @@ public class GetCountData {
 				sum += value;
 			}
 
-			return sum / values.size();
-		}
-
-		@Override
-		public String toString() {
-
-			return result.toString();
+			return sum / values.get(hour).size();
 		}
 	}
 }

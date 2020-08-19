@@ -1,5 +1,7 @@
 package org.matsim.mosaik2.prepare;
 
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
@@ -14,7 +16,7 @@ public class NodeMatcher {
 
     Map<String, MatchedLinkID> parseNodeMatching(String filePath) throws IOException {
 
-        Map<String, MatchedLinkID> hashMap = new HashMap<>();
+        Map<String, MatchedLinkID> result = new HashMap<>();
 
         try (var reader = new FileReader(filePath)) {
 
@@ -35,7 +37,7 @@ public class NodeMatcher {
 
                     var matchedCount1 = new MatchedLinkID(fromID_1, toID_1, linkID_1);
 
-                    hashMap.put(dzNumber_1, matchedCount1);
+                    result.put(dzNumber_1, matchedCount1);
 
                     var dzNumber_2 = record.get("DZ_Nr") + "_R2";
                     var fromID_2 = record.get("Node_from_R2");
@@ -44,55 +46,39 @@ public class NodeMatcher {
 
                     var matchedCount2 = new MatchedLinkID(fromID_2, toID_2, linkID_2);
 
-                    hashMap.put(dzNumber_2, matchedCount2);
+                    result.put(dzNumber_2, matchedCount2);
 
                 }
-
         }
 
-        return hashMap;
+        return result;
     }
 
+    @Getter
+    @RequiredArgsConstructor
     static class MatchedLinkID {
 
         private final String fromID;
         private final String toID;
         private final String linkID;
 
-        public MatchedLinkID(String fromID, String toID, String linkID) {
-
-            this.fromID = fromID;
-            this.toID = toID;
-            this.linkID = linkID;
-
-        }
-
         public String getLinkID() {
-
             return linkID;
-
         }
 
         public String getFromID() {
-
             return fromID;
-
         }
 
         public String getToID() {
-
             return toID;
-
         }
 
         @Override
         public String toString() {
 
-            // return "Link_ID: " + this.linkID + "; Node_from_ID: " + this.fromID + "; Node_to_ID: " + this.toID;
             return this.linkID;
 
         }
-
     }
-
 }

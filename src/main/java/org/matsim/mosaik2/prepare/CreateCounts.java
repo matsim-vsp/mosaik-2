@@ -2,6 +2,7 @@ package org.matsim.mosaik2.prepare;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
@@ -17,16 +18,11 @@ public class CreateCounts {
 
 	private static final Logger logger = Logger.getLogger(CreateCounts.class);
 
-	// Windows path: "projects\mosaik-2\raw-data\calibration-data\"
-	// private static final Path longTermCountsRootFederalRoad = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\long-term-counts-federal-road.txt");
-	// private static final Path longTermCountsRootHighway = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\long-term-counts-highway.txt");
-	// private static final Path longTermCountsIdMapping = Paths.get("\\projects\\mosaik-2\\raw-data\\calibration-data\\countstation-osm-node-matching.csv");
-
 	private static final Path longTermCountsRootFederalRoad = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-federal-road.txt");
 	private static final Path longTermCountsRootHighway = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-highway.txt");
 	private static final Path longTermCountsIdMapping = Paths.get("projects/mosaik-2/raw-data/calibration-data/countstation-osm-node-matching.csv");
 
-	private static final Path outputCounts = Paths.get("projects/mosaik-2/matsim-input-filesstuttgart-inkl-umland/counts-stuttgart.xml.gz");
+	private static final Path outputCounts = Paths.get("projects/mosaik-2/matsim-input-files/stuttgart-inkl-umland-vsp/counts-stuttgart.xml.gz");
 
 	public static void main(String[] args) throws IOException {
 
@@ -56,23 +52,26 @@ public class CreateCounts {
 
 			var count = counts.createAndAddCount(Id.createLinkId(value.getLinkId()), data.getValue().getStationId());
 
-			for (var hour : data.getValue().getObvservedHours()) {
+			System.out.println(data.getValue().getStationId());
 
-				var hourlyValue = data.getValue().averageForHour(hour);
-				count.createVolume(Integer.parseInt(hour), hourlyValue);
+			for (var hour : data.getValue().getResult().keySet()) {
+
+				count.createVolume(Integer.parseInt(StringUtils.stripStart(hour, "0")), data.getValue().getResult().get(hour));
+
 			}
+			logger.info("Create new count object! Station ID: " + value.getStationId() + "  Link ID: " + value.getLinkId() + "  Counts: " + value.getResult());
 		}
 
 		new CountsWriter(counts).write(input.sharedSvn + outputCounts);
 	}
 
 	private static boolean testInputFiles(InputArguments input) {
-		return Files.exists(Paths.get((input.sharedSvn + longTermCountsIdMapping))) && Files.exists(Paths.get((input.sharedSvn + longTermCountsRootHighway))) && Files.exists(Paths.get((input.sharedSvn + longTermCountsRootFederalRoad)));
+		return Files.exists(Paths.get(input.sharedSvn + longTermCountsIdMapping)) && Files.exists(Paths.get(input.sharedSvn + longTermCountsRootHighway)) && Files.exists(Paths.get(input.sharedSvn + outputCounts));
 	}
 
 	static class InputArguments {
 
 		@Parameter(names = {"-sharedsvn", "-s"}, description = "Path to the sharedSVN folder", required = true)
-		private final String sharedSvn = "";
+		private String sharedSvn;
 	}
 }

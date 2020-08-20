@@ -7,7 +7,6 @@ import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.contrib.gtfs.GtfsConverter;
 import org.matsim.core.config.ConfigUtils;
-import org.matsim.core.network.io.MatsimNetworkReader;
 import org.matsim.core.network.io.NetworkWriter;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
@@ -30,9 +29,9 @@ public class CreatePt {
     private static final String regionalSchedule = "projects\\mosaik-2\\raw-data\\gtfs\\regional_sbahn_gtfs_20200818.zip";
     private static final String localSchedule = "projects\\mosaik-2\\raw-data\\gtfs\\nahverkehr_gtfs_20200818.zip";
     private static final String networkFile = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\network-stuttgart.xml.gz";
-    private static final String outputSchedule = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\transit-schedule-stuttgart.xml.gz";
-    private static final String outputVehicles = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\transit-vehicles-stuttgart.xml.gz";
-    private static final String outputNetwork = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\network-with-pt-stuttgart.xml.gz";
+    public static final String outputSchedule = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\transit-schedule-stuttgart.xml.gz";
+    public static final String outputVehicles = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\transit-vehicles-stuttgart.xml.gz";
+    public static final String outputNetwork = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\network-with-pt-stuttgart.xml.gz";
 
     public static void main(String[] args) {
 
@@ -40,19 +39,29 @@ public class CreatePt {
         JCommander.newBuilder().addObject(arguments).build().parse(args);
 
         var scenario = ScenarioUtils.createScenario(ConfigUtils.createConfig());
-        new MatsimNetworkReader(scenario.getNetwork()).readFile(arguments.sharedSvn + networkFile);
 
-        var bbox = BoundingBox.fromNetwork(scenario.getNetwork()).toGeometry();
-
-        parseGtfsFeed(scenario, Paths.get(arguments.sharedSvn, localSchedule), bbox);
-        parseGtfsFeed(scenario, Paths.get(arguments.sharedSvn, regionalSchedule), bbox);
-
-        new CreatePseudoNetwork(scenario.getTransitSchedule(), scenario.getNetwork(), "pt_").createNetwork();
-        new CreateVehiclesForSchedule(scenario.getTransitSchedule(), scenario.getTransitVehicles()).run();
+        createSchedule(scenario, Paths.get(arguments.sharedSvn));
 
         new TransitScheduleWriter(scenario.getTransitSchedule()).writeFile(arguments.sharedSvn + outputSchedule);
         new MatsimVehicleWriter(scenario.getTransitVehicles()).writeFile(arguments.sharedSvn + outputVehicles);
         new NetworkWriter(scenario.getNetwork()).write(arguments.sharedSvn + outputNetwork);
+    }
+
+    public static void createSchedule(Scenario scenario, Path svn) {
+
+        var bbox = BoundingBox.fromNetwork(scenario.getNetwork()).toGeometry();
+
+        parseGtfsFeed(scenario, svn.resolve(localSchedule), bbox);
+        parseGtfsFeed(scenario, svn.resolve(regionalSchedule), bbox);
+
+        new CreatePseudoNetwork(scenario.getTransitSchedule(), scenario.getNetwork(), "pt_").createNetwork();
+        new CreateVehiclesForSchedule(scenario.getTransitSchedule(), scenario.getTransitVehicles()).run();
+    }
+
+    public static void writeScheduleAndVehicles(Scenario scenario, Path svn) {
+
+        new TransitScheduleWriter(scenario.getTransitSchedule()).writeFile(svn.resolve(outputSchedule).toString());
+        new MatsimVehicleWriter(scenario.getTransitVehicles()).writeFile(svn.resolve(outputVehicles).toString());
     }
 
     private static void parseGtfsFeed(Scenario scenario, Path feed, PreparedGeometry bbox) {

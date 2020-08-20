@@ -8,7 +8,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 import org.matsim.api.core.v01.TransportMode;
-import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.NetworkWriter;
 import org.matsim.contrib.osm.networkReader.SupersonicOsmNetworkReader;
 import org.matsim.core.network.NetworkUtils;
@@ -17,6 +17,8 @@ import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Set;
 
 @Log4j2
@@ -32,8 +34,13 @@ public class CreateNetwork {
         var arguments = new InputArgs();
         JCommander.newBuilder().addObject(arguments).build().parse(args);
 
-        var bbox = getBBox(arguments.sharedSvn);
-        var bounds = CreateNetwork.createGeometry(bbox);
+        var network = createNetwork(Paths.get(arguments.sharedSvn));
+        writeNetwork(network, Paths.get(arguments.sharedSvn));
+    }
+
+    public static Network createNetwork(Path svnPath) {
+
+        var bbox = getBBox(svnPath);
 
         log.info("Starting to parse osm network. This will not output anything for a while until it reaches the interesting part of the osm file.");
 
@@ -41,41 +48,30 @@ public class CreateNetwork {
 
         var network = new SupersonicOsmNetworkReader.Builder()
                 .setCoordinateTransformation(transformation)
-                .setIncludeLinkAtCoordWithHierarchy((coord, id) -> bounds.covers(MGC.coord2Point(coord)))
+                .setIncludeLinkAtCoordWithHierarchy((coord, id) -> bbox.covers(MGC.coord2Point(coord)))
                 .setAfterLinkCreated((link, map, direction) -> link.setAllowedModes(allowedModes))
                 .build()
-                .read(arguments.sharedSvn + osmFile);
+                .read(svnPath.resolve(osmFile));
 
         log.info("Done parsing osm file. ");
-        log.info("Writing network to " + arguments.sharedSvn + outputNetwork);
-        new NetworkWriter(network).write(arguments.sharedSvn + outputNetwork);
+        return network;
+    }
+
+    public static void writeNetwork(Network network, Path svn) {
+        log.info("Writing network to " + svn.resolve(outputNetwork));
+        new NetworkWriter(network).write(svn.resolve(outputNetwork).toString());
 
         log.info("");
         log.info("Finished \uD83C\uDF89");
     }
 
-    private static BoundingBox getBBox(String sharedSvn) {
+    private static PreparedGeometry getBBox(Path sharedSvn) {
 
         log.info("Reading senozon network");
         var senozonNetwork = NetworkUtils.createNetwork();
-        new MatsimNetworkReader(senozonNetwork).readFile(sharedSvn + senozonNetworkPath);
+        new MatsimNetworkReader(senozonNetwork).readFile(sharedSvn.resolve(senozonNetworkPath).toString());
 
-        log.info("Done reading senozon network");
-        log.info("Calculating bounding box of car network");
-        // take the bounding box of the senozon network
-        var bbox = new BoundingBox();
-        for (Link link : senozonNetwork.getLinks().values()) {
-
-            if (link.getAllowedModes().contains("car")) {
-                bbox.adjust(link.getFromNode().getCoord());
-                bbox.adjust(link.getToNode().getCoord());
-            }
-        }
-
-        log.info("Done calculating bounding box of car network.");
-        log.info("Bbox is: " + bbox.toString());
-
-        return bbox;
+        return BoundingBox.fromNetwork(senozonNetwork).toGeometry();
     }
 
     private static PreparedGeometry createGeometry(BoundingBox bbox) {

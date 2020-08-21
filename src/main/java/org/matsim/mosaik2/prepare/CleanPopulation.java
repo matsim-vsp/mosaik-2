@@ -17,7 +17,6 @@ public class CleanPopulation {
     private static final String inputPopulation = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland\\optimizedPopulation.xml.gz";
     private static final String outputPopulation = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\population-25pct-stuttgart.xml.gz";
 
-
     public static void main(String[] args) {
 
         var arguments = new InputArgs();
@@ -31,6 +30,7 @@ public class CleanPopulation {
                 .forEach(person -> {
 
                     var plan = person.getSelectedPlan();
+                    plan.setScore(null);
 
                     // clear plans
                     person.getPlans().clear();

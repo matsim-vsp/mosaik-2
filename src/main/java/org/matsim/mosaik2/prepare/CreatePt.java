@@ -31,7 +31,7 @@ public class CreatePt {
     private static final String networkFile = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\network-stuttgart.xml.gz";
     public static final String outputSchedule = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\transit-schedule-stuttgart.xml.gz";
     public static final String outputVehicles = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\transit-vehicles-stuttgart.xml.gz";
-    public static final String outputNetwork = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\network-with-pt-stuttgart.xml.gz";
+    public static final String outputNetwork = "projects\\mosaik-2\\matsim-input-files\\stuttgart-inkl-umland-vsp\\network-stuttgart.xml.gz";
 
     public static void main(String[] args) {
 

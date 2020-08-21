@@ -3,10 +3,7 @@ package org.matsim.mosaik2.prepare;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import lombok.extern.log4j.Log4j2;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
-import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.NetworkWriter;
@@ -72,21 +69,6 @@ public class CreateNetwork {
         new MatsimNetworkReader(senozonNetwork).readFile(sharedSvn.resolve(senozonNetworkPath).toString());
 
         return BoundingBox.fromNetwork(senozonNetwork).toGeometry();
-    }
-
-    private static PreparedGeometry createGeometry(BoundingBox bbox) {
-
-        var gFactory = new GeometryFactory();
-        var geometry = gFactory.createPolygon(new Coordinate[]{
-                new Coordinate(bbox.getMinX(), bbox.getMinY()),
-                new Coordinate(bbox.getMaxX(), bbox.getMinY()),
-                new Coordinate(bbox.getMaxX(), bbox.getMaxY()),
-                new Coordinate(bbox.getMinX(), bbox.getMaxY()),
-                new Coordinate(bbox.getMinX(), bbox.getMinY())
-        });
-
-        var pFactory = new PreparedGeometryFactory();
-        return pFactory.create(geometry);
     }
 
     private static class InputArgs {

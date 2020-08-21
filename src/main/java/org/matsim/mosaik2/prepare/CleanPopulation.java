@@ -2,9 +2,7 @@ package org.matsim.mosaik2.prepare;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
-import org.matsim.api.core.v01.population.Activity;
-import org.matsim.api.core.v01.population.Leg;
-import org.matsim.api.core.v01.population.PlanElement;
+import org.matsim.api.core.v01.population.*;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.population.io.PopulationReader;
 import org.matsim.core.population.io.PopulationWriter;
@@ -53,7 +51,64 @@ public class CleanPopulation {
                     person.addPlan(plan);
                 });
 
+        splitActivityTypesBasedOnDuration(scenario.getPopulation());
+
         new PopulationWriter(scenario.getPopulation()).write(svn.resolve(outputPopulation).toString());
+    }
+
+    /**
+     * Split activities into typical durations to improve value of travel time savings calculation.
+     */
+    private static void splitActivityTypesBasedOnDuration(Population population) {
+
+        final double timeBinSize_s = 600.;
+
+        // Calculate activity durations for the next step
+        for (Person p : population.getPersons().values()) {
+            for (Plan plan : p.getPlans()) {
+                for (PlanElement el : plan.getPlanElements()) {
+
+                    if (!(el instanceof Activity))
+                        continue;
+
+                    Activity act = (Activity) el;
+                    double duration = act.getEndTime().orElse(24 * 3600)
+                            - act.getStartTime().orElse(0);
+
+                    int durationCategoryNr = (int) Math.round((duration / timeBinSize_s));
+
+                    if (durationCategoryNr <= 0) {
+                        durationCategoryNr = 1;
+                    }
+
+                    String newType = act.getType() + "_" + (durationCategoryNr * timeBinSize_s);
+                    act.setType(newType);
+
+                }
+
+                mergeOvernightActivities(plan);
+            }
+        }
+    }
+
+    private static void mergeOvernightActivities(Plan plan) {
+
+        if (plan.getPlanElements().size() > 1) {
+            Activity firstActivity = (Activity) plan.getPlanElements().get(0);
+            Activity lastActivity = (Activity) plan.getPlanElements().get(plan.getPlanElements().size() - 1);
+
+            String firstBaseActivity = firstActivity.getType().split("_")[0];
+            String lastBaseActivity = lastActivity.getType().split("_")[0];
+
+            if (firstBaseActivity.equals(lastBaseActivity)) {
+                double mergedDuration = Double.parseDouble(firstActivity.getType().split("_")[1]) + Double.parseDouble(lastActivity.getType().split("_")[1]);
+
+
+                firstActivity.setType(firstBaseActivity + "_" + mergedDuration);
+                lastActivity.setType(lastBaseActivity + "_" + mergedDuration);
+            }
+        }  // skipping plans with just one activity
+
     }
 
     private static class InputArgs {

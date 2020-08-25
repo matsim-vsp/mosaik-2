@@ -11,6 +11,7 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlansCalcRouteConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
+import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.controler.OutputDirectoryLogging;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.mosaik2.Utils;
@@ -38,14 +39,14 @@ public class Run {
         config.qsim().setUsingTravelTimeCheckInTeleportation(true);
         config.qsim().setUsePersonIdForMissingVehicleId(false);
         config.subtourModeChoice().setProbaForRandomSingleTripMode(0.5);
-
+        config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
         final long minDuration = 600;
         final long maxDuration = 3600 * 27;
         final long difference = 600;
 
         Utils.createTypicalDurations("home", minDuration, maxDuration, difference).forEach(params -> config.planCalcScore().addActivityParams(params));
         Utils.createTypicalDurations("work", minDuration, maxDuration, difference).forEach(params -> config.planCalcScore().addActivityParams(params));
-        Utils.createTypicalDurations("leiseure", minDuration, maxDuration, difference).forEach(params -> config.planCalcScore().addActivityParams(params));
+        Utils.createTypicalDurations("leisure", minDuration, maxDuration, difference).forEach(params -> config.planCalcScore().addActivityParams(params));
         Utils.createTypicalDurations("shopping", minDuration, maxDuration, difference).forEach(params -> config.planCalcScore().addActivityParams(params));
         Utils.createTypicalDurations("errands", minDuration, maxDuration, difference).forEach(params -> config.planCalcScore().addActivityParams(params));
         Utils.createTypicalDurations("business", minDuration, maxDuration, difference).forEach(params -> config.planCalcScore().addActivityParams(params));

@@ -9,6 +9,7 @@ import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.NetworkWriter;
 import org.matsim.contrib.osm.networkReader.SupersonicOsmNetworkReader;
 import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.network.algorithms.MultimodalNetworkCleaner;
 import org.matsim.core.network.io.MatsimNetworkReader;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
@@ -51,6 +52,13 @@ public class CreateNetwork {
                 .read(svnPath.resolve(osmFile));
 
         log.info("Done parsing osm file. ");
+        log.info("Starting network cleaner");
+
+        var cleaner = new MultimodalNetworkCleaner(network);
+        cleaner.run(Set.of(TransportMode.car));
+        cleaner.run(Set.of(TransportMode.ride));
+
+        log.info("Finsihed network cleaner");
         return network;
     }
 

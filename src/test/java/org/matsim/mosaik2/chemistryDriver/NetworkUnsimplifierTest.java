@@ -2,6 +2,7 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import de.topobyte.osm4j.core.access.OsmInputException;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -103,6 +104,7 @@ public class NetworkUnsimplifierTest {
     }
 
     @Test
+    @Ignore
     public void testBerlin() throws FileNotFoundException, OsmInputException {
 
         var simplifiedNetworkFromScenario = NetworkUtils.readNetwork("https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/de/berlin/berlin-v5.4-10pct/output-berlin-v5.4-10pct/berlin-v5.4-10pct.output_network.xml.gz");
@@ -135,6 +137,7 @@ public class NetworkUnsimplifierTest {
     }
 
     @Test
+    @Ignore
     public void writeBerlinComplete() {
 
         final var osmFilePath = "C:\\Users\\Janek\\Downloads\\berlin-latest.osm.pbf";

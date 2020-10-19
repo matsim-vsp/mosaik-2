@@ -30,7 +30,9 @@ import static java.util.stream.Collectors.groupingBy;
 @RequiredArgsConstructor
 public class NetworkUnsimplifier {
 
-    static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, final String osmFile, final String destinationCrs) throws FileNotFoundException, OsmInputException {
+	public static final String LENGHT_FRACTION_KEY = "length_fraction";
+
+	static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, final String osmFile, final String destinationCrs) throws FileNotFoundException, OsmInputException {
 
 		var file = new File(osmFile);
 		var transformation = TransformationFactory.getCoordinateTransformation("EPSG:4326", destinationCrs);
@@ -100,7 +102,6 @@ public class NetworkUnsimplifier {
 			var newLink = createLinkFromWay(osmWay, simpleLink, i, direction, nodes, factory);
 			result.add(newLink);
 		}
-
         return result;
     }
 
@@ -111,6 +112,9 @@ public class NetworkUnsimplifier {
 		var link = factory.createLink(Id.createLinkId(simpleLink.getId().toString() + "_" + fromIndex), fromNode, toNode);
 
 		link.getAttributes().putAttribute("origid", simpleLink.getAttributes().getAttribute("origid"));
+
+		// add this attribute so that the emissions generated for the simpleLink can be distributed onto the unsimplified links correctly
+		link.getAttributes().putAttribute(LENGHT_FRACTION_KEY, link.getLength() / simpleLink.getLength());
 		return link;
 	}
 

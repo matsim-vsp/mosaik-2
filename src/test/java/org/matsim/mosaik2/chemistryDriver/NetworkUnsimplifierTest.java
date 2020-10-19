@@ -9,6 +9,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.matsim.api.core.v01.Coord;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.NetworkWriter;
 import org.matsim.api.core.v01.network.Node;
@@ -21,6 +22,8 @@ import org.matsim.testcases.MatsimTestUtils;
 
 import java.io.FileNotFoundException;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -94,12 +97,31 @@ public class NetworkUnsimplifierTest {
                 .flatMap(Collection::stream)
                 .collect(Collectors.groupingBy(link -> (long) link.getAttributes().getAttribute("origid")));
 
+        // assert that the network from the osm file and the unsimplified network have the same number of sub links
+        // for each osm way
         for (var entry : resultGroupedByOrigId.entrySet()) {
 
             var linksForOrigId = unsimplifiedGroupedByOrigId.get(entry.getKey());
 
             if (!exceptionsForAssertion.contains(entry.getKey()))
                 assertEquals(linksForOrigId.size(), entry.getValue().size());
+        }
+
+        // make sure the length share is correct by summing the shares up
+        // exclude the exceptional ways as with the number of links
+        for (Map.Entry<Id<Link>, List<Link>> entry : result.entrySet()) {
+
+
+            var simplifiedLink = simplifiedNetwork.getLinks().get(entry.getKey());
+            var origId = (long) simplifiedLink.getAttributes().getAttribute("origid");
+
+            if (!exceptionsForAssertion.contains(origId)) {
+                var summedLength = entry.getValue().stream()
+                        .map(Link::getLength)
+                        .reduce(Double::sum)
+                        .orElseThrow();
+                assertEquals(simplifiedLink.getLength(), summedLength, 0.0000001);
+            }
         }
     }
 

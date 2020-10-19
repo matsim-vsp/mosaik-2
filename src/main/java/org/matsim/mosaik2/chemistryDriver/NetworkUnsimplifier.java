@@ -30,7 +30,7 @@ import static java.util.stream.Collectors.groupingBy;
 @RequiredArgsConstructor
 public class NetworkUnsimplifier {
 
-    static Map<Id<Link>, List<Link>> filterNodesFromOsmFile(final String osmFile, final Network network, final String destinationCrs) throws FileNotFoundException, OsmInputException {
+    static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, final String osmFile, final String destinationCrs) throws FileNotFoundException, OsmInputException {
 
 		var file = new File(osmFile);
 		var transformation = TransformationFactory.getCoordinateTransformation("EPSG:4326", destinationCrs);
@@ -38,7 +38,7 @@ public class NetworkUnsimplifier {
 		// collect the original ids from the network
 		var originalIds = network.getLinks().values().stream()
 				.map(link -> {
-					var origId = (long) link.getAttributes().getAttribute("origid");
+					var origId = parseOrigId(link);
 					return Tuple.of(origId, link.getId());
 				})
                 .collect(groupingBy(Tuple::getFirst, Collectors.mapping(Tuple::getSecond, Collectors.toSet())));
@@ -71,6 +71,18 @@ public class NetworkUnsimplifier {
 					return Tuple.of(linkId2OsmWay.getKey(), createLinks(link, way, indices, direction, nodes, network.getFactory()));
 				})
 				.collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+	}
+
+	private static long parseOrigId(Link link) {
+
+		Object attr = link.getAttributes().getAttribute("origid");
+		if (attr instanceof String) {
+			return Long.parseLong((String) attr);
+		} else if (attr instanceof Long) {
+			return (long) attr;
+		}
+
+		throw new RuntimeException("attribute origid is expected to be either of type String or long");
 	}
 
 	private static int getDirection(IndexContainer indices) {

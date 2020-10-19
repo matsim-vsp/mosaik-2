@@ -30,196 +30,131 @@ import static java.util.stream.Collectors.groupingBy;
 @RequiredArgsConstructor
 public class NetworkUnsimplifier {
 
-    static Map<Id<Link>, List<Link>> filterNodesFromOsmFile(String osmFile, Network network, String destinationCrs) throws FileNotFoundException, OsmInputException {
+    static Map<Id<Link>, List<Link>> filterNodesFromOsmFile(final String osmFile, final Network network, final String destinationCrs) throws FileNotFoundException, OsmInputException {
 
-        var file = new File(osmFile);
-        var transformation = TransformationFactory.getCoordinateTransformation("EPSG:4326", destinationCrs);
+		var file = new File(osmFile);
+		var transformation = TransformationFactory.getCoordinateTransformation("EPSG:4326", destinationCrs);
 
-        // find some stützstellen
-        var originalIds = network.getLinks().values().stream()
-                .map(link -> {
-                    var origId = (long)link.getAttributes().getAttribute("origid");
-                    return Tuple.of(origId, link.getId());
-                })
+		// collect the original ids from the network
+		var originalIds = network.getLinks().values().stream()
+				.map(link -> {
+					var origId = (long) link.getAttributes().getAttribute("origid");
+					return Tuple.of(origId, link.getId());
+				})
                 .collect(groupingBy(Tuple::getFirst, Collectors.mapping(Tuple::getSecond, Collectors.toSet())));
-                //.collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
 
-        // set up first pass for ways
+		// read in the ways from the supplied osm file
         var reader = new PbfReader(file, false);
         var nodeReferencesCollector = new CollectNodeReferences(originalIds);
         reader.setHandler(nodeReferencesCollector);
-        reader.read();
+		reader.read();
 
-        // second pass to read nodes
-        reader = new PbfReader(file, false);
-        var nodesCollector = new CollectNodes(nodeReferencesCollector.getNodesReferencingWays(), transformation);
-        reader.setHandler(nodesCollector);
-        reader.read();
+		// read in the nodes from the supplied osm file
+		reader = new PbfReader(file, false);
+		var nodesCollector = new CollectNodes(nodeReferencesCollector.getNodesReferencingWays(), transformation);
+		reader.setHandler(nodesCollector);
+		reader.read();
 
-        var nodes = nodesCollector.getNodes();
+		final var nodes = nodesCollector.getNodes();
 
-        Map<Id<Link>, List<Link>> result = new HashMap<>();
+		return nodeReferencesCollector.getLinkIdToWayReference().entrySet().stream()
+				.map(linkId2OsmWay -> {
+					var link = network.getLinks().get(linkId2OsmWay.getKey());
+					var way = linkId2OsmWay.getValue();
 
-        for (var linkId2OsmWay : nodeReferencesCollector.linkIdToWayReference.entrySet()) {
+					var indices = getIndices(link.getFromNode().getId(), link.getToNode().getId(), way);
 
-            var link = network.getLinks().get(linkId2OsmWay.getKey());
-            var way = linkId2OsmWay.getValue();
+					// determine the direction we have to iterate. The matsim network contains forward and backwards links for
+					// the same way
+					var direction = getDirection(indices);
 
-            if ((long) link.getAttributes().getAttribute("origid") == 6185090) {
-				var stop = "it";
-			}
-            var startIndex = getNodeIndex(link.getFromNode().getId(), way);
-            var endIndex = getNodeIndex(link.getToNode().getId(), way);
-
-            // determine the direction we have to iterate. The matsim network contains forward and backwards links for
-            // the same way
-            var direction = getDirection(startIndex, endIndex);
-
-            if (isLoop(linkId2OsmWay.getValue()) && wrapsAround(way, startIndex, endIndex, direction)) {
-
-                var links = createLinksWithWrapAround(link, way, startIndex, endIndex, direction * -1, nodes, network.getFactory());
-                result.computeIfAbsent(link.getId(), id -> new ArrayList<>()).addAll(links);
-
-            } else {
-                var links = createLinks(link, way, startIndex, endIndex, direction, nodes, network.getFactory());
-                result.computeIfAbsent(linkId2OsmWay.getKey(), id -> new ArrayList<>()).addAll(links);
-            }
-        }
-
-        return result;
-    }
-
-    private static int getNodeIndex(Id<Node> fromNode, OsmWay way) {
-
-        for (var i = 0; i < way.getNumberOfNodes(); i++) {
-
-            if (fromNode.equals(Id.createNodeId(way.getNodeId(i))))
-                return i;
-        }
-
-        throw new RuntimeException("this is not expected");
-    }
-
-    private static int getDirection(int startIndex, int endIndex) {
-        return endIndex - startIndex > 0 ? 1 : -1;
-    }
-
-    private static boolean isLoop(OsmWay way) {
-
-		if (way.getNodeId(0) == way.getNodeId(way.getNumberOfNodes() - 1)) {
-			var stop = "it";
-		}
-		for (var a = 0; a < way.getNumberOfNodes(); a++) {
-			var nodeId = way.getNodeId(a);
-			for (var b = a + 1; b < way.getNumberOfNodes(); b++) {
-				var toCompare = way.getNodeId(b);
-				if (nodeId == toCompare) {
-					return true;
-				}
-			}
-		}
-
-		return false;
+					return Tuple.of(linkId2OsmWay.getKey(), createLinks(link, way, indices, direction, nodes, network.getFactory()));
+				})
+				.collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
 	}
 
-    private static List<Link> createLinks(Link simpleLink, OsmWay osmWay, int startIndex, int endIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
+	private static int getDirection(IndexContainer indices) {
+		return indices.getEndIndex() - indices.getStartIndex() > 0 ? 1 : -1;
+	}
 
-        List<Link> result = new ArrayList<>();
-        // iterate over all nodes between start and end index
-        // depending on the direction iteration is conducted for- or backwards
-        // the terminal condition will stop one iteration before i is equal to end index
-        for(var i = startIndex; i != endIndex; i += direction) {
+	private static List<Link> createLinks(Link simpleLink, OsmWay osmWay, IndexContainer indices, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
 
-            var newLink = createLinkFromWay(osmWay, simpleLink, i, direction, nodes, factory);
-            result.add(newLink);
-        }
-
-        return result;
-    }
-
-    private static List<Link> createLinksWithWrapAround(Link simpleLink, OsmWay osmWay, int startIndex, int endIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
-
-        List<Link> result = new ArrayList<>();
-		for (var i = initializeIndexWithWrapAround(startIndex, osmWay.getNumberOfNodes(), direction); keepGoingWithWrapAround(i, startIndex, endIndex, direction); i = increaseIndexWithWrapAround(i, osmWay.getNumberOfNodes(), direction)) {
-
-			// if (i + direction >= osmWay.getNumberOfNodes()) i = 0;
-			// else if (i + direction < 0) i = osmWay.getNumberOfNodes() - 1;
+		List<Link> result = new ArrayList<>();
+		// iterate over all nodes between start and end index
+		// depending on the direction iteration is conducted for- or backwards
+		// the terminal condition will stop one iteration before i is equal to end index
+		for (var i = indices.getStartIndex(); i != indices.getEndIndex(); i += direction) {
 
 			var newLink = createLinkFromWay(osmWay, simpleLink, i, direction, nodes, factory);
 			result.add(newLink);
 		}
-		return result;
-	}
 
-	private static int increaseIndexWithWrapAround(int current, int size, int direction) {
-
-		// first increase counter
-		int next = current + direction;
-
-		if (direction > 0 && next >= size - 1) {
-			return 0; // skip last node and use the first in the array, because first and last are included twice
-		} else if (direction < 0 && next == 0) {
-			next = size - 1; // don't use the zeroth node but the last because first and last are included twice
-		}
-
-		return next;
-	}
-
-	private static int initializeIndexWithWrapAround(int startIndex, int size, int direction) {
-
-		if (startIndex == 0 && direction < 0) {
-			return size - 1;
-		}
-		return startIndex;
-	}
+        return result;
+    }
 
 	private static Link createLinkFromWay(OsmWay osmWay, Link simpleLink, int fromIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
 
 		var fromNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex)));
 		var toNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex + direction)));
-
 		var link = factory.createLink(Id.createLinkId(simpleLink.getId().toString() + "_" + fromIndex), fromNode, toNode);
-
-		// this comes in handy for testing eventually copy other values as well
 
 		link.getAttributes().putAttribute("origid", simpleLink.getAttributes().getAttribute("origid"));
 		return link;
 	}
 
-    private static boolean keepGoingWithWrapAround(int currentIndex, int startIndex, int endIndex, int direction) {
+	private static IndexContainer getIndices(Id<Node> fromNode, Id<Node> toNode, OsmWay way) {
 
-        if (direction > 0 ) {
-            // if i has wrapped around yet, test whether we have reached the end index. Same in other direction
-            if (currentIndex >= startIndex) return true;
-            return currentIndex < endIndex;
-        }
-        else {
-            if (currentIndex <= startIndex) return true;
-            return currentIndex > endIndex;
-        }
-    }
+		// figure out whether there are multiple candidates for the start end end node in the nodes collection of the osm-way
+		var firstFromNodeIndex = getNodeIndex(fromNode, way, 0);
+		var firstToNodeIndex = getNodeIndex(toNode, way, 0);
+		var secondFromNodeIndex = getNodeIndex(fromNode, way, firstFromNodeIndex + 1);
+		var secondToNodeIndex = getNodeIndex(toNode, way, firstToNodeIndex + 1);
 
-    private static boolean wrapsAround(OsmWay osmWay, int startIndex, int endIndex, int direction) {
+		// remember the first candidates in every case
+		List<IndexContainer> indexList = new ArrayList<>();
+		indexList.add(new IndexContainer(firstFromNodeIndex, firstToNodeIndex));
 
-        // figure out the direction, whether we have to wrap around the array
-        var normalDistance = direction > 0 ? endIndex - startIndex : startIndex - endIndex;
-        var wrapAroundDistance = 0;
-        if (direction > 0 ) {
-            wrapAroundDistance = osmWay.getNumberOfNodes() - endIndex + startIndex;
-        } else {
-            wrapAroundDistance = osmWay.getNumberOfNodes() - startIndex + endIndex;
-        }
+		// if there are secondary candidates also remember those and all possible combinations
+		if (secondFromNodeIndex != -1)
+			indexList.add(new IndexContainer(secondFromNodeIndex, firstToNodeIndex));
+		if (secondToNodeIndex != -1)
+			indexList.add(new IndexContainer(firstFromNodeIndex, secondToNodeIndex));
+		if (secondFromNodeIndex != -1 && secondToNodeIndex != -1)
+			indexList.add(new IndexContainer(secondFromNodeIndex, secondToNodeIndex));
 
-        return wrapAroundDistance < normalDistance;
-    }
+		// select the candidate pair with the fewest nodes in between
+		// maybe move comparator into static variable so it doesn't have to be rebuild each time
+		indexList.sort(Comparator.comparingInt(indexPair -> Math.abs(indexPair.getStartIndex() - indexPair.getEndIndex())));
+		return indexList.get(0);
+	}
 
+	private static int getNodeIndex(Id<Node> fromNode, OsmWay way, int startIndex) {
 
+		for (var i = startIndex; i < way.getNumberOfNodes(); i++) {
 
-    @RequiredArgsConstructor
-    private static class CollectNodeReferences implements OsmHandler {
+			if (fromNode.equals(Id.createNodeId(way.getNodeId(i))))
+				return i;
+		}
 
-        @Getter
-        private final Map<Long, Set<OsmWay>> nodesReferencingWays = new HashMap<>();
+		// id was not found
+		return -1;
+	}
+
+	@RequiredArgsConstructor
+	private static class IndexContainer {
+
+		@Getter
+		private final int startIndex;
+
+		@Getter
+		private final int endIndex;
+	}
+
+	@RequiredArgsConstructor
+	private static class CollectNodeReferences implements OsmHandler {
+
+		@Getter
+		private final Map<Long, Set<OsmWay>> nodesReferencingWays = new HashMap<>();
         @Getter
         private final Map<Id<Link>, OsmWay> linkIdToWayReference = new HashMap<>();
 

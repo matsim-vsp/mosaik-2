@@ -103,6 +103,19 @@ public class WriteChemistryInputForErnsReuterSample {
         });
     }
 
+    private static String mapMatsimPollutantToPalmPollutant(Pollutant name) {
+
+        if (name.equals(Pollutant.PM))
+            return "PM10";
+        if (name.equals(Pollutant.PM2_5))
+            return "PM25";
+        if (name.equals(Pollutant.CO2_TOTAL))
+            return "CO2";
+
+        // all others are either not simulated or stay the same
+        return name.toString();
+    }
+
     private void write2() throws FileNotFoundException, OsmInputException {
 
         var network = NetworkUtils.readNetwork(networkFile);
@@ -153,15 +166,15 @@ public class WriteChemistryInputForErnsReuterSample {
         }
 
         // transform emissions by link into emissions on a raster
-        TimeBinMap<Map<Pollutant, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
+        TimeBinMap<Map<String, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
         for (var bin : timeBinMap.getTimeBins()) {
 
-            Map<Pollutant, Raster> rasterByPollutant = new HashMap<>();
+            Map<String, Raster> rasterByPollutant = new HashMap<>();
             for (var emissionByPollutant : bin.getValue().entrySet()) {
 
                 var emissions = emissionByPollutant.getValue();
                 var raster = Bresenham.rasterizeNetwork(unsimplifiedNetwork, new Raster.Bounds(0, 0, 36 * cellSize, 36 * cellSize), emissions, cellSize);
-                rasterByPollutant.put(emissionByPollutant.getKey(), raster);
+                rasterByPollutant.put(mapMatsimPollutantToPalmPollutant(emissionByPollutant.getKey()), raster);
             }
             rasterTimeBinMap.getTimeBin(bin.getStartTime()).setValue(rasterByPollutant);
         }

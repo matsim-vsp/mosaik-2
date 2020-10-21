@@ -1,9 +1,7 @@
 package org.matsim.mosaik2.chemistryDriver;
 
 import org.apache.log4j.Logger;
-import org.matsim.api.core.v01.Coord;
 import org.matsim.contrib.analysis.time.TimeBinMap;
-import org.matsim.contrib.emissions.Pollutant;
 import ucar.ma2.*;
 import ucar.nc2.Attribute;
 import ucar.nc2.NetcdfFileWriter;
@@ -30,7 +28,7 @@ public class PalmChemistryInput2 {
     private static final String TIMESTAMP = "timestamp";
     private static final String EMISSION_VALUES = "emission_values";
 
-    public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<Pollutant, Raster>> data) {
+    public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data) {
 
         // get the observed pollutants
         var observedPollutants = data.getTimeBin(data.getStartTime()).getValue().keySet();
@@ -53,7 +51,7 @@ public class PalmChemistryInput2 {
         }
     }
 
-    private static void writeData(NetcdfFileWriter writer, TimeBinMap<Map<Pollutant, Raster>> data, Set<Pollutant> observedPollutants, Raster raster) throws IOException, InvalidRangeException {
+    private static void writeData(NetcdfFileWriter writer, TimeBinMap<Map<String, Raster>> data, Set<String> observedPollutants, Raster raster) throws IOException, InvalidRangeException {
 
         var pollutantToIndex = new ArrayList<>(observedPollutants);
         var emissionIndex = new ArrayInt.D1(pollutantToIndex.size(), false);
@@ -63,7 +61,7 @@ public class PalmChemistryInput2 {
 
         var emissionNames = new ArrayChar.D2(pollutantToIndex.size(), 64);
         for (var i = 0; i < pollutantToIndex.size(); i++) {
-            emissionNames.setString(i, pollutantToIndex.get(i).toString());
+            emissionNames.setString(i, pollutantToIndex.get(i));
         }
 
         var zValues = new ArrayDouble.D1(1);
@@ -111,7 +109,7 @@ public class PalmChemistryInput2 {
         writer.write(writer.findVariable(EMISSION_VALUES), emissionValues);
     }
 
-    private static void writeDimensions(NetcdfFileWriter writer, Set<Pollutant> observedPollutants, Raster raster) {
+    private static void writeDimensions(NetcdfFileWriter writer, Set<String> observedPollutants, Raster raster) {
 
         writer.addUnlimitedDimension(TIME);
         writer.addDimension(X, raster.getXLength());
@@ -175,7 +173,7 @@ public class PalmChemistryInput2 {
         return result;
     }
 
-    private static TimeBinMap.TimeBin<Map<Pollutant, Raster>> getTimeBin(TimeBinMap<Map<Pollutant, Raster>> data, int index) {
+    private static TimeBinMap.TimeBin<Map<String, Raster>> getTimeBin(TimeBinMap<Map<String, Raster>> data, int index) {
 
         var bin = data.getTimeBin(index * data.getBinSize());
 

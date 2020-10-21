@@ -13,6 +13,7 @@ import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.NetworkFactory;
+import org.matsim.api.core.v01.network.Node;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.network.NetworkUtils;
@@ -108,7 +109,7 @@ public class WriteChemistryInputForErnsReuterSample {
         var bounds = createBoundingBox();
         var originUTM33 = new Coord(385761.5, 5819224.0);
 
-        // transform network onto UTM-33 and relative to the orign coord, so that the raster has origin = (0,0)
+        // transform network onto UTM-33 and relative to the origin coord, so that the raster has origin = (0,0)
         var filteredNetwork = network.getLinks().values().parallelStream()
                 .map(link -> transformLink(link, originUTM33, network.getFactory()))
                 .filter(link -> isCoveredBy(link, bounds))
@@ -139,9 +140,17 @@ public class WriteChemistryInputForErnsReuterSample {
             }
         }).readFile(emissionEventsFile);
 
+        // create a network out of the unsimplified links
         var unsimplifiedNetwork = linkToUnsimplifiedLinks.values().stream()
                 .flatMap(Collection::stream)
                 .collect(NetworkUtils.getCollector());
+
+        // fit the unsimplified network onto the raster
+        for (Node node : unsimplifiedNetwork.getNodes().values()) {
+
+            var relativeToOrigin = CoordUtils.minus(node.getCoord(), originUTM33);
+            node.setCoord(relativeToOrigin);
+        }
 
         // transform emissions by link into emissions on a raster
         TimeBinMap<Map<Pollutant, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);

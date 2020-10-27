@@ -33,6 +33,12 @@ public class WriteChemistryInputForErnsReuterSample {
 
     private static final Logger logger = Logger.getLogger(WriteChemistryInputForErnsReuterSample.class);
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
+    private static final Map<Pollutant, String> pollutants = Map.of(
+            Pollutant.NO2, "NO2",
+            Pollutant.CO2_TOTAL, "CO2",
+            Pollutant.PM, "PM10",
+            Pollutant.CO, "CO"
+    );// NO is missing for now, it would have to be calculated from NOx - NO2
 
     private static final double cellSize = 10;
     private static final double timeBinSize = 3600;
@@ -103,19 +109,6 @@ public class WriteChemistryInputForErnsReuterSample {
         });
     }
 
-    private static String mapMatsimPollutantToPalmPollutant(Pollutant name) {
-
-        if (name.equals(Pollutant.PM))
-            return "PM10";
-        if (name.equals(Pollutant.PM2_5))
-            return "PM25";
-        if (name.equals(Pollutant.CO2_TOTAL))
-            return "CO2";
-
-        // all others are either not simulated or stay the same
-        return name.toString();
-    }
-
     private void write2() throws FileNotFoundException, OsmInputException {
 
         var network = NetworkUtils.readNetwork(networkFile);
@@ -132,7 +125,13 @@ public class WriteChemistryInputForErnsReuterSample {
 
         // read emissions into time bins sorted by pollutant and link id
         TimeBinMap<Map<Pollutant, TObjectDoubleMap<Id<Link>>>> timeBinMap = new TimeBinMap<>(timeBinSize);
+        var pollutantsOfInterest = pollutants.keySet();
+
         new RawEmissionEventsReader((time, linkId, vehicleId, pollutant, value) -> {
+
+            // ignore everything we're not interested in
+            if (!pollutantsOfInterest.contains(pollutant))
+                return;
 
             var id = Id.createLinkId(linkId);
             if (filteredNetwork.getLinks().containsKey(id)) {
@@ -147,6 +146,8 @@ public class WriteChemistryInputForErnsReuterSample {
                 // distribute the emissions from the simplified link onto the more detailed sub links from osm
                 for (Link link : linkToUnsimplifiedLinks.get(id)) {
                     var lengthFraction = (double) link.getAttributes().getAttribute(NetworkUnsimplifier.LENGHT_FRACTION_KEY);
+                    // scaleFactor to compensate for scenario sample size
+                    // lengthFraction to weight the unsimplified sub-links according to their share of the overall length of the simplified link
                     var linkEmission = value * scaleFactor * lengthFraction;
                     linkEmissions.adjustOrPutValue(link.getId(), linkEmission, linkEmission);
                 }
@@ -158,9 +159,8 @@ public class WriteChemistryInputForErnsReuterSample {
                 .flatMap(Collection::stream)
                 .collect(NetworkUtils.getCollector());
 
-        // fit the unsimplified network onto the raster
+        // fit the unsimplified network onto the raster, which has the (0,0) as origin
         for (Node node : unsimplifiedNetwork.getNodes().values()) {
-
             var relativeToOrigin = CoordUtils.minus(node.getCoord(), originUTM33);
             node.setCoord(relativeToOrigin);
         }
@@ -174,7 +174,8 @@ public class WriteChemistryInputForErnsReuterSample {
 
                 var emissions = emissionByPollutant.getValue();
                 var raster = Bresenham.rasterizeNetwork(unsimplifiedNetwork, new Raster.Bounds(0, 0, 36 * cellSize, 36 * cellSize), emissions, cellSize);
-                rasterByPollutant.put(mapMatsimPollutantToPalmPollutant(emissionByPollutant.getKey()), raster);
+                var palmPollutantKey = pollutants.get(emissionByPollutant.getKey());
+                rasterByPollutant.put(palmPollutantKey, raster);
             }
             rasterTimeBinMap.getTimeBin(bin.getStartTime()).setValue(rasterByPollutant);
         }

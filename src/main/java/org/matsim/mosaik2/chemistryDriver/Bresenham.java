@@ -13,14 +13,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.DoubleBinaryOperator;
 import java.util.stream.Collectors;
 
 public abstract class Bresenham {
 
+    /**
+     * rasterizes link onto cells it crosses. The 'line' which is drawn is 1 cell wide. The emissions of the link are
+     * equally distributed into the cells. Additionally the emissions per link are divided by cell area. If a link has
+     * an emission value of 100g and the cellSize is 10m and the link covers 2 cells the resulting value per cell is
+     * 100g / 2 / (10m * 10m) = 0.5g/m2
+     */
     static Raster rasterizeNetwork(final Network network, final Raster.Bounds bounds, final TObjectDoubleMap<Id<Link>> emissions, final double cellSize) {
 
         var raster = new Raster(bounds, cellSize);
+        final var area = cellSize * cellSize;
 
         emissions.forEachEntry((linkId, value) -> {
 
@@ -32,7 +38,7 @@ public abstract class Bresenham {
             rasterizeLink(link, cellSize, (x, y) -> {
 
                 if (bounds.covers(x, y))
-                    raster.adjustValueForCoord(x, y, value / counter.get());
+                    raster.adjustValueForCoord(x, y, value / counter.get() / area);
             });
 
             return true;

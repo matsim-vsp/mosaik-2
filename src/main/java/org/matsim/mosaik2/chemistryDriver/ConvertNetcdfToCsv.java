@@ -44,7 +44,7 @@ public class ConvertNetcdfToCsv {
         try (var netcdfFile = NetcdfFile.open(this.netcdfFile); var csvFile = Files.newBufferedWriter(Paths.get(outputfile)); var printer = new CSVPrinter(csvFile, CSVFormat.DEFAULT)) {
 
             // print csv header
-            printer.printRecord("time", "x", "y", "NOx");
+            printer.printRecord("time", "x", "y", "PM10");
 
             var xValues = NetcdfUtils.toDoubleArray(netcdfFile.findVariable("Eu_UTM"));
             var yValues = NetcdfUtils.toDoubleArray(netcdfFile.findVariable("Nu_UTM"));
@@ -53,7 +53,7 @@ public class ConvertNetcdfToCsv {
             /*
             float kc_NO(time=1440, ku_above_surf=1, y=36, x=36);
              */
-            var noValues = netcdfFile.findVariable("kc_NO");
+            var noValues = netcdfFile.findVariable("kc_PM10");
 
             for (int ti = 0; ti < times.size(); ti++) {
                 for(int yi = 0; yi < yValues.size(); yi++) {

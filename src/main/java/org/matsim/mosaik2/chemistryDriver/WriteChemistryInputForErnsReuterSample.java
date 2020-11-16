@@ -5,6 +5,8 @@ import com.beust.jcommander.Parameter;
 import de.topobyte.osm4j.core.access.OsmInputException;
 import gnu.trove.map.TObjectDoubleMap;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
@@ -24,6 +26,10 @@ import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.mosaik2.events.RawEmissionEventsReader;
 
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
@@ -181,5 +187,33 @@ public class WriteChemistryInputForErnsReuterSample {
         }
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasterTimeBinMap);
+
+        logger.info("Writing csv file to: C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv");
+        writeCSV(Paths.get("C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv"), rasterTimeBinMap);
+    }
+
+    public void writeCSV(Path file, TimeBinMap<Map<String, Raster>> map) {
+
+        try (var writer = Files.newBufferedWriter(file); var printer = new CSVPrinter(writer, CSVFormat.DEFAULT)) {
+
+            // print header
+            printer.printRecord("time", "x", "y", "NO2");
+
+            for (TimeBinMap.TimeBin<Map<String, Raster>> timeBin : map.getTimeBins()) {
+
+                var time = timeBin.getStartTime();
+                var raster = timeBin.getValue().get("NO2");
+                raster.forEachCoordinate((x, y, value) -> {
+                    // meh, have to delegate this to the outside
+                    try {
+                        printer.printRecord(time, x, y, value);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

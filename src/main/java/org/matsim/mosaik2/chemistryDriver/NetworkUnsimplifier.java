@@ -9,8 +9,10 @@ import de.topobyte.osm4j.core.model.iface.OsmWay;
 import de.topobyte.osm4j.pbf.seq.PbfReader;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.apache.log4j.Logger;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.NetworkFactory;
@@ -30,147 +32,190 @@ import static java.util.stream.Collectors.groupingBy;
 @RequiredArgsConstructor
 public class NetworkUnsimplifier {
 
-	public static final String LENGHT_FRACTION_KEY = "length_fraction";
+    public static final String LENGTH_FRACTION_KEY = "length_fraction";
+    public static final String NOT_MATCHED_KEY = "NOT_MATCHED";
+    private static final Logger log = Logger.getLogger(NetworkUnsimplifier.class);
 
-	static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, final String osmFile, final String destinationCrs) throws FileNotFoundException, OsmInputException {
+    static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, final String osmFile, final String destinationCrs) throws FileNotFoundException, OsmInputException {
 
-		var file = new File(osmFile);
-		var transformation = TransformationFactory.getCoordinateTransformation("EPSG:4326", destinationCrs);
+        var file = new File(osmFile);
+        var transformation = TransformationFactory.getCoordinateTransformation("EPSG:4326", destinationCrs);
 
-		// collect the original ids from the network
-		var originalIds = network.getLinks().values().stream()
-				.map(link -> {
-					var origId = parseOrigId(link);
-					return Tuple.of(origId, link.getId());
-				})
+        log.info("Collecting original ids from network");
+        // collect the original ids from the network
+        var originalIds = network.getLinks().values().stream()
+                .filter(link -> link.getAllowedModes().contains(TransportMode.car))
+                .map(link -> {
+                    var origId = parseOrigId(link);
+                    return Tuple.of(origId, link.getId());
+                })
                 .collect(groupingBy(Tuple::getFirst, Collectors.mapping(Tuple::getSecond, Collectors.toSet())));
 
-		// read in the ways from the supplied osm file
+        log.info("Start parsing ways from osm file");
+        // read in the ways from the supplied osm file
         var reader = new PbfReader(file, false);
         var nodeReferencesCollector = new CollectNodeReferences(originalIds);
         reader.setHandler(nodeReferencesCollector);
-		reader.read();
+        reader.read();
 
-		// read in the nodes from the supplied osm file
-		reader = new PbfReader(file, false);
-		var nodesCollector = new CollectNodes(nodeReferencesCollector.getNodesReferencingWays(), transformation);
-		reader.setHandler(nodesCollector);
-		reader.read();
+        log.info("Start parsing nodes from osm file");
+        // read in the nodes from the supplied osm file
+        reader = new PbfReader(file, false);
+        var nodesCollector = new CollectNodes(nodeReferencesCollector.getNodesReferencingWays(), transformation);
+        reader.setHandler(nodesCollector);
+        reader.read();
 
-		final var nodes = nodesCollector.getNodes();
+        final var nodes = nodesCollector.getNodes();
 
-		return nodeReferencesCollector.getLinkIdToWayReference().entrySet().stream()
-				.map(linkId2OsmWay -> {
-					var link = network.getLinks().get(linkId2OsmWay.getKey());
-					var way = linkId2OsmWay.getValue();
+        log.info("Start matching matsim links to osm ways");
+        var result = nodeReferencesCollector.getLinkIdToWayReference().entrySet().stream()
+                .map(linkId2OsmWay -> {
+                    var link = network.getLinks().get(linkId2OsmWay.getKey());
+                    var way = linkId2OsmWay.getValue();
 
-					var indices = getIndices(link.getFromNode().getId(), link.getToNode().getId(), way);
+                    if (link.getId().equals(Id.createLinkId("14923"))) {
+                        log.info("stop it");
+                    }
 
-					// determine the direction we have to iterate. The matsim network contains forward and backwards links for
-					// the same way
-					var direction = getDirection(indices);
+                    var indices = getIndices(link.getFromNode().getId(), link.getToNode().getId(), way);
 
-					return Tuple.of(linkId2OsmWay.getKey(), createLinks(link, way, indices, direction, nodes, network.getFactory()));
-				})
-				.collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
-	}
+                    // determine the direction we have to iterate. The matsim network contains forward and backwards links for
+                    // the same way
+                    var direction = getDirection(indices);
 
-	private static long parseOrigId(Link link) {
+                    return Tuple.of(linkId2OsmWay.getKey(), createLinks(link, way, indices, direction, nodes, network.getFactory()));
+                })
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
 
-		Object attr = link.getAttributes().getAttribute("origid");
-		if (attr instanceof String) {
-			return Long.parseLong((String) attr);
-		} else if (attr instanceof Long) {
-			return (long) attr;
-		}
+        // find ways which didn't have a corresponding osm way
+        Map<Id<Link>, List<Link>> linksWithNoOsmWay = network.getLinks().entrySet().stream()
+                .filter(entry -> !result.containsKey(entry.getKey()))
+                .peek(entry -> {
+                    entry.getValue().getAttributes().putAttribute(LENGTH_FRACTION_KEY, 1.0);
+                    entry.getValue().getAttributes().putAttribute(NOT_MATCHED_KEY, true);
+                })
+                .collect(Collectors.toMap(Map.Entry::getKey, e -> List.of(e.getValue())));
 
-		throw new RuntimeException("attribute origid is expected to be either of type String or long");
-	}
+        // put them into the result as well so that emissions can be calculated for them directly
+        result.putAll(linksWithNoOsmWay);
 
-	private static int getDirection(IndexContainer indices) {
-		return indices.getEndIndex() - indices.getStartIndex() > 0 ? 1 : -1;
-	}
+        var unmatched = result.values().stream()
+                .filter(list -> list.size() <= 1)
+                .flatMap(Collection::stream)
+                .filter(link -> link.getAttributes().getAttribute(NOT_MATCHED_KEY) != null)
+                .count();
 
-	private static List<Link> createLinks(Link simpleLink, OsmWay osmWay, IndexContainer indices, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
-
-		List<Link> result = new ArrayList<>();
-		// iterate over all nodes between start and end index
-		// depending on the direction iteration is conducted for- or backwards
-		// the terminal condition will stop one iteration before i is equal to end index
-		for (var i = indices.getStartIndex(); i != indices.getEndIndex(); i += direction) {
-
-			var newLink = createLinkFromWay(osmWay, simpleLink, i, direction, nodes, factory);
-			result.add(newLink);
-		}
+        log.info(unmatched + "/" + network.getLinks().size() + " couldn't be matched :-(");
         return result;
     }
 
-	private static Link createLinkFromWay(OsmWay osmWay, Link simpleLink, int fromIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
+    private static long parseOrigId(Link link) {
 
-		var fromNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex)));
-		var toNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex + direction)));
-		var link = factory.createLink(Id.createLinkId(simpleLink.getId().toString() + "_" + fromIndex), fromNode, toNode);
+        Object attr = link.getAttributes().getAttribute("origid");
+        if (attr instanceof String) {
+            return Long.parseLong((String) attr);
+        } else if (attr instanceof Long) {
+            return (long) attr;
+        }
 
-		link.getAttributes().putAttribute("origid", simpleLink.getAttributes().getAttribute("origid"));
+        throw new RuntimeException("attribute origid is expected to be either of type String or long");
+    }
 
-		// add this attribute so that the emissions generated for the simpleLink can be distributed onto the unsimplified links correctly
-		link.getAttributes().putAttribute(LENGHT_FRACTION_KEY, link.getLength() / simpleLink.getLength());
-		return link;
-	}
+    private static int getDirection(IndexContainer indices) {
+        return indices.getEndIndex() - indices.getStartIndex() > 0 ? 1 : -1;
+    }
 
-	private static IndexContainer getIndices(Id<Node> fromNode, Id<Node> toNode, OsmWay way) {
+    private static List<Link> createLinks(Link simpleLink, OsmWay osmWay, IndexContainer indices, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
 
-		// figure out whether there are multiple candidates for the start end end node in the nodes collection of the osm-way
-		var firstFromNodeIndex = getNodeIndex(fromNode, way, 0);
-		var firstToNodeIndex = getNodeIndex(toNode, way, 0);
-		var secondFromNodeIndex = getNodeIndex(fromNode, way, firstFromNodeIndex + 1);
-		var secondToNodeIndex = getNodeIndex(toNode, way, firstToNodeIndex + 1);
+        try {
+            List<Link> result = new ArrayList<>();
 
-		// remember the first candidates in every case
-		List<IndexContainer> indexList = new ArrayList<>();
-		indexList.add(new IndexContainer(firstFromNodeIndex, firstToNodeIndex));
+            // iterate over all nodes between start and end index
+            // depending on the direction iteration is conducted for- or backwards
+            // the terminal condition will stop one iteration before i is equal to end index
+            for (var i = indices.getStartIndex(); i != indices.getEndIndex(); i += direction) {
 
-		// if there are secondary candidates also remember those and all possible combinations
-		if (secondFromNodeIndex != -1)
-			indexList.add(new IndexContainer(secondFromNodeIndex, firstToNodeIndex));
-		if (secondToNodeIndex != -1)
-			indexList.add(new IndexContainer(firstFromNodeIndex, secondToNodeIndex));
-		if (secondFromNodeIndex != -1 && secondToNodeIndex != -1)
-			indexList.add(new IndexContainer(secondFromNodeIndex, secondToNodeIndex));
+                var newLink = createLinkFromWay(osmWay, simpleLink, i, direction, nodes, factory);
+                result.add(newLink);
+            }
+            return result;
+        } catch (Exception e) {
+            // if anything goes wrong i.e. the nodes within the osm way don't match the simple link simply use the simple link
+            // as a fallback. The simple link accounts for all emissions of an emissions event
+            simpleLink.getAttributes().putAttribute(LENGTH_FRACTION_KEY, 1.0);
+            simpleLink.getAttributes().putAttribute(NOT_MATCHED_KEY, true);
+            return List.of(simpleLink);
+        }
+    }
 
-		// select the candidate pair with the fewest nodes in between
-		// maybe move comparator into static variable so it doesn't have to be rebuild each time
-		indexList.sort(Comparator.comparingInt(indexPair -> Math.abs(indexPair.getStartIndex() - indexPair.getEndIndex())));
-		return indexList.get(0);
-	}
+    private static Link createLinkFromWay(OsmWay osmWay, Link simpleLink, int fromIndex, int direction, Map<Id<Node>, Node> nodes, NetworkFactory factory) {
 
-	private static int getNodeIndex(Id<Node> fromNode, OsmWay way, int startIndex) {
 
-		for (var i = startIndex; i < way.getNumberOfNodes(); i++) {
+        var fromNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex)));
+        var toNode = nodes.get(Id.createNodeId(osmWay.getNodeId(fromIndex + direction)));
+        var link = factory.createLink(Id.createLinkId(simpleLink.getId().toString() + "_" + fromIndex), fromNode, toNode);
 
-			if (fromNode.equals(Id.createNodeId(way.getNodeId(i))))
-				return i;
-		}
+        link.getAttributes().putAttribute("origid", simpleLink.getAttributes().getAttribute("origid"));
 
-		// id was not found
-		return -1;
-	}
+        // add this attribute so that the emissions generated for the simpleLink can be distributed onto the unsimplified links correctly
+        link.getAttributes().putAttribute(LENGTH_FRACTION_KEY, link.getLength() / simpleLink.getLength());
+        return link;
 
-	@RequiredArgsConstructor
-	private static class IndexContainer {
+    }
 
-		@Getter
-		private final int startIndex;
+    private static IndexContainer getIndices(Id<Node> fromNode, Id<Node> toNode, OsmWay way) {
 
-		@Getter
-		private final int endIndex;
-	}
+        // figure out whether there are multiple candidates for the start end end node in the nodes collection of the osm-way
+        var firstFromNodeIndex = getNodeIndex(fromNode, way, 0);
+        var firstToNodeIndex = getNodeIndex(toNode, way, 0);
+        var secondFromNodeIndex = getNodeIndex(fromNode, way, firstFromNodeIndex + 1);
+        var secondToNodeIndex = getNodeIndex(toNode, way, firstToNodeIndex + 1);
 
-	@RequiredArgsConstructor
-	private static class CollectNodeReferences implements OsmHandler {
+        // remember the first candidates in every case
+        List<IndexContainer> indexList = new ArrayList<>();
+        indexList.add(new IndexContainer(firstFromNodeIndex, firstToNodeIndex));
 
-		@Getter
-		private final Map<Long, Set<OsmWay>> nodesReferencingWays = new HashMap<>();
+        // if there are secondary candidates also remember those and all possible combinations
+        if (secondFromNodeIndex != -1)
+            indexList.add(new IndexContainer(secondFromNodeIndex, firstToNodeIndex));
+        if (secondToNodeIndex != -1)
+            indexList.add(new IndexContainer(firstFromNodeIndex, secondToNodeIndex));
+        if (secondFromNodeIndex != -1 && secondToNodeIndex != -1)
+            indexList.add(new IndexContainer(secondFromNodeIndex, secondToNodeIndex));
+
+        // select the candidate pair with the fewest nodes in between
+        // maybe move comparator into static variable so it doesn't have to be rebuild each time
+        indexList.sort(Comparator.comparingInt(indexPair -> Math.abs(indexPair.getStartIndex() - indexPair.getEndIndex())));
+        return indexList.get(0);
+    }
+
+    private static int getNodeIndex(Id<Node> fromNode, OsmWay way, int startIndex) {
+
+        for (var i = startIndex; i < way.getNumberOfNodes(); i++) {
+
+            if (fromNode.equals(Id.createNodeId(way.getNodeId(i))))
+                return i;
+        }
+
+        // id was not found
+        return -1;
+    }
+
+    @RequiredArgsConstructor
+    private static class IndexContainer {
+
+        @Getter
+        private final int startIndex;
+
+        @Getter
+        private final int endIndex;
+    }
+
+    @RequiredArgsConstructor
+    private static class CollectNodeReferences implements OsmHandler {
+
+        @Getter
+        private final Map<Long, Set<OsmWay>> nodesReferencingWays = new HashMap<>();
         @Getter
         private final Map<Id<Link>, OsmWay> linkIdToWayReference = new HashMap<>();
 

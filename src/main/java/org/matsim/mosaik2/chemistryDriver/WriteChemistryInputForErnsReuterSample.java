@@ -19,6 +19,7 @@ import org.matsim.api.core.v01.network.Node;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.CoordUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
@@ -33,7 +34,26 @@ import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+/**
+ * For the ernst reuter sample scenario this used the following input params:
+ * -n open-berlin 5.4 network file
+ * -e open-berlin 5.4 10% events file
+ * -osm berlin latest from https://downloads.geofabrik.de
+ * -o local output file
+ * -s scale factor of 10 (since 10% scenario size)
+ * -cs cell size of 10m
+ * <p>
+ * For the scenario Björn Maronga runs for us we've used the same parameters as above but
+ * -cs cell size of 2m
+ * -dimX 1024
+ * -dimY 1024
+ * -origX
+ * 385029.5
+ * -origY
+ * 5818412.0
+ */
 @SuppressWarnings("FieldMayBeFinal")
 public class WriteChemistryInputForErnsReuterSample {
 
@@ -43,10 +63,10 @@ public class WriteChemistryInputForErnsReuterSample {
             Pollutant.NO2, "NO2",
             Pollutant.CO2_TOTAL, "CO2",
             Pollutant.PM, "PM10",
-            Pollutant.CO, "CO"
+            Pollutant.CO, "CO",
+            Pollutant.NOx, "NOx"
     );// NO is missing for now, it would have to be calculated from NOx - NO2
 
-    private static final double cellSize = 10;
     private static final double timeBinSize = 3600;
 
     @Parameter(names = "-n", required = true)
@@ -63,6 +83,21 @@ public class WriteChemistryInputForErnsReuterSample {
 
     @Parameter(names = "-s")
     private int scaleFactor = 100; // by default we assume that one runs this script with emissions from a 1pct sample
+
+    @Parameter(names = "-cs") // by default this is 10
+    private double cellSize = 10;
+
+    @Parameter(names = "-dimX")
+    private double xDimension = 36;
+
+    @Parameter(names = "-dimY")
+    private double yDimension = 36;
+
+    @Parameter(names = "-origX")
+    private double origX = 385761.5;
+
+    @Parameter(names = "-origY")
+    private double origY = 5819224.0;
 
     public static void main(String[] args) throws FileNotFoundException, OsmInputException {
 
@@ -95,18 +130,16 @@ public class WriteChemistryInputForErnsReuterSample {
     }
 
     private static boolean isCoveredBy(Link link, Geometry geometry) {
-        return geometry.covers(MGC.coord2Point(link.getFromNode().getCoord())) || geometry.covers(MGC.coord2Point(link.getToNode().getCoord()));
+        return geometry.covers(MGC.coord2Point(link.getFromNode().getCoord())) && geometry.covers(MGC.coord2Point(link.getToNode().getCoord()));
     }
 
-    private static Geometry createBoundingBox() {
+    private Geometry createBoundingBox() {
 
-        // these are taken from the ernst-reuter-example we've received from the FU-Berlin
         final var originX = 0; // southern boundary
         final var originY = 0; // western boundary
-        final var numberOfCells = 36;
 
-        final var maxX = originX + numberOfCells * cellSize;
-        final var maxY = originY + numberOfCells * cellSize;
+        final var maxX = originX + xDimension * cellSize;
+        final var maxY = originY + yDimension * cellSize;
 
         return new GeometryFactory().createPolygon(new Coordinate[]{
                 new Coordinate(originX, originY), new Coordinate(originX, maxY),
@@ -119,7 +152,7 @@ public class WriteChemistryInputForErnsReuterSample {
 
         var network = NetworkUtils.readNetwork(networkFile);
         var bounds = createBoundingBox();
-        var originUTM33 = new Coord(385761.5, 5819224.0);
+        var originUTM33 = new Coord(origX, origY);
 
         // transform network onto UTM-33 and relative to the origin coord, so that the raster has origin = (0,0)
         var filteredNetwork = network.getLinks().values().parallelStream()
@@ -151,7 +184,7 @@ public class WriteChemistryInputForErnsReuterSample {
 
                 // distribute the emissions from the simplified link onto the more detailed sub links from osm
                 for (Link link : linkToUnsimplifiedLinks.get(id)) {
-                    var lengthFraction = (double) link.getAttributes().getAttribute(NetworkUnsimplifier.LENGHT_FRACTION_KEY);
+                    var lengthFraction = (double) link.getAttributes().getAttribute(NetworkUnsimplifier.LENGTH_FRACTION_KEY);
                     // scaleFactor to compensate for scenario sample size
                     // lengthFraction to weight the unsimplified sub-links according to their share of the overall length of the simplified link
                     var linkEmission = value * scaleFactor * lengthFraction;
@@ -175,15 +208,35 @@ public class WriteChemistryInputForErnsReuterSample {
         TimeBinMap<Map<String, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
         for (var bin : timeBinMap.getTimeBins()) {
 
-            Map<String, Raster> rasterByPollutant = new HashMap<>();
-            for (var emissionByPollutant : bin.getValue().entrySet()) {
+            logger.info("Writing emissions to raster for timestep: " + bin.getStartTime());
 
-                var emissions = emissionByPollutant.getValue();
-                var raster = Bresenham.rasterizeNetwork(unsimplifiedNetwork, new Raster.Bounds(0, 0, 36 * cellSize, 36 * cellSize), emissions, cellSize);
-                var palmPollutantKey = pollutants.get(emissionByPollutant.getKey());
-                rasterByPollutant.put(palmPollutantKey, raster);
-            }
+            var rasterByPollutant = bin.getValue().entrySet().parallelStream()
+                    .map(entry -> {
+
+                        var emissions = entry.getValue();
+                        var raster = Bresenham.rasterizeNetwork(unsimplifiedNetwork, new Raster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
+                        var palmPollutantKey = pollutants.get(entry.getKey());
+                        return Tuple.of(palmPollutantKey, raster);
+                    })
+                    .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
             rasterTimeBinMap.getTimeBin(bin.getStartTime()).setValue(rasterByPollutant);
+        }
+
+        // calculate no
+        for (TimeBinMap.TimeBin<Map<String, Raster>> timeBin : rasterTimeBinMap.getTimeBins()) {
+
+            var no2 = timeBin.getValue().get(pollutants.get(Pollutant.NO2));
+            var nox = timeBin.getValue().get(pollutants.get(Pollutant.NOx));
+            var no = new Raster(no2.getBounds(), no2.getCellSize());
+
+            nox.forEachCoordinate((x, y, noxValue) -> {
+                var no2Value = no2.getValueByCoord(x, y);
+                var noValue = noxValue - no2Value;
+                no.adjustValueForCoord(x, y, noValue);
+            });
+
+            timeBin.getValue().put("NO", no);
+            timeBin.getValue().remove("NOx");
         }
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasterTimeBinMap);

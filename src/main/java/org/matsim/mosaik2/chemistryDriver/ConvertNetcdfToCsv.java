@@ -22,10 +22,13 @@ public class ConvertNetcdfToCsv {
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:25833", "EPSG:31468");
 
     @Parameter(names = "-input")
-    public String netcdfFile = "";
+    public String netcdfFile;
 
     @Parameter(names = "-output")
-    public String outputfile = "";
+    public String outputfile;
+
+    @Parameter(names = "-pollutant")
+    public String pollutant;
 
 
     public static void main(String[] args) {
@@ -44,7 +47,7 @@ public class ConvertNetcdfToCsv {
         try (var netcdfFile = NetcdfFile.open(this.netcdfFile); var csvFile = Files.newBufferedWriter(Paths.get(outputfile)); var printer = new CSVPrinter(csvFile, CSVFormat.DEFAULT)) {
 
             // print csv header
-            printer.printRecord("time", "x", "y", "PM10");
+            printer.printRecord("time", "x", "y", pollutant);
 
             var xValues = NetcdfUtils.toDoubleArray(netcdfFile.findVariable("Eu_UTM"));
             var yValues = NetcdfUtils.toDoubleArray(netcdfFile.findVariable("Nu_UTM"));
@@ -53,7 +56,7 @@ public class ConvertNetcdfToCsv {
             /*
             float kc_NO(time=1440, ku_above_surf=1, y=36, x=36);
              */
-            var noValues = netcdfFile.findVariable("kc_PM10");
+            var noValues = netcdfFile.findVariable("kc_" + pollutant);
 
             for (int ti = 0; ti < times.size(); ti++) {
                 for(int yi = 0; yi < yValues.size(); yi++) {

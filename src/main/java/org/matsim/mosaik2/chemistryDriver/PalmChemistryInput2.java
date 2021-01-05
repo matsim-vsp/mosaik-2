@@ -152,8 +152,7 @@ public class PalmChemistryInput2 {
         writer.findVariable(Z).addAttribute(new Attribute("units", "m"));
         writer.findVariable(EMISSION_VALUES).addAttribute(new Attribute("long_name", "emission values"));
         writer.findVariable(EMISSION_VALUES).addAttribute(new Attribute("_Fill_Value", -999.9F));
-        // unclear whether it is this unit in our case...
-        writer.findVariable(EMISSION_VALUES).addAttribute(new Attribute("units", "g/m2/hour"));
+        writer.findVariable(EMISSION_VALUES).addAttribute(new Attribute("units", "kg/m2/hour"));
     }
 
     private static void writeGlobalAttributes(NetcdfFileWriter writer) {

@@ -15,7 +15,6 @@ import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.NetworkFactory;
-import org.matsim.api.core.v01.network.Node;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.network.NetworkUtils;
@@ -31,7 +30,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -148,7 +146,7 @@ public class WriteChemistryInputForErnsReuterSample {
         });
     }
 
-    private void write2() throws FileNotFoundException, OsmInputException {
+    private void write2() {
 
         var network = NetworkUtils.readNetwork(networkFile);
         var bounds = createBoundingBox();
@@ -160,7 +158,7 @@ public class WriteChemistryInputForErnsReuterSample {
                 .filter(link -> isCoveredBy(link, bounds))
                 .collect(NetworkUtils.getCollector());
 
-        var linkToUnsimplifiedLinks = NetworkUnsimplifier.unsimplifyNetwork(filteredNetwork, osmFile, "EPSG:25833");
+        // var linkToUnsimplifiedLinks = NetworkUnsimplifier.unsimplifyNetwork(filteredNetwork, osmFile, "EPSG:25833");
 
         // read emissions into time bins sorted by pollutant and link id
         TimeBinMap<Map<Pollutant, TObjectDoubleMap<Id<Link>>>> timeBinMap = new TimeBinMap<>(timeBinSize);
@@ -183,18 +181,25 @@ public class WriteChemistryInputForErnsReuterSample {
                 var linkEmissions = emissionsByPollutant.computeIfAbsent(pollutant, p -> new TObjectDoubleHashMap<>());
 
                 // distribute the emissions from the simplified link onto the more detailed sub links from osm
-                for (Link link : linkToUnsimplifiedLinks.get(id)) {
+              /*  for (Link link : linkToUnsimplifiedLinks.get(id)) {
                     var lengthFraction = (double) link.getAttributes().getAttribute(NetworkUnsimplifier.LENGTH_FRACTION_KEY);
                     // scaleFactor to compensate for scenario sample size
                     // lengthFraction to weight the unsimplified sub-links according to their share of the overall length of the simplified link
-                    var linkEmission = value * scaleFactor * lengthFraction;
+                    // divide by 1000 because the palm input is expected to be in kg/m2/dt
+                    var linkEmission = value * scaleFactor * lengthFraction / 1000;
                     linkEmissions.adjustOrPutValue(link.getId(), linkEmission, linkEmission);
                 }
+
+               */
+
+                // do it unsimplified
+                var linkEmission = value * scaleFactor / 1000;
+                linkEmissions.adjustOrPutValue(id, linkEmission, linkEmission);
             }
         }).readFile(emissionEventsFile);
 
         // create a network out of the unsimplified links
-        var unsimplifiedNetwork = linkToUnsimplifiedLinks.values().stream()
+       /* var unsimplifiedNetwork = linkToUnsimplifiedLinks.values().stream()
                 .flatMap(Collection::stream)
                 .collect(NetworkUtils.getCollector());
 
@@ -203,6 +208,9 @@ public class WriteChemistryInputForErnsReuterSample {
             var relativeToOrigin = CoordUtils.minus(node.getCoord(), originUTM33);
             node.setCoord(relativeToOrigin);
         }
+        */
+
+        // unsimplified network is already adjusted to origin
 
         // transform emissions by link into emissions on a raster
         TimeBinMap<Map<String, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
@@ -214,7 +222,9 @@ public class WriteChemistryInputForErnsReuterSample {
                     .map(entry -> {
 
                         var emissions = entry.getValue();
-                        var raster = Bresenham.rasterizeNetwork(unsimplifiedNetwork, new Raster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
+                        //var raster = Bresenham.rasterizeNetwork(unsimplifiedNetwork, new Raster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
+                        // do it unsimplified
+                        var raster = Bresenham.rasterizeNetwork(filteredNetwork, new Raster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
                         var palmPollutantKey = pollutants.get(entry.getKey());
                         return Tuple.of(palmPollutantKey, raster);
                     })

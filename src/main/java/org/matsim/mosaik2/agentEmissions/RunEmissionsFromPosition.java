@@ -215,7 +215,7 @@ public class RunEmissionsFromPosition {
         @Override
         public void handleEvent(Event event) {
 
-            if (event.getEventType().equals(PositionEmissionsModule.EmissionPositionEvent.EVENT_TYPE)) {
+            if (event.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE)) {
                 delegate.handleEvent(event);
             }
         }

@@ -1,7 +1,9 @@
 package org.matsim.mosaik2.agentEmissions;
 
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.network.Network;
@@ -26,6 +28,7 @@ import org.matsim.core.controler.events.ShutdownEvent;
 import org.matsim.core.controler.listener.AfterMobsimListener;
 import org.matsim.core.controler.listener.BeforeMobsimListener;
 import org.matsim.core.controler.listener.ShutdownListener;
+import org.matsim.core.events.SimStepParallelEventsManagerImpl;
 import org.matsim.core.events.algorithms.EventWriter;
 import org.matsim.core.events.algorithms.EventWriterXML;
 import org.matsim.core.events.handler.BasicEventHandler;
@@ -38,14 +41,18 @@ import org.matsim.vehicles.EngineInformation;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
+import ucar.ma2.*;
+import ucar.nc2.NetcdfFileWriter;
 
 import javax.inject.Inject;
+import javax.inject.Singleton;
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 public class RunEmissionsFromPosition {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
 
         var emissionConfig = new EmissionsConfigGroup();
         emissionConfig.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.fromVehicleTypeDescription);
@@ -102,7 +109,9 @@ public class RunEmissionsFromPosition {
         controler.addOverridingModule(new AbstractModule() {
             @Override
             public void install() {
+
                 addControlerListenerBinding().to(MobsimHandler.class);
+                bind(EventsManager.class).to(SimStepParallelEventsManagerImpl.class).in(Singleton.class);
             }
         });
 
@@ -179,27 +188,43 @@ public class RunEmissionsFromPosition {
         @Inject
         private OutputDirectoryHierarchy outputDirectoryHierarchy;
 
-        private WriterHandler handler;
+        @Inject
+        private Scenario scenario;
+
+        private WriterHandler xmlHandler;
+        private NetcdfWriterHandler netcdfHandler;
+
+
 
         @Override
         public void notifyAfterMobsim(AfterMobsimEvent event) {
-            eventsManager.removeHandler(handler);
-            handler.closeFile();
-            handler = null;
+            eventsManager.removeHandler(xmlHandler);
+            xmlHandler.closeFile();
+            xmlHandler = null;
+
+            eventsManager.removeHandler(netcdfHandler);
+            netcdfHandler.closeFile();
+            netcdfHandler = null;
         }
 
         @Override
         public void notifyBeforeMobsim(BeforeMobsimEvent event) {
             if (event.isLastIteration()) {
-                handler = new WriterHandler(outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "position-emissions.xml.gz"));
-                eventsManager.addHandler(handler);
+                xmlHandler = new WriterHandler(outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "position-emissions.xml.gz"));
+                eventsManager.addHandler(xmlHandler);
+                try {
+                    netcdfHandler = new NetcdfWriterHandler(outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "position-emissions.nc"), scenario.getPopulation().getPersons().size());
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                eventsManager.addHandler(netcdfHandler);
             }
         }
 
         @Override
         public void notifyShutdown(ShutdownEvent event) {
-            if (event.isUnexpected() && handler != null)
-                handler.closeFile();
+            if (event.isUnexpected() && xmlHandler != null)
+                xmlHandler.closeFile();
         }
     }
 
@@ -223,6 +248,133 @@ public class RunEmissionsFromPosition {
         @Override
         public void closeFile() {
             delegate.closeFile();
+        }
+    }
+
+    private static class NetcdfWriterHandler implements BasicEventHandler, EventWriter {
+
+        private final NetcdfFileWriter writer;
+        private final Object2IntOpenHashMap<Id<Vehicle>> idMapping = new Object2IntOpenHashMap<>();
+
+        // only try time and ids for now
+        private int[] currentTimeIndex = new int[] {-1};
+        private double currentTimeStep = Double.NEGATIVE_INFINITY;
+
+        private int currentPersonIndex = 0;
+        private int lastIntId = 0;
+
+        private final Array timeData = Array.factory(DataType.DOUBLE, new int[] {1});
+        private final Array numberOfVehicles = Array.factory(DataType.INT, new int[] {1});
+        private ArrayInt.D2 vehicleIds;
+        private ArrayDouble.D2 x;
+        private ArrayDouble.D2 y;
+
+
+        private NetcdfWriterHandler(String filename, int numberOfAgents) throws IOException {
+            writer = NetcdfFileWriter.createNew(NetcdfFileWriter.Version.netcdf3, filename);
+            writeDimensions(numberOfAgents);
+            writeVariables();
+            writer.create();
+        }
+
+        private void writeDimensions(int numberOfAgents) {
+
+            writer.addUnlimitedDimension("time");
+            writer.addDimension("agents", numberOfAgents);
+        }
+
+        private void writeVariables() {
+
+            writer.addVariable("time", DataType.DOUBLE, "time");
+            writer.addVariable("number_of_vehicles", DataType.INT, "time");
+            writer.addVariable("vehicle_id", DataType.INT, "time agents");
+            writer.addVariable("x", DataType.DOUBLE, "time agents");
+            writer.addVariable("y", DataType.DOUBLE, "time agents");
+
+            // next think about emissions
+        }
+
+        @Override
+        public void closeFile() {
+            try {
+                // write data from last timestep
+                writeData();
+                writer.close();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Override
+        public void handleEvent(Event event) {
+            if (event.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE)) {
+
+                var positionEmissionEvent = (PositionEmissionsModule.PositionEmissionEvent)event;
+                if (positionEmissionEvent.getEmissionType().equals("cold")) return; // ignore cold events for now, but think about it later
+
+                var time = positionEmissionEvent.getTime();
+                adjustTime(time);
+                int intId = idMapping.computeIfAbsent(positionEmissionEvent.getVehicleId(), id -> {
+                    lastIntId++;
+                    return lastIntId;
+                });
+
+                try {
+                    vehicleIds.set(0, currentPersonIndex, intId);
+                    x.set(0, currentPersonIndex, positionEmissionEvent.getCoord().getX());
+                    y.set(0, currentPersonIndex, positionEmissionEvent.getCoord().getY());
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+                currentPersonIndex++;
+            }
+        }
+
+        @Override
+        public void reset(int iteration) {
+            currentTimeStep = 0;
+            currentPersonIndex = 0;
+            currentTimeIndex = new int[] {-1};
+        }
+
+        private void adjustTime(double time) {
+            if (time > currentTimeStep) {
+
+                // assuming that only positive time values are valid
+                if (currentTimeStep >= 0)
+                    writeData();
+
+                beforeTimestep(time);
+            }
+        }
+
+        private void writeData() {
+            // write all the stuff
+            try {
+                timeData.setDouble(timeData.getIndex(), currentTimeStep);
+                writer.write("time", currentTimeIndex, timeData);
+
+                numberOfVehicles.setInt(numberOfVehicles.getIndex(), (int) vehicleIds.getSize());
+                writer.write("number_of_vehicles", currentTimeIndex, numberOfVehicles);
+
+                writer.write("vehicle_id", new int[] {currentTimeIndex[0], 0}, vehicleIds);
+                writer.write("x", new int[] { currentTimeIndex[0], 0}, x);
+                writer.write("y", new int[] { currentTimeIndex[0], 0}, y);
+            } catch (IOException | InvalidRangeException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        private void beforeTimestep(double time) {
+
+            // reset all the state
+            currentTimeStep = time;
+            currentPersonIndex = 0;
+            currentTimeIndex[0] = currentTimeIndex[0] + 1; // increase time index by 1
+            // person data for the next time slice. Of dimension 1 for timestep and of number of agents for agents
+            vehicleIds = new ArrayInt.D2(1, writer.findDimension("agents").getLength(), false);
+            x = new ArrayDouble.D2(1, writer.findDimension("agents").getLength());
+            y = new ArrayDouble.D2(1, writer.findDimension("agents").getLength());
         }
     }
 }

@@ -11,6 +11,7 @@ import org.matsim.core.config.Config;
 import org.matsim.core.config.groups.ControlerConfigGroup;
 import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.vehicles.EngineInformation;
+import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
 
@@ -52,7 +53,9 @@ public class Utils {
         config.controler().setWriteSnapshotsInterval(1);
         config.controler().setSnapshotFormat(Set.of(ControlerConfigGroup.SnapshotFormat.positionevents));
         config.controler().setFirstIteration(0);
-        config.controler().setLastIteration(10);
+        config.controler().setLastIteration(0);
+        // we want simstepparalleleventsmanagerimpl
+        config.parallelEventHandling().setSynchronizeOnSimSteps(true);
     }
 
     static void applyNetworkAttributes(Network network) {
@@ -109,32 +112,19 @@ public class Utils {
 
     static void applyVehicleInformation(VehicleType vehicleType) {
 
-
-
         EngineInformation engineInformation = vehicleType.getEngineInformation();
         VehicleUtils.setHbefaVehicleCategory( engineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
         VehicleUtils.setHbefaTechnology( engineInformation, "average" );
         VehicleUtils.setHbefaSizeClass( engineInformation, "average" );
         VehicleUtils.setHbefaEmissionsConcept( engineInformation, "average" );
+    }
 
-        /*EngineInformation freightEngineInformation = freightVehicleType.getEngineInformation();
-        VehicleUtils.setHbefaVehicleCategory( freightEngineInformation, HbefaVehicleCategory.HEAVY_GOODS_VEHICLE.toString());
-        VehicleUtils.setHbefaTechnology( freightEngineInformation, "average" );
-        VehicleUtils.setHbefaSizeClass( freightEngineInformation, "average" );
-        VehicleUtils.setHbefaEmissionsConcept( freightEngineInformation, "average" );
+    public static void createAndAddVehicles(Scenario scenario, VehicleType type) {
 
-
-
-        // public transit vehicles should be considered as non-hbefa vehicles
-        for (VehicleType type : scenario.getTransitVehicles().getVehicleTypes().values()) {
-            EngineInformation engineInformation = type.getEngineInformation();
-            // TODO: Check! Is this a zero emission vehicle?!
-            VehicleUtils.setHbefaVehicleCategory( engineInformation, HbefaVehicleCategory.NON_HBEFA_VEHICLE.toString());
-            VehicleUtils.setHbefaTechnology( engineInformation, "average" );
-            VehicleUtils.setHbefaSizeClass( engineInformation, "average" );
-            VehicleUtils.setHbefaEmissionsConcept( engineInformation, "average" );
+        for (var person : scenario.getPopulation().getPersons().values()) {
+            Vehicle vehicle = VehicleUtils.createVehicle(Id.createVehicleId(person.getId().toString() + "_car"), type);
+            scenario.getVehicles().addVehicle(vehicle);
+            VehicleUtils.insertVehicleIdsIntoAttributes(person, Map.of("car", vehicle.getId()));
         }
-
-         */
     }
 }

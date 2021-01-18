@@ -37,21 +37,12 @@ public class RunEquilSetUp {
         scenario.getVehicles().addVehicleType(vehicleType);
         Utils.applyVehicleInformation(vehicleType);
 
-        createAndAddVehicles(scenario, vehicleType);
+        Utils.createAndAddVehicles(scenario, vehicleType);
         var controler = new Controler(scenario);
 
         controler.addOverridingModule(new PositionEmissionsModule());
         controler.addOverridingModule(new PositionEmissionNetcdfModule());
 
         controler.run();
-    }
-
-    private static void createAndAddVehicles(Scenario scenario, VehicleType type) {
-
-        for (var person : scenario.getPopulation().getPersons().values()) {
-            Vehicle vehicle = VehicleUtils.createVehicle(Id.createVehicleId(person.getId().toString() + "_car"), type);
-            scenario.getVehicles().addVehicle(vehicle);
-            VehicleUtils.insertVehicleIdsIntoAttributes(person, Map.of("car", vehicle.getId()));
-        }
     }
 }

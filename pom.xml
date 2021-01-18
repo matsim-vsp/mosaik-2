@@ -58,6 +58,12 @@
             <version>12.2</version>
         </dependency>
 
+        <dependency>
+        <groupId>com.github.matsim-scenarios</groupId>
+        <artifactId>matsim-berlin</artifactId>
+        <version>5.5.1</version>
+        </dependency>
+
         <!-- netcdf support -->
         <dependency>
             <groupId>edu.ucar</groupId>

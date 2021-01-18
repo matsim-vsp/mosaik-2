@@ -35,7 +35,6 @@
             <groupId>org.matsim</groupId>
             <artifactId>matsim-examples</artifactId>
             <version>${matsim.version}</version>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.matsim.contrib</groupId>

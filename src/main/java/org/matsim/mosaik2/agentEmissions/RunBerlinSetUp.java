@@ -72,8 +72,8 @@ public class RunBerlinSetUp {
 
         var controler = RunBerlinScenario.prepareControler(scenario);
 
-        controler.addOverridingModule(new PositionEmissionsModule());
-        controler.addOverridingModule(new PositionEmissionNetcdfModule());
+      //  controler.addOverridingModule(new PositionEmissionsModule());
+      //  controler.addOverridingModule(new PositionEmissionNetcdfModule());
 
         controler.run();
     }

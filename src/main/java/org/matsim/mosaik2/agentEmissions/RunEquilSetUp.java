@@ -26,7 +26,7 @@ public class RunEquilSetUp {
         var config = ConfigUtils.loadConfig(configPath, emissionConfig, netcdfConfig);
 
         config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
-        config.controler().setOutputDirectory("C:\\Users\\Janekdererste\\Desktop\\position-emission");
+        config.controler().setOutputDirectory("test/output/position-emission");
         config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
         Utils.applySnapshotSettings(config);
 

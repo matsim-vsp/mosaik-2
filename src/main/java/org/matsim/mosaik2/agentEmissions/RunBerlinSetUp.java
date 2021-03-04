@@ -24,7 +24,7 @@ public class RunBerlinSetUp {
         var config = RunBerlinScenario.prepareConfig(args, emissionsConfig, positionEmissionNetcdfConfig);
 
         config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
-        config.controler().setOutputDirectory("C:\\Users\\Janekdererste\\Desktop\\berlin-position-emissions");
+        config.controler().setOutputDirectory("test/output/berlin-position-emissions");
 
         Utils.applySnapshotSettings(config);
 

@@ -24,10 +24,10 @@ public class Utils {
         var emissionConfig = new EmissionsConfigGroup();
         emissionConfig.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
         emissionConfig.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.tryDetailedThenTechnologyAverageThenAverageTable);
-        emissionConfig.setDetailedColdEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_ColdStart_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
-        emissionConfig.setDetailedWarmEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_HOT_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
-        emissionConfig.setAverageColdEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_ColdStart_Vehcat_2020_Average.csv");
-        emissionConfig.setAverageWarmEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_HOT_Vehcat_2020_Average.csv");
+        emissionConfig.setDetailedColdEmissionFactorsFile("../shared-svn/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
+        emissionConfig.setDetailedWarmEmissionFactorsFile("../shared-svn/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
+        emissionConfig.setAverageColdEmissionFactorsFile("../shared-svn/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Vehcat_2020_Average.csv");
+        emissionConfig.setAverageWarmEmissionFactorsFile("../shared-svn/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv");
         emissionConfig.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
         return emissionConfig;
     }

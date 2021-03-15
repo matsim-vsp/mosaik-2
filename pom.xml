@@ -96,6 +96,26 @@
             <artifactId>fastutil</artifactId>
             <version>8.4.3</version>
         </dependency>
+
+        <!-- https://mvnrepository.com/artifact/edu.ucar/netcdf -->
+        <dependency>
+            <groupId>edu.ucar</groupId>
+            <artifactId>netcdf</artifactId>
+            <version>4.2</version>
+
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>log4j</groupId>
+                    <artifactId>log4j</artifactId>
+                </exclusion>
+            </exclusions>
+
+        </dependency>
+
     </dependencies>
 
     <build>

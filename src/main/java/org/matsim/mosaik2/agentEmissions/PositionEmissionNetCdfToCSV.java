@@ -162,25 +162,5 @@ public class PositionEmissionNetCdfToCSV {
         private String outputCsvFile;
 
     }
-    
-    private class ValueMatcher {
-        int id;
-        double time;
-        
-        ValueMatcher(int id, double time){
-            this.id = id;
-            this.time = time;
-        }
-
-        public int getId() {
-            return id;
-        }
-
-        public double getTime() {
-            return time;
-        }
-    }
-
-
 
 }

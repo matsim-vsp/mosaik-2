@@ -63,6 +63,7 @@ public class RunSimpleSetUp {
         var config = ConfigUtils.createConfig(emissionConfig, netcdfWriterConfig);
         config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
         config.controler().setOutputDirectory("test/output/position-emission");
+        config.controler().setLastIteration(0);
 
         final PlanCalcScoreConfigGroup.ActivityParams homeParams = new PlanCalcScoreConfigGroup.ActivityParams("home")
                 .setTypicalDuration(20);

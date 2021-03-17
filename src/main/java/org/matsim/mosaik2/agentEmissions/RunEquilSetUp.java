@@ -30,7 +30,7 @@ public class RunEquilSetUp {
         config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
         Utils.applySnapshotSettings(config);
 
-        config.controler().setLastIteration(20);
+        config.controler().setLastIteration(10);
 
 
         var scenario = ScenarioUtils.loadScenario(config);

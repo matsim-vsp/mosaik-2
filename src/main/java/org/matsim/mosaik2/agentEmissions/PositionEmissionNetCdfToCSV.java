@@ -20,6 +20,19 @@ import java.util.Map;
  * @author dwedekind
  */
 
+/**
+ * This is a class for converting position emissions in netcdf format to csv format
+ * (for e. g. easier plausibility checks of the netcdf content).
+ *
+ * The main method takes to input arguments:
+ * -netCdfFile => which is the path string of your netcdf file
+ * -outputCsvFile => which is the path string of your output csv file
+ *
+ * The code of this class was specifically written for the emissions netcdf design
+ * and is not generally applicable for converting any type of netcdf to csv.
+ *
+ */
+
 public class PositionEmissionNetCdfToCSV {
     private static final Logger log = Logger.getLogger(PositionEmissionNetCdfToCSV.class);
     private final NetcdfFile ncFile;

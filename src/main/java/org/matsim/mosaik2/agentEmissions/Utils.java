@@ -54,7 +54,7 @@ public class Utils {
         config.controler().setWriteSnapshotsInterval(1);
         config.controler().setSnapshotFormat(Set.of(ControlerConfigGroup.SnapshotFormat.positionevents));
         config.controler().setFirstIteration(0);
-        /*config.controler().setLastIteration(0);*/
+//        config.controler().setLastIteration(0);
         // we want simstepparalleleventsmanagerimpl
         config.parallelEventHandling().setSynchronizeOnSimSteps(true);
     }

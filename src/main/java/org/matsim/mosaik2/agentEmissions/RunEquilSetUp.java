@@ -30,6 +30,9 @@ public class RunEquilSetUp {
         config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
         Utils.applySnapshotSettings(config);
 
+        config.controler().setLastIteration(10);
+
+
         var scenario = ScenarioUtils.loadScenario(config);
         Utils.applyNetworkAttributes(scenario.getNetwork());
 
@@ -42,6 +45,8 @@ public class RunEquilSetUp {
 
         controler.addOverridingModule(new PositionEmissionsModule());
         controler.addOverridingModule(new PositionEmissionNetcdfModule());
+
+
 
         controler.run();
     }

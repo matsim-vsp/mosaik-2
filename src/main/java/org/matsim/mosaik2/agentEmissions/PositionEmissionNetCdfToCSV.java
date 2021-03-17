@@ -10,11 +10,13 @@ import ucar.ma2.Array;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
 
+import javax.xml.stream.events.Characters;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * @author dwedekind
@@ -33,6 +35,7 @@ import java.util.Map;
  *
  */
 
+
 public class PositionEmissionNetCdfToCSV {
     private static final Logger log = Logger.getLogger(PositionEmissionNetCdfToCSV.class);
     private final NetcdfFile ncFile;
@@ -45,8 +48,8 @@ public class PositionEmissionNetCdfToCSV {
         JCommander.newBuilder().addObject(input).build().parse(args);
         log.info("Input netcdf file: " + input.netCdfFile);
         PositionEmissionNetCdfToCSV converter = new PositionEmissionNetCdfToCSV( input.netCdfFile );
-        List<String> csvRows = converter.processNetCdfToCSVLines();
-        converter.printResults(csvRows, input.outputCsvFile);
+        List<List<String>> row2columns = converter.processNetCdfToRowList();
+        converter.printResults(row2columns, input.outputCsvFile);
 
     }
 
@@ -62,7 +65,7 @@ public class PositionEmissionNetCdfToCSV {
     }
 
 
-    public void printResults(List<String> csvRows, String csvfileName) {
+    public void printResults(List<List<String>> row2columns, String csvfileName) {
 
         try {
 
@@ -70,7 +73,7 @@ public class PositionEmissionNetCdfToCSV {
             CSVPrinter csvPrinter = new CSVPrinter(IOUtils.getBufferedWriter(csvfileName),
                     CSVFormat.DEFAULT.withDelimiter(separator.charAt(0)).withHeader(HEADER));
 
-            for (var row: csvRows){
+            for (var row: row2columns){
                 csvPrinter.printRecord(row);
             }
 
@@ -84,8 +87,8 @@ public class PositionEmissionNetCdfToCSV {
     }
 
 
-    private List<String> processNetCdfToCSVLines() {
-        List<String> csvRows = new ArrayList<>();
+    private List<List<String>> processNetCdfToRowList() {
+        List<List<String>> row2columns = new ArrayList<>();
 
         Map<Integer, Map<Integer, String>> vehicleIds = returnId2ValueMap("vehicle_id");
         Map<Integer, Map<Integer, String>> xs = returnId2ValueMap("x");
@@ -110,13 +113,13 @@ public class PositionEmissionNetCdfToCSV {
                 oneLine.add(no2s.get(time2VehicleAndValue.getKey()).get(vehicleAndValue.getKey()));
                 oneLine.add(pm10s.get(time2VehicleAndValue.getKey()).get(vehicleAndValue.getKey()));
                 oneLine.add(nos.get(time2VehicleAndValue.getKey()).get(vehicleAndValue.getKey()));
-                csvRows.add(String.join(",", oneLine));
+                row2columns.add(oneLine.stream().map(CharSequence::toString).collect(Collectors.toList()));
 
             }
 
         }
 
-        return csvRows;
+        return row2columns;
 
     }
 

@@ -18,7 +18,6 @@ import org.matsim.core.controler.listener.AfterMobsimListener;
 import org.matsim.core.controler.listener.BeforeMobsimListener;
 import org.matsim.core.controler.listener.ShutdownListener;
 import org.matsim.core.events.algorithms.EventWriter;
-import org.matsim.core.events.algorithms.EventWriterXML;
 import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.vehicles.Vehicle;
@@ -140,7 +139,10 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
     private static class NetcdfWriterHandler implements BasicEventHandler, EventWriter {
 
         private final NetcdfFileWriter writer;
+
+        // Mapping of string based matsim ids to successive integer (due to netcdf file format)
         private final Object2IntOpenHashMap<Id<Vehicle>> idMapping = new Object2IntOpenHashMap<>();
+
         private final Map<Pollutant, String> pollutants;
         private final boolean calculateNO;
 
@@ -148,7 +150,7 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
         private int[] currentTimeIndex = new int[] {-1};
         private double currentTimeStep = Double.NEGATIVE_INFINITY;
 
-        private int currentPersonIndex = 0;
+        private int currentVehicleIndex = 0;
         private int lastIntId = 0;
 
         private final Array timeData = Array.factory(DataType.DOUBLE, new int[] {1});
@@ -236,6 +238,7 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
 
                 if (positionEmissionEvent.getEmissionType().equals("cold")) return; // ignore cold events for now, but think about it later
 
+                // Set currentTimeStep to current event time if necessary
                 adjustTime(positionEmissionEvent.getTime());
 
                 int intId = idMapping.computeIfAbsent(positionEmissionEvent.getVehicleId(), id -> {
@@ -244,16 +247,16 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
                 });
 
                 try {
-                    vehicleIds.set(0, currentPersonIndex, intId);
-                    x.set(0, currentPersonIndex, positionEmissionEvent.getCoord().getX());
-                    y.set(0, currentPersonIndex, positionEmissionEvent.getCoord().getY());
+                    vehicleIds.set(0, currentVehicleIndex, intId);
+                    x.set(0, currentVehicleIndex, positionEmissionEvent.getCoord().getX());
+                    y.set(0, currentVehicleIndex, positionEmissionEvent.getCoord().getY());
 
                     for (var eventEmissions : positionEmissionEvent.getEmissions().entrySet()) {
                         if (pollutants.containsKey(eventEmissions.getKey())) {
 
                             var dataKey = pollutants.get(eventEmissions.getKey());
                             var data = emissions.get(dataKey);
-                            data.set(0, currentPersonIndex, eventEmissions.getValue());
+                            data.set(0, currentVehicleIndex, eventEmissions.getValue());
                         }
                     }
 
@@ -262,23 +265,24 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
                         var no2 = positionEmissionEvent.getEmissions().get(Pollutant.NO2);
                         var no = nox - no2;
                         var data = emissions.get("NO");
-                        data.set(0, currentPersonIndex, no);
+                        data.set(0, currentVehicleIndex, no);
                     }
 
                 } catch (Exception e) {
                     throw new RuntimeException(e);
                 }
-                currentPersonIndex++;
+                currentVehicleIndex++;
             }
         }
 
         @Override
         public void reset(int iteration) {
             currentTimeStep = 0;
-            currentPersonIndex = 0;
+            currentVehicleIndex = 0;
             currentTimeIndex = new int[] {-1};
         }
 
+        // ToDo - Check here
         private void adjustTime(double time) {
             if (time > currentTimeStep) {
 
@@ -296,7 +300,7 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
                 timeData.setDouble(timeData.getIndex(), currentTimeStep);
                 writer.write("time", currentTimeIndex, timeData);
 
-                numberOfVehicles.setInt(numberOfVehicles.getIndex(), currentPersonIndex);
+                numberOfVehicles.setInt(numberOfVehicles.getIndex(), currentVehicleIndex);
                 writer.write("number_of_vehicles", currentTimeIndex, numberOfVehicles);
 
                 writer.write("vehicle_id", getCurrentIndex(), vehicleIds);
@@ -319,11 +323,13 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
             return new int[] { currentTimeIndex[0], 0};
         }
 
+
+        // ToDo - Check here
         private void beforeTimestep(double time) {
 
             // reset all the state
             currentTimeStep = time;
-            currentPersonIndex = 0;
+            currentVehicleIndex = 0;
             currentTimeIndex[0] = currentTimeIndex[0] + 1; // increase time index by 1
             // person data for the next time slice. Of dimension 1 for timestep and of number of agents for agents
             vehicleIds = new ArrayInt.D2(1, writer.findDimension("agents").getLength(), false);

@@ -90,6 +90,7 @@ public class PositionEmissionNetCdfToCSV {
     private List<List<String>> processNetCdfToRowList() {
         List<List<String>> row2columns = new ArrayList<>();
 
+        List<Integer> timeOffset = returnTimesOffset();
         Map<Integer, Map<Integer, String>> vehicleIds = returnId2ValueMap("vehicle_id");
         Map<Integer, Map<Integer, String>> xs = returnId2ValueMap("x");
         Map<Integer, Map<Integer, String>> ys = returnId2ValueMap("y");
@@ -103,7 +104,7 @@ public class PositionEmissionNetCdfToCSV {
         for (var time2VehicleAndValue: vehicleIds.entrySet()){
             for (var vehicleAndValue: time2VehicleAndValue.getValue().entrySet()){
                 List<CharSequence> oneLine = new ArrayList<>();
-                oneLine.add(String.valueOf(time2VehicleAndValue.getKey()));
+                oneLine.add(String.valueOf(time2VehicleAndValue.getKey()+timeOffset.get(time2VehicleAndValue.getKey())));
                 oneLine.add(vehicleIds.get(time2VehicleAndValue.getKey()).get(vehicleAndValue.getKey()));
                 oneLine.add(xs.get(time2VehicleAndValue.getKey()).get(vehicleAndValue.getKey()));
                 oneLine.add(ys.get(time2VehicleAndValue.getKey()).get(vehicleAndValue.getKey()));
@@ -125,8 +126,7 @@ public class PositionEmissionNetCdfToCSV {
 
 
     private Map<Integer, Map<Integer, String>> returnId2ValueMap(String variableName){
-        Map<Integer, Map<Integer, String>> time2VehicleAndValue = new HashMap<>();
-        int index = 0;
+        Map<Integer, Map<Integer, String>> timestamp2VehicleAndValue = new HashMap<>();
 
         Variable var = null;
         try {
@@ -150,12 +150,12 @@ public class PositionEmissionNetCdfToCSV {
             readShape[0]  = 1;     // read one row
             readShape[1]  = nCols; // read the entire set of columns for that row
 
-            time2VehicleAndValue.put(iRow, new HashMap<>());
+            timestamp2VehicleAndValue.put(iRow, new HashMap<>());
             try {
 
                 Array array = var.read(readOrigin, readShape);
                 for (int iCol = 0; iCol < nCols; iCol++) {
-                    time2VehicleAndValue.get(iRow).put(iCol, String.valueOf(array.getObject(iCol)));
+                    timestamp2VehicleAndValue.get(iRow).put(iCol, String.valueOf(array.getObject(iCol)));
                 }
                 
 
@@ -165,7 +165,32 @@ public class PositionEmissionNetCdfToCSV {
 
         }
 
-        return time2VehicleAndValue;
+        return timestamp2VehicleAndValue;
+    }
+
+
+    private List<Integer> returnTimesOffset() {
+        var v = ncFile.findVariable("time");
+        Array times = null;
+
+        try {
+            times = v.read();
+        } catch (Exception ignored){
+
+        }
+
+        assert times != null;
+
+        int[] timeOffsets = (int[]) times.get1DJavaArray(Integer.TYPE);
+
+        List<Integer> intList = new ArrayList<Integer>(timeOffsets.length);
+        for (int i : timeOffsets)
+        {
+            intList.add(i);
+        }
+
+        return intList;
+
     }
 
 

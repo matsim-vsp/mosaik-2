@@ -4,16 +4,20 @@ import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.contrib.emissions.EmissionModule;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
+import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.QSimConfigGroup;
+import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.examples.ExamplesUtils;
+import org.matsim.mosaik2.events.ReactiveEventsManager;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
 
+import javax.inject.Singleton;
 import java.util.Map;
 
 public class RunEquilSetUp {
@@ -40,8 +44,15 @@ public class RunEquilSetUp {
         Utils.createAndAddVehicles(scenario, vehicleType);
         var controler = new Controler(scenario);
 
-        controler.addOverridingModule(new PositionEmissionsModule());
-        controler.addOverridingModule(new PositionEmissionNetcdfModule());
+        //controler.addOverridingModule(new PositionEmissionsModule());
+        //controler.addOverridingModule(new PositionEmissionNetcdfModule());
+
+        controler.addOverridingModule(new AbstractModule() {
+            @Override
+            public void install() {
+                bind(EventsManager.class).to(ReactiveEventsManager.class).in(Singleton.class);
+            }
+        });
 
         controler.run();
     }

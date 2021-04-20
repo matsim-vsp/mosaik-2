@@ -8,33 +8,38 @@ import org.matsim.core.events.EventsManagerImpl;
 import org.matsim.core.events.SingleHandlerEventsManager;
 import org.matsim.core.events.handler.EventHandler;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Flow;
-import java.util.concurrent.Phaser;
-import java.util.concurrent.SubmissionPublisher;
+import javax.inject.Inject;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ReactiveEventsManager implements EventsManager {
 
     private static final Logger log = Logger.getLogger(ReactiveEventsManager.class);
 
-    private final SubmissionPublisher<Event> publisher;
-    private final List<SubscriberManager> subscribers = new ArrayList<>();
+
+    private final Map<EventHandler, SubscriberManager> subscribers = new HashMap<>();
     private final Phaser phaser = new Phaser(1);
 
     private final AtomicBoolean isInitialized = new AtomicBoolean(false);
     private final AtomicDouble currentTimestep = new AtomicDouble(Double.NEGATIVE_INFINITY);
+    private final AtomicBoolean hasThrown = new AtomicBoolean(false);
 
     // this delegate is used to handle events synchronously during un-initialized state
     private final EventsManager delegate = new EventsManagerImpl();
 
-    public ReactiveEventsManager(int parallelism) {
+    private SubmissionPublisher<Event> publisher;
 
-        publisher = new SubmissionPublisher<>(Executors.newWorkStealingPool(parallelism), 1024);
+    public ReactiveEventsManager(int parallelism) {
+        this();
     }
 
+    @Inject
+    public ReactiveEventsManager() {
+        log.info("creating publisher");
+        publisher = new SubmissionPublisher<>();
+    }
 
     @Override
     public void processEvent(Event event) {
@@ -46,11 +51,17 @@ public class ReactiveEventsManager implements EventsManager {
 
         setCurrentTimestep(event.getTime());
 
+        // the phaser register and de-register around the submission of events is necessary to get the finish processing right
+        phaser.register();
+
         if (isInitialized.get()) {
-            for (var subscriber : subscribers) {
-                log.info("register for: " + event.getEventType() + ", " + event.getTime());
+           /* for (var subscriber : subscribers.values()) {
+                //log.info("register for: " + event.getEventType() + ", " + event.getTime());
                 subscriber.register();
             }
+
+            */
+            log.info("submit event " + event.getEventType() + ", " + event.getTime());
             publisher.submit(event);
         }
         else {
@@ -58,6 +69,7 @@ public class ReactiveEventsManager implements EventsManager {
             delegate.processEvent(event);
         }
 
+        phaser.arriveAndDeregister();
     }
 
     private void setCurrentTimestep(double time) {
@@ -65,7 +77,7 @@ public class ReactiveEventsManager implements EventsManager {
         while (time > currentTimestep.get()) {
             var previousTime = currentTimestep.get();
             // wait for event handlers to process all events from previous time step including events emitted after 'afterSimStep' was called
-            phaser.arriveAndAwaitAdvance();
+            awaitProcessingOfEvents();
             currentTimestep.compareAndSet(previousTime, time);
         }
     }
@@ -75,7 +87,7 @@ public class ReactiveEventsManager implements EventsManager {
 
         var manager = new SingleHandlerEventsManager(handler);
         var subscriber = new SubscriberManager(manager, phaser);
-        subscribers.add(subscriber);
+        subscribers.put(handler, subscriber);
         publisher.subscribe(subscriber);
 
         delegate.addHandler(handler);
@@ -84,26 +96,32 @@ public class ReactiveEventsManager implements EventsManager {
     @Override
     public void removeHandler(EventHandler handler) {
 
+        if (isInitialized.get()) throw new RuntimeException("don't remove handlers while parallel events processing happens");
+
+        if (subscribers.containsKey(handler)) {
+            var subscriber = subscribers.remove(handler);
+            subscriber.cancelSubscription();
+        }
     }
 
     @Override
     public void resetHandlers(int iteration) {
-
+        for (var subscriber : subscribers.values())
+            subscriber.resetHandlers(iteration);
     }
 
     @Override
     public void initProcessing() {
-        // wait for processing of events which were emitted in between iterations
-        //phaser.arriveAndAwaitAdvance();
+
+        reCreatePublisher();
         isInitialized.set(true);
         currentTimestep.set(Double.NEGATIVE_INFINITY);
         delegate.initProcessing();
-
     }
 
     @Override
     public void afterSimStep(double time) {
-        phaser.arriveAndAwaitAdvance();
+        awaitProcessingOfEvents();
     }
 
     @Override
@@ -111,11 +129,41 @@ public class ReactiveEventsManager implements EventsManager {
         log.info("before finish processing");
         // setting isInitialized before waiting for finishing of all events
         isInitialized.set(false);
+        publisher.close();
         phaser.arriveAndAwaitAdvance();
 
+        if (!hasThrown.get())
+            throwExceptionIfAnyThreadCrashed();
 
         delegate.finishProcessing();
-        log.info("after finish processing");
+    }
+
+    private void awaitProcessingOfEvents() {
+        publisher.close();
+        log.info("closed publisher. Waiting for handlers to finish");
+        phaser.arriveAndAwaitAdvance();
+        throwExceptionIfAnyThreadCrashed();
+        reCreatePublisher();
+    }
+
+    private void reCreatePublisher() {
+        log.info("setting up new publisher");
+        var start = System.nanoTime();
+        this.publisher = new SubmissionPublisher<>();
+        for (var subscription : subscribers.values()) {
+            publisher.subscribe(subscription);
+        }
+        log.info("Re-creating took: " + (System.nanoTime() - start) / 1000000.0 + "s");
+    }
+
+    private void throwExceptionIfAnyThreadCrashed() {
+        subscribers.values().stream()
+                .filter(SubscriberManager::hadException)
+                .findAny()
+                .ifPresent(process -> {
+                    hasThrown.set(true);
+                    throw new RuntimeException(process.getCaughtException());
+                });
     }
 
     private static class SubscriberManager implements Flow.Subscriber<Event> {
@@ -124,18 +172,37 @@ public class ReactiveEventsManager implements EventsManager {
         private final Phaser phaser;
 
         private Flow.Subscription subscription;
+        private Exception caughtException;
 
         private SubscriberManager(EventsManager manager, Phaser phaser) {
             this.manager = manager;
             // create a tiered phaser
-            this.phaser = new Phaser(phaser);
-        }
-
-        private void register() {
-
+            this.phaser = phaser;
             phaser.register();
         }
 
+       /* private void register() {
+            phaser.register();
+        }
+
+        */
+
+        private void resetHandlers(int iteration) {
+            manager.resetHandlers(iteration);
+        }
+
+        private void cancelSubscription() {
+            if (subscription != null)
+                subscription.cancel();
+        }
+
+        private boolean hadException() {
+            return caughtException != null;
+        }
+
+        private Exception getCaughtException() {
+            return caughtException;
+        }
 
         @Override
         public void onSubscribe(Flow.Subscription subscription) {
@@ -146,24 +213,34 @@ public class ReactiveEventsManager implements EventsManager {
 
         @Override
         public void onNext(Event item) {
+            tryProcessEvent(item);
+           // log.info("processed event " + item.getEventType() + ", " + item.getTime());
+            subscription.request(1);
+        }
+
+        private void tryProcessEvent(Event event) {
             try {
-                //log.info("onNext: " + item.getEventType() + ": " + item.getTime());
-                manager.processEvent(item);
-            } finally {
-                //log.info("onNext arriveAndDeregister");
+             //   log.info("process event");
+                manager.processEvent(event);
+            } catch (Exception e) {
+                log.info("caught exception");
+                e.printStackTrace();
+                caughtException = e;
+            } /*finally {
                 phaser.arriveAndDeregister();
             }
-            subscription.request(1);
+            */
         }
 
         @Override
         public void onError(Throwable throwable) {
-
+            log.info("on error: " + throwable.getMessage());
         }
 
         @Override
         public void onComplete() {
-
+            log.info("on complete");
+            phaser.arrive();
         }
     }
 }

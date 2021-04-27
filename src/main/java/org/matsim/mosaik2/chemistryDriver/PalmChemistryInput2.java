@@ -30,10 +30,13 @@ public class PalmChemistryInput2 {
 
     public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data) {
 
-        // get the observed pollutants
-        var observedPollutants = data.getTimeBin(data.getStartTime()).getValue().keySet();
-        // get the very first raster for dimensions.
-        var raster = data.getTimeBin(data.getStartTime()).getValue().values().iterator().next();
+        // get the observed pollutants from first valid time bin
+        var observedPollutants = data.getTimeBins().iterator().next().getValue().keySet();
+        //var observedPollutants = data.getTimeBin(data.getStartTime()).getValue().keySet();
+
+        // get the very first raster for dimensions. from first valid time bin
+        var raster = data.getTimeBins().iterator().next().getValue().values().iterator().next();
+        //var raster = data.getTimeBin(data.getStartTime()).getValue().values().iterator().next();
 
 
         try (var writer = NetcdfFileWriter.createNew(NetcdfFileWriter.Version.netcdf3, outputFile)) {
@@ -90,6 +93,9 @@ public class PalmChemistryInput2 {
                 var pollutantRaster = pollutantEntry.getValue();
                 pollutantRaster.forEachIndex(((xi, yi, value) -> {
 
+                    if (value > 0) {
+                        logger.info(pollutantEntry.getKey() + " (" + xi + "," + yi + "): " + value);
+                    }
                     var p = pollutantToIndex.indexOf(pollutantEntry.getKey());
                     emissionValues.set(tmp, 0, yi, xi, p, (float) value);
                 }));
@@ -152,7 +158,7 @@ public class PalmChemistryInput2 {
         writer.findVariable(Z).addAttribute(new Attribute("units", "m"));
         writer.findVariable(EMISSION_VALUES).addAttribute(new Attribute("long_name", "emission values"));
         writer.findVariable(EMISSION_VALUES).addAttribute(new Attribute("_Fill_Value", -999.9F));
-        writer.findVariable(EMISSION_VALUES).addAttribute(new Attribute("units", "kg/m2/hour"));
+        writer.findVariable(EMISSION_VALUES).addAttribute(new Attribute("units", "g/m2/hour"));
     }
 
     private static void writeGlobalAttributes(NetcdfFileWriter writer) {

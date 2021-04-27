@@ -9,7 +9,7 @@
     <version>0.0.1-SNAPSHOT</version>
 
     <properties>
-        <matsim.version>13.0-SNAPSHOT</matsim.version>
+        <matsim.version>14.0-SNAPSHOT</matsim.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.source>11</maven.compiler.source>
@@ -70,6 +70,13 @@
             <artifactId>cdm</artifactId>
             <version>5.0.0</version>
             <scope>compile</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-log4j12</artifactId>
+                </exclusion>
+
+            </exclusions>
         </dependency>
 
         <dependency>
@@ -83,7 +90,7 @@
         <dependency>
             <groupId>com.beust</groupId>
             <artifactId>jcommander</artifactId>
-            <version>1.71</version>
+            <version>1.81</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -168,15 +175,11 @@
             <name>Geotools repository</name>
             <url>https://repo.osgeo.org/repository/release/</url>
         </repository>
-        <repository>
-            <!-- Repository for MATSim releases (MATSim is not on Maven central) -->
-            <id>matsim</id>
-            <url>https://dl.bintray.com/matsim/matsim</url>
-        </repository>
+
         <repository>
             <!-- For MATSim snapshots: -->
-            <id>ojo-snapshots</id>
-            <url>https://oss.jfrog.org/libs-snapshot</url>
+            <id>matsim</id>
+            <url>https://repo.matsim.org/repository/matsim</url>
         </repository>
 
         <!-- network reader dependencies -->

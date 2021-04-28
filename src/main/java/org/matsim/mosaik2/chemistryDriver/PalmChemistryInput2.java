@@ -17,16 +17,16 @@ public class PalmChemistryInput2 {
 
     private static final Logger logger = Logger.getLogger(PalmChemistryInput2.class);
 
-    private static final String TIME = "time";
-    private static final String Z = "z";
-    private static final String X = "x";
-    private static final String Y = "y";
-    private static final String SPECIES = "nspecies";
-    private static final String FIELD_LEN = "field_length";
-    private static final String EMISSION_NAME = "emission_name";
-    private static final String EMISSION_INDEX = "emission_index";
-    private static final String TIMESTAMP = "timestamp";
-    private static final String EMISSION_VALUES = "emission_values";
+    public static final String TIME = "time";
+    public static final String Z = "z";
+    public static final String X = "x";
+    public static final String Y = "y";
+    public static final String SPECIES = "nspecies";
+    public static final String FIELD_LEN = "field_length";
+    public static final String EMISSION_NAME = "emission_name";
+    public static final String EMISSION_INDEX = "emission_index";
+    public static final String TIMESTAMP = "timestamp";
+    public static final String EMISSION_VALUES = "emission_values";
 
     public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data) {
 

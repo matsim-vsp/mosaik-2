@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import lombok.Getter;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.events.Event;
@@ -52,7 +53,7 @@ public class AggregateEmissionsByTimeHandler implements BasicEventHandler {
             var emissionByPollutant = timeBin.getValue();
 
             for (var pollutant : pollutantsOfInterest) {
-                var linkEmissions = emissionByPollutant.computeIfAbsent(pollutant, p -> new HashMap<>());
+                var linkEmissions = emissionByPollutant.computeIfAbsent(pollutant, p -> new Object2DoubleOpenHashMap<>());
                 var value = emissions.get(pollutant) * scaleFactor;
                 linkEmissions.merge(linkId, value, Double::sum);
             }

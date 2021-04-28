@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import lombok.EqualsAndHashCode;
 import org.locationtech.jts.geom.Geometry;
 import org.matsim.api.core.v01.Coord;
 
@@ -173,6 +174,7 @@ public class Raster {
         double applyAsDouble(int xi, int yi);
     }
 
+    @EqualsAndHashCode
     public static class Bounds {
         private double minX = Double.POSITIVE_INFINITY;
         private double minY = Double.POSITIVE_INFINITY;

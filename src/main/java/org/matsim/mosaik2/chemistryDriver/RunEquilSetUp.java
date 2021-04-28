@@ -11,6 +11,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
+import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.mosaik2.events.RawEmissionEventsReader;
@@ -49,47 +50,37 @@ public class RunEquilSetUp {
         writer.write();
     }
 
+    RunEquilSetUp() {
+
+    }
+
+    RunEquilSetUp(String networkFile, String emissionEventsFile, String outputFile, double cellSize) {
+        this.cellSize = cellSize;
+        this.emissionEventsFile = emissionEventsFile;
+        this.networkFile = networkFile;
+        this.outputFile = outputFile;
+    }
+
     private void write() {
 
+        // get the network
         var network = NetworkUtils.readNetwork(networkFile);
 
-        TimeBinMap<Map<Pollutant, TObjectDoubleMap<Id<Link>>>> timeBinMap = new TimeBinMap<>(timeBinSize);
+        // read the emission events
+        var manager = EventsUtils.createEventsManager();
+        var handler = new AggregateEmissionsByTimeHandler(network, pollutants.keySet(), timeBinSize, 1.0);
+        EventsUtils.readEvents(manager, emissionEventsFile);
+        var emissions = handler.getTimeBinMap();
 
-        new RawEmissionEventsReader((time, linkId, vehicleId, pollutant, value) -> {
-            if (!pollutants.containsKey(pollutant)) return;
+        // convert pollutants to palm names
+        var converter = new PollutantToPalmNameConverter(pollutants);
+        var palmEmissions = converter.convert(emissions);
 
-            var id = Id.createLinkId(linkId);
-
-            if (network.getLinks().containsKey(id)) {
-
-                var timeBin = timeBinMap.getTimeBin(time);
-                if (!timeBin.hasValue()) {
-                    timeBin.setValue(new HashMap<>());
-                }
-                var emissionsByPollutant = timeBin.getValue();
-                var linkEmissions = emissionsByPollutant.computeIfAbsent(pollutant, p -> new TObjectDoubleHashMap<>());
-                var linkEmissionValue = value * 1000000;
-                linkEmissions.adjustOrPutValue(id, linkEmissionValue, linkEmissionValue);
-            }
-        }).readFile(emissionEventsFile);
-
-        TimeBinMap<Map<String, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
+        // put emissions onto a raster
         var bounds = getBounds(network);
+        var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
 
-        for (var bin: timeBinMap.getTimeBins()) {
-
-            var rasterByPollutant = bin.getValue().entrySet().parallelStream()
-                    .map(entry -> {
-                        var emissions = entry.getValue();
-                        var raster = Bresenham.rasterizeNetwork(network, bounds, emissions, cellSize);
-                        var palmPollutantKey = pollutants.get(entry.getKey());
-                        return Tuple.of(palmPollutantKey, raster);
-                    })
-                    .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
-            rasterTimeBinMap.getTimeBin(bin.getStartTime()).setValue(rasterByPollutant);
-        }
-
-        PalmChemistryInput2.writeNetCdfFile(outputFile, rasterTimeBinMap);
+        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions);
     }
 
     private static Raster.Bounds getBounds(Network network) {
@@ -97,6 +88,4 @@ public class RunEquilSetUp {
         var coords = network.getNodes().values().stream().map(BasicLocation::getCoord).collect(Collectors.toSet());
         return new Raster.Bounds(coords);
     }
-
-
 }

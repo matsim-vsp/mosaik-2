@@ -21,8 +21,6 @@ import org.matsim.vehicles.VehicleUtils;
 
 public class OfflineEmissions {
 
-
-
     public static void main(String[] args) {
 
         if (args.length != 1) {

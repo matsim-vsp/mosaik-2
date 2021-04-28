@@ -21,11 +21,13 @@ public class AggregateEmissionsByTimeHandler implements BasicEventHandler {
     private final TimeBinMap<Map<Pollutant, Map<Id<Link>, Double>>> timeBinMap;
     private final Network network;
     private final Set<Pollutant> pollutantsOfInterest;
+    private final double scaleFactor;
 
-    AggregateEmissionsByTimeHandler(Network network, Set<Pollutant> pollutantsOfInterest, double timeBinSize) {
+    AggregateEmissionsByTimeHandler(Network network, Set<Pollutant> pollutantsOfInterest, double timeBinSize, double scaleFactor) {
         this.network = network;
         this.pollutantsOfInterest = pollutantsOfInterest;
         timeBinMap = new TimeBinMap<>(timeBinSize);
+        this.scaleFactor = scaleFactor;
     }
 
     @Override
@@ -51,7 +53,7 @@ public class AggregateEmissionsByTimeHandler implements BasicEventHandler {
 
             for (var pollutant : pollutantsOfInterest) {
                 var linkEmissions = emissionByPollutant.computeIfAbsent(pollutant, p -> new HashMap<>());
-                var value = emissions.get(pollutant);
+                var value = emissions.get(pollutant) * scaleFactor;
                 linkEmissions.merge(linkId, value, Double::sum);
             }
         }

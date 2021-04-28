@@ -24,7 +24,7 @@ public class AggregateEmissionsByTimeHandlerTest {
         var pollutants = Set.of(Pollutant.NOx);
         var emissions = Map.of(Pollutant.NOx, 1.0);
 
-        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10);
+        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10, 1.0);
         var event = new WarmEmissionEvent(1, linkId, Id.createVehicleId("vehicle"), emissions);
 
         handler.handleEvent(event);
@@ -32,7 +32,7 @@ public class AggregateEmissionsByTimeHandlerTest {
         var timeBinMap = handler.getTimeBinMap();
 
         assertEquals(1, timeBinMap.getTimeBins().size());
-        assertEquals(emissions.get(Pollutant.NOx), timeBinMap.getTimeBin(1).getValue().get(Pollutant.NOx).get(linkId));
+        assertEquals(emissions.get(Pollutant.NOx), timeBinMap.getTimeBin(1).getValue().get(Pollutant.NOx).get(linkId), 0.000001);
     }
 
     @Test
@@ -42,7 +42,7 @@ public class AggregateEmissionsByTimeHandlerTest {
         var pollutants = Set.of(Pollutant.NOx);
         var emissions = Map.of(Pollutant.NOx, 1.0);
 
-        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10);
+        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10, 1.0);
         var event = new ColdEmissionEvent(1, linkId, Id.createVehicleId("vehicle"), emissions);
 
         handler.handleEvent(event);
@@ -50,7 +50,25 @@ public class AggregateEmissionsByTimeHandlerTest {
         var timeBinMap = handler.getTimeBinMap();
 
         assertEquals(1, timeBinMap.getTimeBins().size());
-        assertEquals(emissions.get(Pollutant.NOx), timeBinMap.getTimeBin(1).getValue().get(Pollutant.NOx).get(linkId));
+        assertEquals(emissions.get(Pollutant.NOx), timeBinMap.getTimeBin(1).getValue().get(Pollutant.NOx).get(linkId), .00001);
+    }
+
+    @Test
+    public void addSingleEventWithScaleFactor() {
+
+        var network = TestUtils.createRandomNetwork(1, 100, 100);
+        var linkId = network.getLinks().values().iterator().next().getId();
+        var pollutants = Set.of(Pollutant.NOx);
+        var emissions = Map.of(Pollutant.NOx, 1.0);
+        var scaleFactor = 10.0;
+        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10, scaleFactor);
+
+        handler.handleEvent(new ColdEmissionEvent(1, linkId, Id.createVehicleId("vehicle"), emissions));
+
+        var timeBinMap = handler.getTimeBinMap();
+
+        assertEquals(1, timeBinMap.getTimeBins().size());
+        assertEquals(emissions.get(Pollutant.NOx) * scaleFactor, timeBinMap.getTimeBin(1).getValue().get(Pollutant.NOx).get(linkId), 0.00001);
     }
 
     @Test
@@ -61,7 +79,7 @@ public class AggregateEmissionsByTimeHandlerTest {
         var pollutants = Set.of(Pollutant.NOx);
         var emissions = Map.of(Pollutant.NOx, 1.0, Pollutant.NO2, 20.0);
 
-        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10);
+        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10, 1.0);
 
         handler.handleEvent(new ColdEmissionEvent(1, linkId, Id.createVehicleId("bla"), emissions));
         handler.handleEvent(new ColdEmissionEvent(2, linkId, Id.createVehicleId("bla"), emissions));
@@ -92,7 +110,7 @@ public class AggregateEmissionsByTimeHandlerTest {
         var pollutants = Set.of(Pollutant.NOx, Pollutant.NO2);
         var emissions = Map.of(Pollutant.NOx, 1.0, Pollutant.NO2, 20.0);
 
-        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10);
+        var handler = new AggregateEmissionsByTimeHandler(network, pollutants, 10,1.0);
 
         for (var link : network.getLinks().values()) {
 

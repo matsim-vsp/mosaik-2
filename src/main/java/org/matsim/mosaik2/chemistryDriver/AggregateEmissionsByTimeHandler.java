@@ -52,11 +52,13 @@ public class AggregateEmissionsByTimeHandler implements BasicEventHandler {
             }
             var emissionByPollutant = timeBin.getValue();
 
-            for (var pollutant : pollutantsOfInterest) {
-                var linkEmissions = emissionByPollutant.computeIfAbsent(pollutant, p -> new Object2DoubleOpenHashMap<>());
-                var value = emissions.get(pollutant) * scaleFactor;
-                linkEmissions.merge(linkId, value, Double::sum);
-            }
+            emissions.entrySet().stream()
+                    .filter(entry -> pollutantsOfInterest.contains(entry.getKey()))
+                    .forEach(entry -> {
+                        var linkEmissions = emissionByPollutant.computeIfAbsent(entry.getKey(), p -> new Object2DoubleOpenHashMap<>());
+                        var value = entry.getValue() * scaleFactor;
+                        linkEmissions.merge(linkId, value, Double::sum);
+                    });
         }
     }
 }

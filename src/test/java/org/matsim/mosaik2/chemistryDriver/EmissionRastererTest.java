@@ -27,7 +27,7 @@ public class EmissionRastererTest {
     @Test
     public void raster() {
 
-        var network = singleLinkNetwork();
+        var network = TestUtils.createSingleLinkNetwork();
         var bounds = new Raster.Bounds(-10, -10, 110, 10);
         var cellSize = 10;
         var linkEmission = Map.of(Id.createLinkId("link"), 1000.0);
@@ -53,18 +53,5 @@ public class EmissionRastererTest {
                 assertEquals(0.0, value, 0.00000001);
             }
         });
-    }
-
-    private Network singleLinkNetwork() {
-
-        var network = NetworkUtils.createNetwork();
-        var fromCoord = new Coord(5,0);
-        var toCoord = new Coord(95, 0);
-        var fromNode = NetworkUtils.createAndAddNode(network, Id.createNodeId("from"), fromCoord);
-        var toNode = NetworkUtils.createAndAddNode(network, Id.createNodeId("to"), toCoord);
-        var link = network.getFactory().createLink(Id.createLinkId("link"), fromNode, toNode);
-        network.addLink(link);
-
-        return network;
     }
 }

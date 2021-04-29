@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<events version="1.0">
+<!-- one event per hour -->
+	<event time="11.0" type="coldEmissionEvent" linkId="1" vehicleId="3" NO2="1000.0"   />
+	<event time="3601.0" type="warmEmissionEvent" linkId="1" vehicleId="3" NO2="1000.0"   />
+	<event time="7201.0" type="coldEmissionEvent" linkId="1" vehicleId="3" NO2="1000.0"   />
+</events>

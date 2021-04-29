@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE network SYSTEM "http://www.matsim.org/files/dtd/network_v1.dtd">
+
+<network name="simpleNetwork">
+   <nodes>
+      <node id="1" x="5" y="0"/>
+      <node id="2" x="95" y="0"/>
+   </nodes>
+   <links>
+      <link id="1" from="1" to="2" length="90" capacity="36000" freespeed="27.78" permlanes="1"  />
+   </links>
+</network>

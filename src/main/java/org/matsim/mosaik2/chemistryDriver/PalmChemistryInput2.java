@@ -92,10 +92,6 @@ public class PalmChemistryInput2 {
 
                 var pollutantRaster = pollutantEntry.getValue();
                 pollutantRaster.forEachIndex(((xi, yi, value) -> {
-
-                    if (value > 0) {
-                        logger.info(pollutantEntry.getKey() + " (" + xi + "," + yi + "): " + value);
-                    }
                     var p = pollutantToIndex.indexOf(pollutantEntry.getKey());
                     emissionValues.set(tmp, 0, yi, xi, p, (float) value);
                 }));
@@ -180,7 +176,7 @@ public class PalmChemistryInput2 {
 
     private static TimeBinMap.TimeBin<Map<String, Raster>> getTimeBin(TimeBinMap<Map<String, Raster>> data, int index) {
 
-        var bin = data.getTimeBin(index * data.getBinSize());
+        var bin = data.getTimeBin(data.getStartTime() + index * data.getBinSize());
 
         if (!bin.hasValue()) {
             bin.setValue(Map.of());

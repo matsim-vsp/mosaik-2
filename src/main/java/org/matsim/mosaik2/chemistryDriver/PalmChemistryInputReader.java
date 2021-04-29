@@ -47,17 +47,14 @@ public class PalmChemistryInputReader {
 
                     // as described here https://www.unidata.ucar.edu/software/netcdf-java/v4.6/tutorial/NetcdfFile.html (Reading data from a Variable)
                     // we read the data for one timestep and one pollutant but all cells of the raster
-                    Array emissionData = emissionValues.read(new int[] {ti, 0, 0, ei }, new int[] { 1, y.size(), x.size(), 1 });
-
-                    // this reduces the array's dimension to two by eliminating time and species dimension, since they have a length of 1 anyway
-                    // because of the way we specified the shape of the 'read command previously
-                    // we can also assume that the values are floats, since that's what they are supposed to be
-                    ArrayFloat.D2 reducedData = (ArrayFloat.D2) emissionData.reduce(); // should make this a 2d array
+                    // the documentation suggest to use 'reduce' to eliminate dimensions with a length of 1. We can't use this here
+                    // because we might have grids with a width of one tile
+                    ArrayFloat.D4 emissionData = (ArrayFloat.D4) emissionValues.read(new int[] {ti, 0, 0, ei }, new int[] { 1, y.size(), x.size(), 1 });
 
                     // now, iterate over all cells of the raster and write the values into our raster data structure
                     for (int xi = 0; xi < x.size(); xi++) {
                         for (int yi = 0; yi < y.size(); yi++) {
-                            float value = reducedData.get(yi, xi);
+                            float value = emissionData.get(0, yi, xi,0);
                             raster.adjustValueForIndex(xi, yi, value);
                         }
                     }
@@ -116,7 +113,7 @@ public class PalmChemistryInputReader {
         double xInterval = getInterval(x);
         double yInterval = getInterval(y);
 
-        if (xInterval != yInterval) throw new RuntimeException("x and y intervall are not equal. The code currently assumes squre grid");
+        if (xInterval > 0 && yInterval > 0 && xInterval != yInterval) throw new RuntimeException("x and y interval are not equal. The code currently assumes square grid");
 
         return xInterval;
     }

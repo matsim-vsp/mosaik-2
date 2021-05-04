@@ -82,6 +82,23 @@ public class TestUtils {
         return network;
     }
 
+    /**
+     * creates a network with one link from (5, 0) to (95, 0) this can be used to test the raster algorithm
+     * @return network with single link
+     */
+    public static Network createSingleLinkNetwork() {
+
+        var network = NetworkUtils.createNetwork();
+        var fromCoord = new Coord(5,0);
+        var toCoord = new Coord(95, 0);
+        var fromNode = NetworkUtils.createAndAddNode(network, Id.createNodeId("from"), fromCoord);
+        var toNode = NetworkUtils.createAndAddNode(network, Id.createNodeId("to"), toCoord);
+        var link = network.getFactory().createLink(Id.createLinkId("link"), fromNode, toNode);
+        network.addLink(link);
+
+        return network;
+    }
+
     private static Link createRandomLink(NetworkFactory factory, double maxX, double maxY) {
         Node fromNode = createRandomNode(factory, maxX, maxY);
         Node toNode = createRandomNode(factory, maxX, maxY);

@@ -30,7 +30,6 @@ import org.matsim.core.controler.events.ShutdownEvent;
 import org.matsim.core.controler.listener.AfterMobsimListener;
 import org.matsim.core.controler.listener.BeforeMobsimListener;
 import org.matsim.core.controler.listener.ShutdownListener;
-import org.matsim.core.events.SimStepParallelEventsManagerImpl;
 import org.matsim.core.events.algorithms.EventWriter;
 import org.matsim.core.events.algorithms.EventWriterXML;
 import org.matsim.core.events.handler.BasicEventHandler;
@@ -104,12 +103,14 @@ public class RunSimpleSetUp {
         controler.addOverridingModule(new PositionEmissionsModule());
         controler.addOverridingModule(new PositionEmissionNetcdfModule());
 
-        controler.addOverridingModule(new AbstractModule() {
+       /* controler.addOverridingModule(new AbstractModule() {
             @Override
             public void install() {
                 bind(EventsManager.class).to(SimStepParallelEventsManagerImpl.class).in(Singleton.class);
             }
         });
+
+        */
 
         controler.run();
     }

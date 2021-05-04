@@ -47,6 +47,39 @@ public abstract class Bresenham {
         return raster;
     }
 
+    /**
+     * rasterizes link onto cells it crosses. The 'line' which is drawn is 1 cell wide. The emissions of the link are
+     * equally distributed into the cells. Additionally the emissions per link are divided by cell area. If a link has
+     * an emission value of 100g and the cellSize is 10m and the link covers 2 cells the resulting value per cell is
+     * 100g / 2 / (10m * 10m) = 0.5g/m2
+     *
+     * Duplicate this to use with normal Map<Id<Link>, Double> backed by a fast utils Object2DoubleMap
+     */
+    static Raster rasterizeNetwork(final Network network, final Raster.Bounds bounds, final Map<Id<Link>, Double> emissions, final double cellSize) {
+
+        var raster = new Raster(bounds, cellSize);
+        final var area = cellSize * cellSize;
+
+
+        for (var entry : emissions.entrySet()) {
+
+            var link = network.getLinks().get(entry.getKey());
+            final double value = entry.getValue();
+
+            // first count number of cells
+            var counter = new AtomicInteger();
+            rasterizeLink(link, cellSize, (x, y) -> counter.incrementAndGet());
+            // second pass for actually writing the emission values
+            rasterizeLink(link, cellSize, (x, y) -> {
+
+                if (bounds.covers(x, y))
+                    raster.adjustValueForCoord(x, y, value / counter.get() / area);
+            });
+        }
+
+        return raster;
+    }
+
     static Map<Id<Link>, List<Coord>> rasterizeNetwork(final Network network, final Geometry bounds, final double cellSize) {
 
         return network.getLinks().values().parallelStream()

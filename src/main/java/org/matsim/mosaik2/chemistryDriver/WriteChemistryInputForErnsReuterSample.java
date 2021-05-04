@@ -193,7 +193,7 @@ public class WriteChemistryInputForErnsReuterSample {
                */
 
                 // do it unsimplified
-                var linkEmission = value * scaleFactor / 1000;
+                var linkEmission = value * scaleFactor;
                 linkEmissions.adjustOrPutValue(id, linkEmission, linkEmission);
             }
         }).readFile(emissionEventsFile);

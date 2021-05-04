@@ -220,6 +220,10 @@ public class Raster {
             return maxY;
         }
 
+        public boolean covers(Coord coord) {
+            return covers(coord.getX(), coord.getY());
+        }
+
         public boolean covers(double x, double y) {
             return minX <= x && x <= maxX && minY <= y && y <= maxY;
         }

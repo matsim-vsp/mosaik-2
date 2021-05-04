@@ -37,7 +37,7 @@ public class OfflineEmissions {
         configGroup.setAverageColdEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v3.2\\EFA_ColdStart_vehcat_2005average.txt");
         configGroup.setAverageWarmEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v3.2\\EFA_HOT_vehcat_2005average.txt");
 
-        config.vehicles().setVehiclesFile("C:\\Users\\Janekdererste\\Desktop\\equil\\output\\output_vehicles.xml.gz");
+        //config.vehicles().setVehiclesFile("C:\\Users\\Janekdererste\\Desktop\\equil\\output\\output_vehicles.xml.gz");
 
         var scenario = ScenarioUtils.loadScenario(config);
 
@@ -127,12 +127,12 @@ public class OfflineEmissions {
 
         EmissionModule emissionModule = injector.getInstance(EmissionModule.class);
 
-        EventWriterXML emissionEventWriter = new EventWriterXML("C:\\Users\\Janekdererste\\Desktop\\equil\\output\\output_emissionEvents.xml.gz");
+        EventWriterXML emissionEventWriter = new EventWriterXML("C:\\Users\\Janekdererste\\Desktop\\emissionEvents_berlin.xml.gz");
         emissionModule.getEmissionEventsManager().addHandler(emissionEventWriter);
 
         eventsManager.initProcessing();
         MatsimEventsReader matsimEventsReader = new MatsimEventsReader(eventsManager);
-        matsimEventsReader.readFile("C:\\Users\\Janekdererste\\Desktop\\equil\\output\\output_events.xml.gz");
+        matsimEventsReader.readFile("C:\\Users\\Janekdererste\\repos\\public-svn\\matsim\\scenarios\\countries\\de\\berlin\\berlin-v5.4-1pct\\output-berlin-v5.4-1pct\\berlin-v5.4-1pct.output_events.xml.gz");
         eventsManager.finishProcessing();
 
         emissionEventWriter.closeFile();

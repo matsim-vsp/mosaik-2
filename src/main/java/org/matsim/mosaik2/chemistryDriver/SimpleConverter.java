@@ -61,8 +61,6 @@ public class SimpleConverter {
         manager.addHandler(handler);
         new EmissionEventsReader(manager).readFile(props.emissionEventsFile);
 
-
-        //EventsUtils.readEvents(manager, props.emissionEventsFile);
         var emissions = handler.getTimeBinMap();
 
         // convert pollutants to palm names

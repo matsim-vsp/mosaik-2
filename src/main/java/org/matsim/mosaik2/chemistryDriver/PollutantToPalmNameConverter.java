@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
@@ -7,12 +8,21 @@ import org.matsim.core.utils.collections.Tuple;
 import visad.browser.Convert;
 
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
 public class PollutantToPalmNameConverter {
 
     private final Map<Pollutant, String> pollutantToName;
+
+    Set<Pollutant> getPollutants() {
+        return pollutantToName.keySet();
+    }
+
+    String getPalmName(Pollutant matsimPollutant) {
+        return pollutantToName.get(matsimPollutant);
+    }
 
     /**
      * Sets default values for emission names

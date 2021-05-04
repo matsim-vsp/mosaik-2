@@ -32,8 +32,7 @@ public class SimpleConverterTest {
                 testUtils.getClassInputDirectory() + "emissionEvents.xml",
                 testFilePath,
                 10,
-                new Raster.Bounds(0, -10, 100, 10
-                )
+                new Raster.Bounds(0, -10, 100, 10)
         );
 
         SimpleConverter.write(props);

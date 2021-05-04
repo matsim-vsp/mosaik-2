@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE config SYSTEM "http://www.matsim.org/files/dtd/config_v2.dtd">
+<config>
+	<module name="controler" >
+		<!-- Default=1000. Last Iteration of a simulation. -->
+		<param name="lastIteration" value="0" />
+		<param name="outputDirectory" value="test/output/position-emission" />
+		<!-- Possible values: failIfDirectoryExists, overwriteExistingFiles, deleteDirectoryIfExists -->
+		<param name="overwriteFiles" value="deleteDirectoryIfExists" />
+		<!-- Comma-separated list of visualizer output file formats. `transims', `googleearth', and `otfvis'. -->
+		<param name="snapshotFormat" value="positionevents" />
+	</module>
+	<module name="network">
+		<param name="inputNetworkFile" value="network.xml.gz" />
+	</module>
+	<module name="plans">
+		<param name="inputPlansFile" value="plans.xml.gz" />
+	</module>
+	<module name="vehicles">
+		<param name="vehiclesFile" value="vehicles.xml.gz" />
+	</module>
+	<module name="emissions" >
+		<!-- file with HBEFA vehicle type specific fleet average cold emission factors -->
+		<param name="averageFleetColdEmissionFactorsFile" value="C:\Users\Janekdererste\repos\shared-svn/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Vehcat_2020_Average.csv" />
+		<!-- file with HBEFA vehicle type specific fleet average warm emission factors -->
+		<param name="averageFleetWarmEmissionFactorsFile" value="C:\Users\Janekdererste\repos\shared-svn/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv" />
+		<!-- file with HBEFA detailed cold emission factors -->
+		<param name="detailedColdEmissionFactorsFile" value="C:\Users\Janekdererste\repos\shared-svn/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv" />
+		<!-- Should the calculation bases on average or detailed emission factors? 
+		onlyTryDetailedElseAbort : try detailed values. Abort if values are not found. Requires DETAILED emission factors. 
+		tryDetailedThenTechnologyAverageElseAbort : try detailed values first, if not found try to use semi-detailed values for 'vehicleType,technology,average,average', if then not found abort. Requires DETAILED emission factors. 
+		tryDetailedThenTechnologyAverageThenAverageTabletry detailed values first, if not found try to use semi-detailed values for 'vehicleType,technology,average,average', if then not found try lookup in average table. Requires DETAILED and AVERAGE emission factors. 
+		directlyTryAverageTableonly calculate from average table. Requires AVERAGE emission factors. Default is onlyTryDetailedElseAbort -->
+		<param name="detailedVsAverageLookupBehavior" value="tryDetailedThenTechnologyAverageThenAverageTable" />
+		<!-- file with HBEFA detailed warm emission factors -->
+		<param name="detailedWarmEmissionFactorsFile" value="C:\Users\Janekdererste\repos\shared-svn/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv" />
+		<!-- REQUIRED if source of the HBEFA road type is set to fromFile. It maps from input road types to HBEFA 3.1 road type strings -->
+		<param name="emissionRoadTypeMappingFile" value="null" />
+		<!-- if true, the original fractional method from Hülsmann et al (2011) will be used to calculate emission factors -->
+		<param name="emissionsComputationMethod" value="AverageSpeed" />
+		<!-- if true, don't fail when average speed is higher than the link freespeed, but cap it instead. -->
+		<param name="handleHighAverageSpeeds" value="false" />
+		<!-- Source of the HBEFFA road type. The options are: fromFile fromLinkAttributes fromOsm. -->
+		<param name="hbefaRoadTypeSource" value="fromLinkAttributes" />
+		<!-- Define on which level the entries in the provided hbefa tables are checked for consistency
+		allCombinations : check if entries for all combinations of HbefaTrafficSituation, HbefaVehicleCategory, HbefaVehicleAttributes, HbefaComponent. are available in the table. It only checks for paramters that are available in the table (e.g. if there is no HGV in the table, it can also pass. 
+		consistent : check if the entries for the two HbefaTrafficSituations 'StopAndGo' and 'FreeFlow' (nov 2020, maybe subject to change) are consistently available in the table. 
+		none : There is no consistency check. This option is NOT recommended and only for backward capability to inputs from before spring 2020 . 
+		Default is allCombinations -->
+		<param name="hbefaTableConsistencyCheckingLevel" value="allCombinations" />
+		<!-- Each vehicle in matsim points to a VehicleType.  For the emissions package to work, each VehicleType needs to contain corresponding information.  This switch determines _where_ in VehicleType that information is contained.  default: asEngineInformationAttributes -->
+		<param name="hbefaVehicleDescriptionSource" value="asEngineInformationAttributes" />
+		<!-- The vehicle information (or vehicles file) should be passed to the scenario.The definition of emission specifications:
+		 - REQUIRED: it must start with the respective HbefaVehicleCategory followed by `;'
+		 - OPTIONAL: if detailed emission calculation is switched on, the emission specifications should aditionally contain HbefaVehicleAttributes (`Technology;SizeClasse;EmConcept'), corresponding to the strings in detailedWarmEmissionFactorsFile.
+		TRUE (DO NOT USE except for backwards compatibility): vehicle type id is used for the emission specifications.
+		FALSE (DO NOT USE except for backwards compability): vehicle description is used for the emission specifications. The emission specifications of a vehicle type should be surrounded by emission specification markers.
+		do not actively set (or set to null) (default): hbefa vehicle type description comes from attribute in vehicle type. -->
+		<param name="isUsingVehicleTypeIdAsVehicleDescription" value="null" />
+		<!-- if false, emission events will not appear in the events file. -->
+		<param name="isWritingEmissionsEvents" value="true" />
+		<!-- Specifies the handling of non-scenario vehicles.  The options are: [Lorg.matsim.contrib.emissions.utils.EmissionsConfigGroup$NonScenarioVehicles;@77102b91 Should eventually be extended by 'getVehiclesFromMobsim'. -->
+		<param name="nonScenarioVehicles" value="abort" />
+		<param name="usingDetailedEmissionCalculation" value="null" />
+	</module>
+	<module name="netcdPositionEmission" >
+		<param name="pollutants" value="CO->CO, CO2_TOTAL->CO2, NOx->NOx, NO2->NO2, PM->PM10" />
+	</module>
+	<module name="planCalcScore" >
+		<parameterset type="scoringParameters" >
+			<parameterset type="activityParams" >
+				<param name="activityType" value="dummy" />
+				<!-- typical duration of activity.  needs to be defined and non-zero.  in sec. -->
+				<param name="typicalDuration" value="02:00:00" />
+			</parameterset>
+			<parameterset type="activityParams" >
+				<param name="activityType" value="home" />
+				<param name="typicalDuration" value="00:00:20" />
+			</parameterset>
+			<parameterset type="activityParams" >
+				<param name="activityType" value="work" />
+				<param name="typicalDuration" value="00:00:20" />
+			</parameterset>
+			<parameterset type="modeParams" >
+				<param name="mode" value="car" />
+			</parameterset>
+			<parameterset type="modeParams" >
+				<param name="mode" value="pt" />
+			</parameterset>
+			<parameterset type="modeParams" >
+				<param name="mode" value="walk" />
+			</parameterset>
+			<parameterset type="modeParams" >
+				<param name="mode" value="bike" />
+			</parameterset>
+			<parameterset type="modeParams" >
+				<param name="mode" value="ride" />
+			</parameterset>
+			<parameterset type="modeParams" >
+				<param name="mode" value="other" />
+			</parameterset>
+		</parameterset>
+	</module>
+	<module name="planscalcroute" >
+	</module>
+	<module name="qsim" >
+		<!-- The (initial) width of the links of the network. Use positive floating point values. This is used only for visualisation. -->
+		<param name="linkWidth" value="0.0" />
+		<!-- snapshotStyle. One of: equiDist queue withHoles withHolesAndShowHoles kinematicWaves  -->
+		<param name="snapshotStyle" value="kinematicWaves" />
+		<param name="snapshotperiod" value="00:00:01" />
+		<!-- If vehicles should all be the same default vehicle, or come from the vehicles file, or something else.  Possible values:  defaultVehicle modeVehicleTypesFromVehiclesData fromVehiclesData -->
+		<param name="vehiclesSource" value="fromVehiclesData" />
+	</module>
+	<module name="strategy" >
+		<parameterset type="strategysettings" >
+			<!-- strategyName of strategy.  Possible default names: SelectRandom BestScore KeepLastSelected ChangeExpBeta SelectExpBeta SelectPathSizeLogit      (selectors), ReRouteTimeAllocationMutatorTimeAllocationMutator_ReRouteChangeSingleTripModeChangeTripModeSubtourModeChoice (innovative strategies). -->
+			<param name="strategyName" value="ChangeExpBeta" />
+			<!-- weight of a strategy: for each agent, a strategy will be selected with a probability proportional to its weight -->
+			<param name="weight" value="1.0" />
+		</parameterset>
+	</module>
+
+</config>

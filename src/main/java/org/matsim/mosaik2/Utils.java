@@ -1,5 +1,8 @@
 package org.matsim.mosaik2;
 
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
+import lombok.Getter;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
@@ -33,5 +36,18 @@ public class Utils {
             i++;
         }
         return result;
+    }
+
+    public static SharedSvnARg parseSharedSvnArg(String[] args) {
+        var arg = new SharedSvnARg();
+        JCommander.newBuilder().addObject(arg).build().parse(args);
+        return arg;
+    }
+
+    public static class SharedSvnARg {
+
+        @Getter
+        @Parameter(names = "-sharedSvn", required = true)
+        private String sharedSvn;
     }
 }

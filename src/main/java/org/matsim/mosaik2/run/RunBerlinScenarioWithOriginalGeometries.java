@@ -1,11 +1,8 @@
 package org.matsim.mosaik2.run;
 
-import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.api.core.v01.population.Plan;
-import org.matsim.contrib.accessibility.utils.AccessibilityFacilityUtils;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
-import org.matsim.core.population.PersonUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.router.TripStructureUtils;
 import org.matsim.facilities.ActivityFacilitiesFactoryImpl;
@@ -14,9 +11,7 @@ import org.matsim.pt.utils.CreatePseudoNetwork;
 import org.matsim.run.RunBerlinScenario;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /*

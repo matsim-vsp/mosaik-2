@@ -8,6 +8,7 @@ import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
+import org.matsim.api.core.v01.TransportMode;
 import org.matsim.contrib.osm.networkReader.LinkProperties;
 import org.matsim.contrib.osm.networkReader.SupersonicOsmNetworkReader;
 import org.matsim.core.network.algorithms.NetworkCleaner;
@@ -38,6 +39,7 @@ public class PrepareBerlinNetwork {
     private static final String outputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-network-with-geometries.xml.gz";
 
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84, TransformationFactory.DHDN_GK4);
+    private static final Set<String> networkModes = Set.of(TransportMode.car, TransportMode.ride, "freight");
 
     public static void main(String[] args) {
 
@@ -55,6 +57,9 @@ public class PrepareBerlinNetwork {
                     if (berlin.covers(MGC.coord2Point(coord))) return true;
 
                     return (hierarchy <= LinkProperties.LEVEL_TERTIARY);
+                })
+                .setAfterLinkCreated((link, map, direction) -> {
+                    link.setAllowedModes(networkModes);
                 })
                 .build()
                 .read(Paths.get(svnArg.getSharedSvn()).resolve(osmFile));

@@ -62,6 +62,13 @@
         <groupId>com.github.matsim-scenarios</groupId>
         <artifactId>matsim-berlin</artifactId>
         <version>5.6.x-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.matsim</groupId>
+                    <artifactId>matsim</artifactId>
+                </exclusion>
+
+            </exclusions>
         </dependency>
 
         <!-- netcdf support -->

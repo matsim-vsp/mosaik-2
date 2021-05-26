@@ -1,19 +1,27 @@
 package org.matsim.mosaik2.prepare;
 
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVParser;
+import lombok.extern.log4j.Log4j2;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
+import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
+import org.matsim.contrib.gtfs.RunGTFS2MATSim;
+import org.matsim.contrib.gtfs.TransitSchedulePostProcessTools;
 import org.matsim.contrib.osm.networkReader.LinkProperties;
 import org.matsim.contrib.osm.networkReader.SupersonicOsmNetworkReader;
+import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.network.algorithms.NetworkCleaner;
-import org.matsim.core.network.algorithms.NetworkSimplifier;
 import org.matsim.core.network.io.NetworkWriter;
+import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
@@ -21,30 +29,55 @@ import org.matsim.core.utils.gis.ShapeFileReader;
 import org.matsim.core.utils.io.tabularFileParser.TabularFileHandler;
 import org.matsim.core.utils.io.tabularFileParser.TabularFileParser;
 import org.matsim.core.utils.io.tabularFileParser.TabularFileParserConfig;
-import org.matsim.mosaik2.Utils;
+import org.matsim.pt.transitSchedule.api.*;
+import org.matsim.pt.utils.CreatePseudoNetwork;
+import org.matsim.vehicles.*;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
 
-import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 
+@Log4j2
 public class PrepareBerlinNetwork {
 
     private static final String countNodesMapping = "studies/countries/de/open_berlin_scenario/be_3/counts/counts_OSM-nodes.csv";
     private static final String osmFile = "projects\\mosaik-2\\raw-data\\osm\\berlin-brandenburg-200507.osm.pbf";
     private static final String stateShapeFile = "projects\\mosaik-2\\raw-data\\shapes\\bundeslaender\\VG250_LAN.shp";
-    private static final String outputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-network-with-geometries.xml.gz";
+    private static final String gtfsFile = "matsim\\scenarios\\countries\\de\\berlin\\berlin-v5.5-10pct\\original-data\\GTFS-VBB-20181214\\GTFS-VBB-20181214.zip";
+
+    private static final String networkOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-network-with-geometries.xml.gz";
+    private static final String scheduleOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-schedule-with-geometries.xml.gz";
+    private static final String vehiclesOutputFile ="projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-transit-vehicles-with-geometries.xml.gz";
 
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84, TransformationFactory.DHDN_GK4);
     private static final Set<String> networkModes = Set.of(TransportMode.car, TransportMode.ride, "freight");
 
     public static void main(String[] args) {
 
-        var svnArg = Utils.parseSharedSvnArg(args);
-        var svnPath = Paths.get(svnArg.getSharedSvn());
+        var svnArg = new Input();
+        JCommander.newBuilder().addObject(svnArg).build().parse(args);
+        var network = createNetwork(svnArg);
+
+        //------------- also create pt --------------------------
+
+       var scenario = ScenarioUtils.createScenario(ConfigUtils.createConfig());
+       createSchedule(scenario, svnArg);
+
+        new CreatePseudoNetwork(scenario.getTransitSchedule(), network, "pt_", 0.1, 100000).createNetwork();
+
+        createVehicles(scenario, network);
+
+        new NetworkWriter(network).write(Paths.get(svnArg.sharedSvn).resolve(networkOutputFile).toString());
+        new TransitScheduleWriter(scenario.getTransitSchedule()).writeFile(Paths.get(svnArg.sharedSvn).resolve(scheduleOutputFile).toString());
+        new MatsimVehicleWriter(scenario.getTransitVehicles()).writeFile(Paths.get(svnArg.sharedSvn).resolve(vehiclesOutputFile).toString());
+    }
+
+    private static Network createNetwork(Input svnArg){
+        var svnPath = Paths.get(svnArg.sharedSvn);
         var nodeIdsToKeep = readNodeIds(svnPath.resolve(countNodesMapping));
 
         var berlin = getBerlinShape(svnPath.resolve(stateShapeFile));
@@ -54,20 +87,222 @@ public class PrepareBerlinNetwork {
                 .setPreserveNodeWithId(nodeIdsToKeep::contains)
                 .setStoreOriginalGeometry(true)
                 .setIncludeLinkAtCoordWithHierarchy((coord, hierarchy) -> {
-                    if (berlin.covers(MGC.coord2Point(coord))) return true;
 
-                    return (hierarchy <= LinkProperties.LEVEL_TERTIARY);
+                    // the entire scenario has tertiary streets
+                    if (hierarchy <= LinkProperties.LEVEL_TERTIARY) return true;
+
+                    // city of berlin has all the streets
+                    return berlin.covers(MGC.coord2Point(coord));
                 })
                 .setAfterLinkCreated((link, map, direction) -> {
                     link.setAllowedModes(networkModes);
                 })
                 .build()
-                .read(Paths.get(svnArg.getSharedSvn()).resolve(osmFile));
+                .read(Paths.get(svnArg.sharedSvn).resolve(osmFile));
 
         new NetworkCleaner().run(network);
+        return network;
+    }
 
-        new NetworkWriter(network).write(Paths.get(svnArg.getSharedSvn()).resolve(outputFile).toString());
+    private static void createSchedule(Scenario scenario, Input svnArgs) {
+        LocalDate date = LocalDate.parse("2018-12-20");
 
+        var schedulePath = Paths.get(svnArgs.publicSvn).resolve(scheduleOutputFile);
+        RunGTFS2MATSim.convertGTFSandAddToScenario(scenario, Paths.get(svnArgs.publicSvn).resolve(gtfsFile).toString(), date, transformation, false);
+        //RunGTFS2MATSim.convertGtfs(Paths.get(svnArgs.publicSvn).resolve(gtfsFile).toString(), schedulePath.toString(), date, transformation, false);
+        //new TransitScheduleReader(scenario).readFile(schedulePath.toString());
+
+        // copy late/early departures to have at complete schedule from ca. 0:00 to ca. 30:00
+       // TransitSchedulePostProcessTools.copyLateDeparturesToStartOfDay(scenario.getTransitSchedule(), 24 * 3600, "copied", false);
+       // TransitSchedulePostProcessTools.copyEarlyDeparturesToFollowingNight(scenario.getTransitSchedule(), 6 * 3600, "copied");
+    }
+
+    private static void createVehicles(Scenario scenario, Network network){
+        // create TransitVehicle types
+        // see https://svn.vsp.tu-berlin.de/repos/public-svn/publications/vspwp/2014/14-24/ for veh capacities
+        // the values set here are at the upper end of the typical capacity range, so on lines with high capacity vehicles the
+        // capacity of the matsim vehicle equals roughly the real vehicles capacity and on other lines the Matsim vehicle
+        // capacity is higher than the real used vehicle's capacity (gtfs provides no information on which vehicle type is used,
+        // and this would be beyond scope here). - gleich sep'19
+        VehiclesFactory vehicleFactory = scenario.getVehicles().getFactory();
+
+        VehicleType reRbVehicleType = vehicleFactory.createVehicleType( Id.create( "RE_RB_veh_type", VehicleType.class ) );
+        {
+            VehicleCapacity capacity = reRbVehicleType.getCapacity();
+            capacity.setSeats( 500 );
+            capacity.setStandingRoom( 600 );
+            VehicleUtils.setDoorOperationMode(reRbVehicleType, VehicleType.DoorOperationMode.serial); // first finish boarding, then start alighting
+            VehicleUtils.setAccessTime(reRbVehicleType, 1.0 / 10.0); // 1s per boarding agent, distributed on 10 doors
+            VehicleUtils.setEgressTime(reRbVehicleType, 1.0 / 10.0); // 1s per alighting agent, distributed on 10 doors
+            scenario.getTransitVehicles().addVehicleType( reRbVehicleType );
+        }
+        VehicleType sBahnVehicleType = vehicleFactory.createVehicleType( Id.create( "S-Bahn_veh_type", VehicleType.class ) );
+        {
+            VehicleCapacity capacity = sBahnVehicleType.getCapacity();
+            capacity.setSeats( 400 );
+            capacity.setStandingRoom( 800 );
+            VehicleUtils.setDoorOperationMode(sBahnVehicleType, VehicleType.DoorOperationMode.serial); // first finish boarding, then start alighting
+            VehicleUtils.setAccessTime(sBahnVehicleType, 1.0 / 24.0); // 1s per boarding agent, distributed on 8*3 doors
+            VehicleUtils.setEgressTime(sBahnVehicleType, 1.0 / 24.0); // 1s per alighting agent, distributed on 8*3 doors
+            scenario.getTransitVehicles().addVehicleType( sBahnVehicleType );
+        }
+        VehicleType uBahnVehicleType = vehicleFactory.createVehicleType( Id.create( "U-Bahn_veh_type", VehicleType.class ) );
+        {
+            VehicleCapacity capacity = uBahnVehicleType.getCapacity() ;
+            capacity.setSeats( 300 );
+            capacity.setStandingRoom( 600 );
+            VehicleUtils.setDoorOperationMode(uBahnVehicleType, VehicleType.DoorOperationMode.serial); // first finish boarding, then start alighting
+            VehicleUtils.setAccessTime(uBahnVehicleType, 1.0 / 18.0); // 1s per boarding agent, distributed on 6*3 doors
+            VehicleUtils.setEgressTime(uBahnVehicleType, 1.0 / 18.0); // 1s per alighting agent, distributed on 6*3 doors
+            scenario.getTransitVehicles().addVehicleType( uBahnVehicleType );
+        }
+        VehicleType tramVehicleType = vehicleFactory.createVehicleType( Id.create( "Tram_veh_type", VehicleType.class ) );
+        {
+            VehicleCapacity capacity = tramVehicleType.getCapacity() ;
+            capacity.setSeats( 80 );
+            capacity.setStandingRoom( 170 );
+            VehicleUtils.setDoorOperationMode(tramVehicleType, VehicleType.DoorOperationMode.serial); // first finish boarding, then start alighting
+            VehicleUtils.setAccessTime(tramVehicleType, 1.0 / 5.0); // 1s per boarding agent, distributed on 5 doors
+            VehicleUtils.setEgressTime(tramVehicleType, 1.0 / 5.0); // 1s per alighting agent, distributed on 5 doors
+            scenario.getTransitVehicles().addVehicleType( tramVehicleType );
+        }
+        VehicleType busVehicleType = vehicleFactory.createVehicleType( Id.create( "Bus_veh_type", VehicleType.class ) );
+        {
+            VehicleCapacity capacity = busVehicleType.getCapacity() ;
+            capacity.setSeats( 50 );
+            capacity.setStandingRoom( 100 );
+            VehicleUtils.setDoorOperationMode(busVehicleType, VehicleType.DoorOperationMode.serial); // first finish boarding, then start alighting
+            VehicleUtils.setAccessTime(busVehicleType, 1.0 / 3.0); // 1s per boarding agent, distributed on 3 doors
+            VehicleUtils.setEgressTime(busVehicleType, 1.0 / 3.0); // 1s per alighting agent, distributed on 3 doors
+            scenario.getTransitVehicles().addVehicleType( busVehicleType );
+        }
+        VehicleType ferryVehicleType = vehicleFactory.createVehicleType( Id.create( "Ferry_veh_type", VehicleType.class ) );
+        {
+            VehicleCapacity capacity = ferryVehicleType.getCapacity() ;
+            capacity.setSeats( 100 );
+            capacity.setStandingRoom( 100 );
+            VehicleUtils.setDoorOperationMode(ferryVehicleType, VehicleType.DoorOperationMode.serial); // first finish boarding, then start alighting
+            VehicleUtils.setAccessTime(ferryVehicleType, 1.0 / 1.0); // 1s per boarding agent, distributed on 1 door
+            VehicleUtils.setEgressTime(ferryVehicleType, 1.0 / 1.0); // 1s per alighting agent, distributed on 1 door
+            scenario.getTransitVehicles().addVehicleType( ferryVehicleType );
+        }
+        // set link speeds and create vehicles according to pt mode
+        for (TransitLine line: scenario.getTransitSchedule().getTransitLines().values()) {
+            VehicleType lineVehicleType;
+            String stopFilter = "";
+
+            // identify veh type / mode using gtfs route type (3-digit code, also found at the end of the line id (gtfs: route_id))
+            int gtfsTransitType;
+            try {
+                gtfsTransitType = Integer.parseInt( (String) line.getAttributes().getAttribute("gtfs_route_type"));
+            } catch (NumberFormatException e) {
+                log.error("unknown transit mode! Line id was " + line.getId().toString() +
+                        "; gtfs route type was " + (String) line.getAttributes().getAttribute("gtfs_route_type"));
+                throw new RuntimeException("unknown transit mode");
+            }
+
+            int agencyId;
+            try {
+                agencyId = Integer.parseInt( (String) line.getAttributes().getAttribute("gtfs_agency_id"));
+            } catch (NumberFormatException e) {
+                log.error("invalid transit agency! Line id was " + line.getId().toString() +
+                        "; gtfs agency was " + (String) line.getAttributes().getAttribute("gtfs_agency_id"));
+                throw new RuntimeException("invalid transit agency");
+            }
+
+            switch (gtfsTransitType) {
+                // the vbb gtfs file generally uses the new gtfs route types, but some lines use the old enum in the range 0 to 7
+                // see https://sites.google.com/site/gtfschanges/proposals/route-type
+                // and https://developers.google.com/transit/gtfs/reference/#routestxt
+                // In GTFS-VBB-20181214.zip some RE lines are wrongly attributed as type 700 (bus)!
+
+                // freespeed are set to make sure that no transit service is delayed
+                // and arrivals are as punctual (not too early) as possible
+                case 100:
+                    lineVehicleType = reRbVehicleType;
+                    stopFilter = "station_S/U/RE/RB";
+                    break;
+                case 109:
+                    // S-Bahn-Berlin is agency id 1
+                    lineVehicleType = sBahnVehicleType;
+                    stopFilter = "station_S/U/RE/RB";
+                    break;
+                case 400:
+                    lineVehicleType = uBahnVehicleType;
+                    stopFilter = "station_S/U/RE/RB";
+                    break;
+                case 3: // bus, same as 700
+                case 700:
+                    // BVG is agency id 796
+                    lineVehicleType = busVehicleType;
+                    break;
+                case 900:
+                    lineVehicleType = tramVehicleType;
+                    break;
+                case 1000:
+                    lineVehicleType = ferryVehicleType;
+                    break;
+                default:
+                    log.error("unknown transit mode! Line id was " + line.getId().toString() +
+                            "; gtfs route type was " + (String) line.getAttributes().getAttribute("gtfs_route_type"));
+                    throw new RuntimeException("unknown transit mode");
+            }
+
+            for (TransitRoute route: line.getRoutes().values()) {
+                int routeVehId = 0; // simple counter for vehicle id _per_ TransitRoute
+
+                // increase speed if current freespeed is lower.
+                List<TransitRouteStop> routeStops = route.getStops();
+                if (routeStops.size() < 2) {
+                    log.error("TransitRoute with less than 2 stops found: line " + line.getId().toString() +
+                            ", route " + route.getId().toString());
+                    throw new RuntimeException("");
+                }
+
+                double lastDepartureOffset = route.getStops().get(0).getDepartureOffset().seconds();
+                // min. time spend at a stop, useful especially for stops whose arrival and departure offset is identical,
+                // so we need to add time for passengers to board and alight
+                double minStopTime = 30.0;
+
+                for (int i = 1; i < routeStops.size(); i++) {
+                    // TODO cater for loop link at first stop? Seems to just work without.
+                    TransitRouteStop routeStop = routeStops.get(i);
+                    // if there is no departure offset set (or infinity), it is the last stop of the line,
+                    // so we don't need to care about the stop duration
+                    double stopDuration = routeStop.getDepartureOffset().isDefined() ?
+                            routeStop.getDepartureOffset().seconds() - routeStop.getArrivalOffset().seconds() : minStopTime;
+                    // ensure arrival at next stop early enough to allow for 30s stop duration -> time for passengers to board / alight
+                    // if link freespeed had been set such that the pt veh arrives exactly on time, but departure tiome is identical
+                    // with arrival time the pt vehicle would have been always delayed
+                    // Math.max to avoid negative values of travelTime
+                    double travelTime = Math.max(1, routeStop.getArrivalOffset().seconds() - lastDepartureOffset - 1.0 -
+                            (stopDuration >= minStopTime ? 0 : (minStopTime - stopDuration))) ;
+                    Link link = network.getLinks().get(routeStop.getStopFacility().getLinkId());
+                    increaseLinkFreespeedIfLower(link, link.getLength() / travelTime);
+                    lastDepartureOffset = routeStop.getDepartureOffset().seconds();
+                }
+
+                // create vehicles for Departures
+                for (Departure departure: route.getDepartures().values()) {
+                    Vehicle veh = vehicleFactory.createVehicle(Id.create("pt_" + route.getId().toString() + "_" + Long.toString(routeVehId++), Vehicle.class), lineVehicleType);
+                    scenario.getTransitVehicles().addVehicle(veh);
+                    departure.setVehicleId(veh.getId());
+                }
+
+                // tag RE, RB, S- and U-Bahn stations for Drt stop filter attribute
+                if (!stopFilter.isEmpty()) {
+                    for (TransitRouteStop routeStop: route.getStops()) {
+                        routeStop.getStopFacility().getAttributes().putAttribute("stopFilter", stopFilter);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void increaseLinkFreespeedIfLower(Link link, double newFreespeed) {
+        if (link.getFreespeed() < newFreespeed) {
+            link.setFreespeed(newFreespeed);
+        }
     }
 
     private static Set<Long> readNodeIds(Path mappingFile) {
@@ -102,8 +337,9 @@ public class PrepareBerlinNetwork {
                 .orElseThrow();
 
         try {
+
             var sourceCRS = CRS.decode("EPSG:25832");
-            var targetCRS = CRS.decode("EPSG:31468");
+            var targetCRS = MGC.getCRS(TransformationFactory.DHDN_GK4);
 
             var mathTransform = CRS.findMathTransform(sourceCRS, targetCRS);
             var transformed = JTS.transform(berlinGeometry, mathTransform);
@@ -112,5 +348,14 @@ public class PrepareBerlinNetwork {
         } catch (FactoryException | TransformException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static class Input {
+
+        @Parameter(required = true, names = "-publicSvn")
+        private String publicSvn;
+
+        @Parameter(required = true, names = "-sharedSvn")
+        private String sharedSvn;
     }
 }

@@ -27,6 +27,7 @@ public class RunBerlinScenarioWithOriginalGeometries {
 
         var scenario = RunBerlinScenario.prepareScenario(config);
 
+        /*
         // merge transit schedule and network
 
         // remove all references of the old network from the schedule
@@ -47,6 +48,8 @@ public class RunBerlinScenarioWithOriginalGeometries {
 
         // add pseudo network for pt
         new CreatePseudoNetwork(scenario.getTransitSchedule(), scenario.getNetwork(), "pt_", 0.1, 100000.0).createNetwork();
+
+         */
 
         // remove linkids from activities
         scenario.getPopulation().getPersons().values().parallelStream()

@@ -36,6 +36,30 @@ public class NetworkUnsimplifier {
     public static final String NOT_MATCHED_KEY = "NOT_MATCHED";
     private static final Logger log = Logger.getLogger(NetworkUnsimplifier.class);
 
+    static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network) {
+
+        return network.getLinks().values().parallelStream()
+                .map(link -> Tuple.of(link.getId(), createLinkSegments(link, network.getFactory())))
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+    }
+
+    static List<Link> createLinkSegments(Link link, NetworkFactory factory) {
+
+        var nodes = NetworkUtils.getOriginalGeometry(link);
+        List<Link> segments = new ArrayList<>();
+
+        for (int i = 0; i < nodes.size() - 1; i++) {
+
+            var fromNode = nodes.get(i);
+            var toNode = nodes.get(i + 1);
+            var id = Id.createLinkId(link.getId().toString() + "_" + i);
+            var segment = factory.createLink(id, fromNode, toNode);
+            segment.getAttributes().putAttribute(LENGTH_FRACTION_KEY, segment.getLength() / link.getLength());
+            segments.add(segment);
+        }
+        return segments;
+    }
+
     static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, final String osmFile, final String destinationCrs) throws FileNotFoundException, OsmInputException {
 
         var file = new File(osmFile);

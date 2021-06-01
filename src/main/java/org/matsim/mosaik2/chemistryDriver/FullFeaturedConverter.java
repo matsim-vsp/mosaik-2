@@ -9,7 +9,9 @@ import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 
+import java.util.Collection;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 
 public class FullFeaturedConverter {
@@ -52,12 +54,14 @@ public class FullFeaturedConverter {
                 .filter(link -> isCoveredBy(link, bounds))
                 .collect(NetworkUtils.getCollector());
 
-        //TODO: This is missing the network un-simplification step. I have to think about this again though, so leave
-        // it out for now.
+        //TODO: Test unsimplification step
+        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network);
 
         // read the emission events
         var manager = EventsUtils.createEventsManager();
-        var handler = new AggregateEmissionsByTimeHandler(network, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
+        //var handler = new AggregateEmissionsByTimeHandler(network, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
+        //TODO: Test new event handler which distributes emissions onto link segments
+        var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
         manager.addHandler(handler);
         new EmissionEventsReader(manager).readFile(emissionEventsFile);
 
@@ -67,7 +71,13 @@ public class FullFeaturedConverter {
         var palmEmissions = pollutantConverter.convert(emissions);
 
         // put emissions onto a raster
-        var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
+        //TODO check if this actually works as expected
+        var segmentNetwork = link2Segments.values().stream()
+                .flatMap(Collection::stream)
+                .collect(NetworkUtils.getCollector());
+        var rasteredEmissions = EmissionRasterer.raster(palmEmissions, segmentNetwork, bounds, cellSize);
+
+        //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
         addNoIfPossible(rasteredEmissions);
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions);

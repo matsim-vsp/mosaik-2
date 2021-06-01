@@ -36,6 +36,10 @@ public class OfflineEmissions {
         configGroup.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
         configGroup.setAverageColdEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v3.2\\EFA_ColdStart_vehcat_2005average.txt");
         configGroup.setAverageWarmEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v3.2\\EFA_HOT_vehcat_2005average.txt");
+        configGroup.setNonScenarioVehicles(EmissionsConfigGroup.NonScenarioVehicles.ignore);
+
+        // we need the generated vehicles of the matsim run
+        config.vehicles().setVehiclesFile("Z:\\berlin\\output\\berlin-v5.5-1pct.output_vehicles.xml.gz");
 
         //config.vehicles().setVehiclesFile("C:\\Users\\Janekdererste\\Desktop\\equil\\output\\output_vehicles.xml.gz");
 
@@ -90,7 +94,7 @@ public class OfflineEmissions {
             }
         }
 
-        Id<VehicleType> carVehicleTypeId = Id.create("defaultVehicleType", VehicleType.class);
+
 
        /* var carVehicleType = VehicleUtils.createVehicleType(carVehicleTypeId);
         carVehicleType.setMaximumVelocity(100/3.6);
@@ -100,15 +104,32 @@ public class OfflineEmissions {
 
 
         */
-
+        Id<VehicleType> carVehicleTypeId = Id.create("car", VehicleType.class);
         var carVehicleType = scenario.getVehicles().getVehicleTypes().get(carVehicleTypeId);
-
+        Id<VehicleType> freightVehicleTypeId = Id.create("freight", VehicleType.class);
+        VehicleType freightVehicleType = scenario.getVehicles().getVehicleTypes().get(freightVehicleTypeId);
 
         EngineInformation carEngineInformation = carVehicleType.getEngineInformation();
         VehicleUtils.setHbefaVehicleCategory( carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
         VehicleUtils.setHbefaTechnology( carEngineInformation, "average" );
         VehicleUtils.setHbefaSizeClass( carEngineInformation, "average" );
         VehicleUtils.setHbefaEmissionsConcept( carEngineInformation, "average" );
+
+        EngineInformation freightEngineInformation = freightVehicleType.getEngineInformation();
+        VehicleUtils.setHbefaVehicleCategory( freightEngineInformation, HbefaVehicleCategory.HEAVY_GOODS_VEHICLE.toString());
+        VehicleUtils.setHbefaTechnology( freightEngineInformation, "average" );
+        VehicleUtils.setHbefaSizeClass( freightEngineInformation, "average" );
+        VehicleUtils.setHbefaEmissionsConcept( freightEngineInformation, "average" );
+
+        // public transit vehicles should be considered as non-hbefa vehicles
+        for (VehicleType type : scenario.getTransitVehicles().getVehicleTypes().values()) {
+            EngineInformation engineInformation = type.getEngineInformation();
+            // TODO: Check! Is this a zero emission vehicle?!
+            VehicleUtils.setHbefaVehicleCategory( engineInformation, HbefaVehicleCategory.NON_HBEFA_VEHICLE.toString());
+            VehicleUtils.setHbefaTechnology( engineInformation, "average" );
+            VehicleUtils.setHbefaSizeClass( engineInformation, "average" );
+            VehicleUtils.setHbefaEmissionsConcept( engineInformation, "average" );
+        }
 
         // the following is copy paste from the example...
 
@@ -132,7 +153,7 @@ public class OfflineEmissions {
 
         eventsManager.initProcessing();
         MatsimEventsReader matsimEventsReader = new MatsimEventsReader(eventsManager);
-        matsimEventsReader.readFile("C:\\Users\\Janekdererste\\repos\\public-svn\\matsim\\scenarios\\countries\\de\\berlin\\berlin-v5.4-1pct\\output-berlin-v5.4-1pct\\berlin-v5.4-1pct.output_events.xml.gz");
+        matsimEventsReader.readFile("Z:\\berlin\\output\\berlin-v5.5-1pct.output_events.xml.gz");
         eventsManager.finishProcessing();
 
         emissionEventWriter.closeFile();

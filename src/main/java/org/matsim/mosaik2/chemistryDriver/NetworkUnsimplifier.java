@@ -45,7 +45,9 @@ public class NetworkUnsimplifier {
 
     static List<Link> createLinkSegments(Link link, NetworkFactory factory) {
 
-        var nodes = NetworkUtils.getOriginalGeometry(link);
+        try {
+            var nodes = NetworkUtils.getOriginalGeometry(link);
+
         List<Link> segments = new ArrayList<>();
 
         for (int i = 0; i < nodes.size() - 1; i++) {
@@ -62,6 +64,12 @@ public class NetworkUnsimplifier {
             segments.add(segment);
         }
         return segments;
+        } catch (Exception e) {
+            log.warn(e.getMessage());
+            log.warn("returning original link: " + link.toString());
+            link.getAttributes().putAttribute(LENGTH_FRACTION_KEY, 1.0);
+            return List.of(link);
+        }
     }
 
     static Network segmentsToNetwork(Map<Id<Link>, List<Link>> segments) {

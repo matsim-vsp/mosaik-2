@@ -2,6 +2,7 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import lombok.Builder;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.NetworkWriter;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
@@ -72,6 +73,7 @@ public class FullFeaturedConverter {
 
         // put emissions onto a raster
         var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
+        new NetworkWriter(segmentNetwork).write("C:\\Users\\Janekdererste\\Desktop\\segment-network.xml.gz");
         var rasteredEmissions = EmissionRasterer.raster(palmEmissions, segmentNetwork, bounds, cellSize);
 
         //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);

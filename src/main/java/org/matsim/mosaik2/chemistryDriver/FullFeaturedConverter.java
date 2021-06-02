@@ -68,10 +68,7 @@ public class FullFeaturedConverter {
         var palmEmissions = pollutantConverter.convert(emissions);
 
         // put emissions onto a raster
-        //TODO check if this actually works as expected
-        var segmentNetwork = link2Segments.values().stream()
-                .flatMap(Collection::stream)
-                .collect(NetworkUtils.getCollector());
+        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
         var rasteredEmissions = EmissionRasterer.raster(palmEmissions, segmentNetwork, bounds, cellSize);
 
         //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);

@@ -91,6 +91,43 @@ public class NetworkUnsimplifierTest {
     }
 
     @Test
+    public void testSegmentsToNetwork() {
+
+        var network = TestUtils.createSingleLinkNetwork(new Coord(0,0), new Coord(100, 0), List.of(new Coord(0, 10), new Coord(100, 10)));
+        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network);
+        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
+
+        assertEquals(3, segmentNetwork.getLinks().size());
+        assertEquals(4, segmentNetwork.getNodes().size());
+
+        for (var node : segmentNetwork.getNodes().values()) {
+
+            if (node.getId().equals(Id.createNodeId("from"))){
+                assertEquals(0, node.getInLinks().size());
+                assertEquals(1, node.getOutLinks().size());
+                assertTrue(node.getOutLinks().containsKey(Id.createLinkId("link_0")));
+            }
+            if (node.getId().equals(Id.createNodeId("to"))) {
+                assertEquals(1, node.getInLinks().size());
+                assertEquals(0, node.getOutLinks().size());
+                assertTrue(node.getInLinks().containsKey(Id.createLinkId("link_2")));
+            }
+            if (node.getId().equals(Id.createNodeId("intermediate_0"))) {
+                assertEquals(1, node.getInLinks().size());
+                assertEquals(1, node.getOutLinks().size());
+                assertTrue(node.getInLinks().containsKey(Id.createLinkId("link_0")));
+                assertTrue(node.getOutLinks().containsKey(Id.createLinkId("link_1")));
+            }
+            if (node.getId().equals(Id.createNodeId("intermediate_1"))) {
+                assertEquals(1, node.getInLinks().size());
+                assertEquals(1, node.getOutLinks().size());
+                assertTrue(node.getInLinks().containsKey(Id.createLinkId("link_1")));
+                assertTrue(node.getOutLinks().containsKey(Id.createLinkId("link_2")));
+            }
+        }
+    }
+
+    @Test
     public void testAndorra() throws FileNotFoundException, OsmInputException {
 
         // in some cases the unsimplification doesn't properly work. This is the case for paths which have a loop on their end with an intersectio in-between

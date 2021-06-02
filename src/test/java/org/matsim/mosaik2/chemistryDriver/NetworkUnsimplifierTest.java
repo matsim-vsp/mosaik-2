@@ -18,6 +18,7 @@ import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
+import org.matsim.mosaik2.utils.TestUtils;
 import org.matsim.testcases.MatsimTestUtils;
 
 import java.io.FileNotFoundException;
@@ -27,7 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.*;
+import static org.matsim.mosaik2.chemistryDriver.NetworkUnsimplifier.LENGTH_FRACTION_KEY;
 
 @Slf4j
 public class NetworkUnsimplifierTest {
@@ -60,6 +62,32 @@ public class NetworkUnsimplifierTest {
                 new Coordinate(maxX, maxY), new Coordinate(originX, maxY),
                 new Coordinate(originX, originY) // close ring
         });
+    }
+
+    @Test
+    public void testLinkMappingFromGeometryAttributes() {
+
+        var network = TestUtils.createSingleLinkNetwork(new Coord(0,0), new Coord(100, 0), List.of(new Coord(0, 10), new Coord(100, 10)));
+        var link = network.getLinks().get(Id.createLinkId("link"));
+
+        var result = NetworkUnsimplifier.unsimplifyNetwork(network);
+
+        assertEquals(network.getLinks().size(), result.size());
+        assertTrue(result.containsKey(link.getId()));
+
+        var resultSegments = result.get(link.getId());
+        assertEquals(3, resultSegments.size());
+
+        for (var segment : resultSegments) {
+            if (segment.getId().equals(Id.createLinkId("link_1"))) {
+                assertEquals(100, segment.getLength(), 0.0001);
+            }
+            else {
+                assertEquals(10, segment.getLength(), 0.0001);
+            }
+            assertNotNull(segment.getAttributes().getAttribute(LENGTH_FRACTION_KEY));
+            assertEquals(segment.getLength() / link.getLength(), (double)segment.getAttributes().getAttribute(LENGTH_FRACTION_KEY), 0.001);
+        }
     }
 
     @Test

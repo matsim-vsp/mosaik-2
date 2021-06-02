@@ -54,13 +54,10 @@ public class FullFeaturedConverter {
                 .filter(link -> isCoveredBy(link, bounds))
                 .collect(NetworkUtils.getCollector());
 
-        //TODO: Test unsimplification step
         var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network);
 
         // read the emission events
         var manager = EventsUtils.createEventsManager();
-        //var handler = new AggregateEmissionsByTimeHandler(network, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
-        //TODO: Test new event handler which distributes emissions onto link segments
         var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
         manager.addHandler(handler);
         new EmissionEventsReader(manager).readFile(emissionEventsFile);

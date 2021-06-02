@@ -55,9 +55,19 @@ public class NetworkUnsimplifier {
             var id = Id.createLinkId(link.getId().toString() + "_" + i);
             var segment = factory.createLink(id, fromNode, toNode);
             segment.getAttributes().putAttribute(LENGTH_FRACTION_KEY, segment.getLength() / link.getLength());
+            segment.setAllowedModes(link.getAllowedModes());
+            segment.setCapacity(link.getCapacity());
+            segment.setFreespeed(link.getFreespeed());
+            segment.setNumberOfLanes(link.getNumberOfLanes());
             segments.add(segment);
         }
         return segments;
+    }
+
+    static Network segmentsToNetwork(Map<Id<Link>, List<Link>> segments) {
+        return segments.values().stream()
+                .flatMap(Collection::stream)
+                .collect(NetworkUtils.getCollector());
     }
 
     static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, final String osmFile, final String destinationCrs) throws FileNotFoundException, OsmInputException {

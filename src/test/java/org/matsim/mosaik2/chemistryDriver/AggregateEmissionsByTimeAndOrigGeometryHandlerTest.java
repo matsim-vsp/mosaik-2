@@ -7,6 +7,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.ColdEmissionEvent;
 import org.matsim.contrib.emissions.events.WarmEmissionEvent;
+import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
 import org.matsim.mosaik2.utils.TestUtils;
 
 import java.util.List;
@@ -21,7 +22,7 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandlerTest {
     public void addSingleWarmEmissionEvent() {
 
         var network = TestUtils.createSingleLinkNetwork(new Coord(0,0), new Coord(80, 0), List.of(new Coord(0, 10), new Coord(80, 10)));
-        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network);
+        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network, new IdentityTransformation());
         var linkId = network.getLinks().values().iterator().next().getId();
         var pollutants = Set.of(Pollutant.NOx);
         var emissions = Map.of(Pollutant.NOx, 1.0);
@@ -47,7 +48,7 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandlerTest {
     @Test
     public void addSingleColdEmissionEvent() {
         var network = TestUtils.createSingleLinkNetwork(new Coord(0,0), new Coord(80, 0), List.of(new Coord(0, 10), new Coord(80, 10)));
-        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network);
+        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network, new IdentityTransformation());
         var linkId = network.getLinks().values().iterator().next().getId();
         var pollutants = Set.of(Pollutant.NOx);
         var emissions = Map.of(Pollutant.NOx, 1.0);
@@ -75,7 +76,7 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandlerTest {
     public void addSingleEventWithScaleFactor() {
 
         var network = TestUtils.createSingleLinkNetwork(new Coord(0,0), new Coord(80, 0), List.of(new Coord(0, 10), new Coord(80, 10)));
-        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network);
+        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network, new IdentityTransformation());
         var linkId = network.getLinks().values().iterator().next().getId();
         var pollutants = Set.of(Pollutant.NOx);
         var emissions = Map.of(Pollutant.NOx, 1.0);
@@ -104,7 +105,7 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandlerTest {
     public void addMultipleEmissionEvents() {
 
         var network = TestUtils.createSingleLinkNetwork(new Coord(0,0), new Coord(80, 0), List.of(new Coord(0, 10), new Coord(80, 10)));
-        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network);
+        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network, new IdentityTransformation());
         var linkId = network.getLinks().values().iterator().next().getId();
         var pollutants = Set.of(Pollutant.NOx);
         var emissions = Map.of(Pollutant.NOx, 1.0);
@@ -144,7 +145,7 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandlerTest {
     public void addMultipleEmissionEventsForDifferentLinks() {
 
         var network = TestUtils.createRandomNetwork(10, 100, 100);
-        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network);
+        var linkMap = NetworkUnsimplifier.unsimplifyNetwork(network, new IdentityTransformation());
         var pollutants = Set.of(Pollutant.NOx);
         var emissions = Map.of(Pollutant.NOx, 1.0);
         var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(linkMap, pollutants, 10, 1.0);

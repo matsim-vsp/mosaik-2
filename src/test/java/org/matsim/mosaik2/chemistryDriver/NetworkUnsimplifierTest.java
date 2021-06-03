@@ -17,6 +17,7 @@ import org.matsim.contrib.osm.networkReader.SupersonicOsmNetworkReader;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
+import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.mosaik2.utils.TestUtils;
 import org.matsim.testcases.MatsimTestUtils;
@@ -70,7 +71,7 @@ public class NetworkUnsimplifierTest {
         var network = TestUtils.createSingleLinkNetwork(new Coord(0,0), new Coord(100, 0), List.of(new Coord(0, 10), new Coord(100, 10)));
         var link = network.getLinks().get(Id.createLinkId("link"));
 
-        var result = NetworkUnsimplifier.unsimplifyNetwork(network);
+        var result = NetworkUnsimplifier.unsimplifyNetwork(network, new IdentityTransformation());
 
         assertEquals(network.getLinks().size(), result.size());
         assertTrue(result.containsKey(link.getId()));
@@ -94,7 +95,7 @@ public class NetworkUnsimplifierTest {
     public void testSegmentsToNetwork() {
 
         var network = TestUtils.createSingleLinkNetwork(new Coord(0,0), new Coord(100, 0), List.of(new Coord(0, 10), new Coord(100, 10)));
-        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network);
+        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, new IdentityTransformation());
         var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
 
         assertEquals(3, segmentNetwork.getLinks().size());

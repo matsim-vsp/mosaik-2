@@ -1,6 +1,7 @@
 package org.matsim.mosaik2.chemistryDriver;
 
 import lombok.Builder;
+import lombok.extern.log4j.Log4j2;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.NetworkWriter;
 import org.matsim.contrib.analysis.time.TimeBinMap;
@@ -14,7 +15,7 @@ import java.util.Collection;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-
+@Log4j2
 public class FullFeaturedConverter {
 
     private final String networkFile;
@@ -58,7 +59,14 @@ public class FullFeaturedConverter {
                 .filter(link -> isCoveredBy(link, bounds))
                 .collect(NetworkUtils.getCollector());
 
-        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network);
+        log.info("Unsimplifying network");
+        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
+
+        log.info("Converting segment map to network");
+        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
+
+        log.info("writing network!");
+        new NetworkWriter(segmentNetwork).write("C:\\Users\\Janekdererste\\Desktop\\segment-network.xml.gz");
 
         // read the emission events
         var manager = EventsUtils.createEventsManager();
@@ -72,8 +80,8 @@ public class FullFeaturedConverter {
         var palmEmissions = pollutantConverter.convert(emissions);
 
         // put emissions onto a raster
-        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
-        new NetworkWriter(segmentNetwork).write("C:\\Users\\Janekdererste\\Desktop\\segment-network.xml.gz");
+
+
         var rasteredEmissions = EmissionRasterer.raster(palmEmissions, segmentNetwork, bounds, cellSize);
 
         //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);

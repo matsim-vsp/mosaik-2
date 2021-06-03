@@ -36,40 +36,51 @@ public class NetworkUnsimplifier {
     public static final String NOT_MATCHED_KEY = "NOT_MATCHED";
     private static final Logger log = Logger.getLogger(NetworkUnsimplifier.class);
 
-    static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network) {
+    static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, CoordinateTransformation transformation) {
 
         return network.getLinks().values().parallelStream()
-                .map(link -> Tuple.of(link.getId(), createLinkSegments(link, network.getFactory())))
+                .map(link -> Tuple.of(link.getId(), createLinkSegments(link, transformation, network.getFactory())))
                 .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
     }
 
-    static List<Link> createLinkSegments(Link link, NetworkFactory factory) {
+    static List<Link> createLinkSegments(Link link, CoordinateTransformation transformation, NetworkFactory factory) {
 
-        try {
-            var nodes = NetworkUtils.getOriginalGeometry(link);
+        var nodes = NetworkUtils.getOriginalGeometry(link);
 
         List<Link> segments = new ArrayList<>();
+        var fromNode = nodes.get(0);
+        var i = 1;
 
-        for (int i = 0; i < nodes.size() - 1; i++) {
+        for (; i < nodes.size() - 1; i++) {
 
-            var fromNode = nodes.get(i);
-            var toNode = nodes.get(i + 1);
-            var id = Id.createLinkId(link.getId().toString() + "_" + i);
-            var segment = factory.createLink(id, fromNode, toNode);
-            segment.getAttributes().putAttribute(LENGTH_FRACTION_KEY, segment.getLength() / link.getLength());
-            segment.setAllowedModes(link.getAllowedModes());
-            segment.setCapacity(link.getCapacity());
-            segment.setFreespeed(link.getFreespeed());
-            segment.setNumberOfLanes(link.getNumberOfLanes());
-            segments.add(segment);
+            var toNode = getNodeTransformed(nodes, i, transformation);
+            segments.add(createSegment(link, fromNode, toNode, i - 1, factory));
+            fromNode = toNode;
         }
+
+        // we need to add one more segment from last intermediate to to-Node
+        segments.add(createSegment(link, fromNode, link.getToNode(), i - 1, factory));
+
         return segments;
-        } catch (Exception e) {
-            log.warn(e.getMessage());
-            log.warn("returning original link: " + link.toString());
-            link.getAttributes().putAttribute(LENGTH_FRACTION_KEY, 1.0);
-            return List.of(link);
-        }
+    }
+
+    static Link createSegment(Link link, Node from, Node to, int segmentIndex, NetworkFactory factory) {
+        var id = Id.createLinkId(link.getId().toString() + "_" + segmentIndex);
+        var segment = factory.createLink(id, from, to);
+        segment.getAttributes().putAttribute(LENGTH_FRACTION_KEY, segment.getLength() / link.getLength());
+        segment.setAllowedModes(link.getAllowedModes());
+        segment.setCapacity(link.getCapacity());
+        segment.setFreespeed(link.getFreespeed());
+        segment.setNumberOfLanes(link.getNumberOfLanes());
+        return segment;
+    }
+
+    static Node getNodeTransformed(List<Node> nodes, int index, CoordinateTransformation transformation) {
+
+        var node = nodes.get(index);
+        var transformedCoord = transformation.transform(node.getCoord());
+        node.setCoord(transformedCoord);
+        return node;
     }
 
     static Network segmentsToNetwork(Map<Id<Link>, List<Link>> segments) {

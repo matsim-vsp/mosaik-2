@@ -1,6 +1,7 @@
 package org.matsim.mosaik2.prepare;
 
 import org.apache.log4j.Logger;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.IOException;
@@ -11,7 +12,7 @@ public class NodeMatcherTest {
 
     private static final Logger logger = Logger.getLogger(NodeMatcherTest.class);
 
-    @Test
+    @Test@Ignore
     public void parseNodeMatching() throws IOException {
 
         // Setup

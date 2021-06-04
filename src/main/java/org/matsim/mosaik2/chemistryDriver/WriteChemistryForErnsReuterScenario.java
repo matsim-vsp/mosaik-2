@@ -50,6 +50,7 @@ public class WriteChemistryForErnsReuterScenario {
                 .cellSize(2)
                 .scaleFactor(100)
                 .timeBinSize(3600)
+                .date("2017-07-31")
                 .build();
 
         converter.write();

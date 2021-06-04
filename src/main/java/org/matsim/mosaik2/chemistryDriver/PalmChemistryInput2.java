@@ -29,15 +29,16 @@ public class PalmChemistryInput2 {
     public static final String EMISSION_VALUES = "emission_values";
 
     public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data) {
+        writeNetCdfFile(outputFile, data, "2017-07-31");
+    }
+
+    public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data, String date) {
 
         // get the observed pollutants from first valid time bin
         var observedPollutants = data.getTimeBins().iterator().next().getValue().keySet();
-        //var observedPollutants = data.getTimeBin(data.getStartTime()).getValue().keySet();
 
         // get the very first raster for dimensions. from first valid time bin
         var raster = data.getTimeBins().iterator().next().getValue().values().iterator().next();
-        //var raster = data.getTimeBin(data.getStartTime()).getValue().values().iterator().next();
-
 
         try (var writer = NetcdfFileWriter.createNew(NetcdfFileWriter.Version.netcdf3, outputFile)) {
 
@@ -47,19 +48,19 @@ public class PalmChemistryInput2 {
             writeGlobalAttributes(writer);
             writer.create();
 
-            writeData(writer, data, observedPollutants, raster);
+            writeData(writer, data, observedPollutants, raster, date);
 
         } catch (IOException | InvalidRangeException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static void writeData(NetcdfFileWriter writer, TimeBinMap<Map<String, Raster>> data, Set<String> observedPollutants, Raster raster) throws IOException, InvalidRangeException {
+    private static void writeData(NetcdfFileWriter writer, TimeBinMap<Map<String, Raster>> data, Set<String> observedPollutants, Raster raster, String date) throws IOException, InvalidRangeException {
 
         var pollutantToIndex = new ArrayList<>(observedPollutants);
         var emissionIndex = new ArrayInt.D1(pollutantToIndex.size(), false);
         for (var i = 0; i < pollutantToIndex.size(); i++) {
-            emissionIndex.set(i, i);
+            emissionIndex.set(i, i + 1);
         }
 
         var emissionNames = new ArrayChar.D2(pollutantToIndex.size(), 64);
@@ -82,7 +83,7 @@ public class PalmChemistryInput2 {
             var bin = getTimeBin(data, i);
             var tmp = i; // copy this into an effectively final variable since it is used inside a lambda function later
 
-            var timestamp = getTimestamp(bin.getStartTime());
+            var timestamp = getTimestamp(date, bin.getStartTime());
             logger.info("writing timestep: " + timestamp);
 
             times.set(i, (int) bin.getStartTime());
@@ -185,8 +186,8 @@ public class PalmChemistryInput2 {
         return bin;
     }
 
-    private static String getTimestamp(double time) {
+    private static String getTimestamp(String date, double time) {
         var startTimeDuration = Duration.ofSeconds((long) time);
-        return String.format("%02d:%02d:%02d", startTimeDuration.toHours(), startTimeDuration.toMinutesPart(), startTimeDuration.toSecondsPart());
+        return String.format(date + " %02d:%02d:%02d +002", startTimeDuration.toHours(), startTimeDuration.toMinutesPart(), startTimeDuration.toSecondsPart());
     }
 }

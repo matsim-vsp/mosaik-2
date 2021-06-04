@@ -1,7 +1,9 @@
 package org.matsim.mosaik2.chemistryDriver;
 
 import lombok.Builder;
+import lombok.extern.log4j.Log4j2;
 import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.NetworkWriter;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
@@ -9,9 +11,11 @@ import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 
+import java.util.Collection;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-
+@Log4j2
 public class FullFeaturedConverter {
 
     private final String networkFile;
@@ -32,8 +36,10 @@ public class FullFeaturedConverter {
 
     private final PollutantToPalmNameConverter pollutantConverter;
 
+    private final String date;
+
     @Builder
-    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter) {
+    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, String date) {
         this.networkFile = networkFile;
         this.emissionEventsFile = emissionEventsFile;
         this.outputFile = outputFile;
@@ -43,6 +49,7 @@ public class FullFeaturedConverter {
         this.bounds = bounds;
         this.transformation = transformation;
         this.pollutantConverter = pollutantConverter;
+        this.date = date == null ? "2017-07-31" : date;
     }
 
     public void write() {
@@ -52,12 +59,18 @@ public class FullFeaturedConverter {
                 .filter(link -> isCoveredBy(link, bounds))
                 .collect(NetworkUtils.getCollector());
 
-        //TODO: This is missing the network un-simplification step. I have to think about this again though, so leave
-        // it out for now.
+        log.info("Unsimplifying network");
+        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
+
+        log.info("Converting segment map to network");
+        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
+
+        log.info("writing network!");
+        new NetworkWriter(segmentNetwork).write("C:\\Users\\Janekdererste\\Desktop\\segment-network.xml.gz");
 
         // read the emission events
         var manager = EventsUtils.createEventsManager();
-        var handler = new AggregateEmissionsByTimeHandler(network, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
+        var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
         manager.addHandler(handler);
         new EmissionEventsReader(manager).readFile(emissionEventsFile);
 
@@ -67,10 +80,14 @@ public class FullFeaturedConverter {
         var palmEmissions = pollutantConverter.convert(emissions);
 
         // put emissions onto a raster
-        var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
+
+
+        var rasteredEmissions = EmissionRasterer.raster(palmEmissions, segmentNetwork, bounds, cellSize);
+
+        //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
         addNoIfPossible(rasteredEmissions);
 
-        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions);
+        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
     }
 
     private static boolean isCoveredBy(Link link, Raster.Bounds bounds) {

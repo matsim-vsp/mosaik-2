@@ -14,9 +14,11 @@ import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.algorithms.EventWriter;
 import org.matsim.core.events.algorithms.EventWriterXML;
 import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.utils.geometry.CoordUtils;
 
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -84,17 +86,27 @@ public class TestUtils {
 
     /**
      * creates a network with one link from (5, 0) to (95, 0) this can be used to test the raster algorithm
+     *
      * @return network with single link
      */
     public static Network createSingleLinkNetwork() {
 
         var network = NetworkUtils.createNetwork();
-        var fromCoord = new Coord(5,0);
+        var fromCoord = new Coord(5, 0);
         var toCoord = new Coord(95, 0);
-        var fromNode = NetworkUtils.createAndAddNode(network, Id.createNodeId("from"), fromCoord);
-        var toNode = NetworkUtils.createAndAddNode(network, Id.createNodeId("to"), toCoord);
+
+        return createSingleLinkNetwork(fromCoord, toCoord, List.of());
+    }
+
+    public static Network createSingleLinkNetwork(Coord from, Coord to, List<Coord> origGeometry) {
+
+        var network = NetworkUtils.createNetwork();
+        var fromNode = NetworkUtils.createAndAddNode(network, Id.createNodeId("from"), from);
+        var toNode = NetworkUtils.createAndAddNode(network, Id.createNodeId("to"), to);
         var link = network.getFactory().createLink(Id.createLinkId("link"), fromNode, toNode);
         network.addLink(link);
+
+        addOriginalGeometry(link, origGeometry);
 
         return network;
     }
@@ -102,7 +114,9 @@ public class TestUtils {
     private static Link createRandomLink(NetworkFactory factory, double maxX, double maxY) {
         Node fromNode = createRandomNode(factory, maxX, maxY);
         Node toNode = createRandomNode(factory, maxX, maxY);
-        return factory.createLink(Id.createLinkId(UUID.randomUUID().toString()), fromNode, toNode);
+        var link = factory.createLink(Id.createLinkId(UUID.randomUUID().toString()), fromNode, toNode);
+        addOriginalGeometry(link, List.of(new Coord(getRandomValue(maxX), getRandomValue(maxY))));
+        return link;
     }
 
     private static Node createRandomNode(NetworkFactory factory, double maxX, double maxY) {
@@ -114,4 +128,26 @@ public class TestUtils {
         return Math.random() * upperBounds;
     }
 
+    private static void addOriginalGeometry(Link link, List<Coord> origGeometry) {
+        if (!origGeometry.isEmpty()) {
+            var builder = new StringBuilder();
+            var prevCoord = link.getFromNode().getCoord();
+            var length = 0.0;
+
+            for (var i = 0; i < origGeometry.size(); i++) {
+
+                var coord = origGeometry.get(i);
+                builder
+                        .append("intermediate_").append(i).append(",")
+                        .append(coord.getX()).append(",")
+                        .append(coord.getY()).append(" ");
+
+                length += CoordUtils.calcEuclideanDistance(prevCoord, coord);
+                prevCoord = coord;
+            }
+            length += CoordUtils.calcEuclideanDistance(prevCoord, link.getToNode().getCoord()); // add last bit of length
+            link.getAttributes().putAttribute(NetworkUtils.ORIG_GEOM, builder.toString());
+            link.setLength(length);
+        }
+    }
 }

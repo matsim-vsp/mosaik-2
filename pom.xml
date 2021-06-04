@@ -9,7 +9,7 @@
     <version>0.0.1-SNAPSHOT</version>
 
     <properties>
-        <matsim.version>14.0-SNAPSHOT</matsim.version>
+        <matsim.version>14.0-PR1524</matsim.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <maven.compiler.source>11</maven.compiler.source>
@@ -61,7 +61,14 @@
         <dependency>
         <groupId>com.github.matsim-scenarios</groupId>
         <artifactId>matsim-berlin</artifactId>
-        <version>5.5.1</version>
+        <version>5.6.x-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.matsim</groupId>
+                    <artifactId>matsim</artifactId>
+                </exclusion>
+
+            </exclusions>
         </dependency>
 
         <!-- netcdf support -->
@@ -161,6 +168,16 @@
                                 <!-- This bit merges the various GeoTools META-INF/services files         -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
@@ -196,6 +213,11 @@
         <repository>
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
+        </repository>
+
+        <repository>
+            <id>SBB</id>
+            <url>https://schweizerischebundesbahnen.bintray.com/simba.mvn</url>
         </repository>
     </repositories>
 

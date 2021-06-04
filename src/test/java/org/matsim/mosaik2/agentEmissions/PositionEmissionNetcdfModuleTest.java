@@ -6,24 +6,37 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.lang3.event.EventUtils;
 import org.junit.Rule;
 import org.junit.Test;
+import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.events.Event;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
 import org.matsim.core.api.experimental.events.EventsManager;
+import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.events.EventsManagerImpl;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.core.scenario.ScenarioUtils;
+import org.matsim.core.utils.geometry.CoordUtils;
+import org.matsim.examples.ExamplesUtils;
 import org.matsim.testcases.MatsimTestUtils;
+import org.matsim.vehicles.EngineInformation;
+import org.matsim.vehicles.VehicleType;
+import org.matsim.vehicles.VehicleUtils;
 
 import javax.inject.Singleton;
 import java.lang.module.Configuration;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import static org.junit.Assert.*;
 
@@ -38,12 +51,59 @@ PositionEmissionNetcdfModuleTest {
     @Test
     public void testSimpleSetUp() {
 
+        runTest(testUtils.getClassInputDirectory() + "config.xml", scenario -> {
+
+            var defaultVehicleType = VehicleUtils.createVehicleType(Id.create(TransportMode.car, VehicleType.class));
+            EngineInformation carEngineInformation = defaultVehicleType.getEngineInformation();
+            VehicleUtils.setHbefaVehicleCategory( carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
+            VehicleUtils.setHbefaTechnology( carEngineInformation, "average" );
+            VehicleUtils.setHbefaSizeClass( carEngineInformation, "average" );
+            VehicleUtils.setHbefaEmissionsConcept( carEngineInformation, "average" );
+
+            scenario.getVehicles().addVehicleType(defaultVehicleType);
+
+            // use euclidean length for links
+            for (Link link : scenario.getNetwork().getLinks().values()) {
+                link.getAttributes().putAttribute("hbefa_road_type", "URB/Access/30");
+            }
+        });
+    }
+
+    @Test
+    public void testEquilSetup() {
+        var configPath = ExamplesUtils.getTestScenarioURL("equil").toString() + "config.xml";
+        runTest(configPath, scenario -> {
+
+            var defaultVehicleType = VehicleUtils.createVehicleType(Id.create(TransportMode.car, VehicleType.class));
+            EngineInformation carEngineInformation = defaultVehicleType.getEngineInformation();
+            VehicleUtils.setHbefaVehicleCategory( carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
+            VehicleUtils.setHbefaTechnology( carEngineInformation, "average" );
+            VehicleUtils.setHbefaSizeClass( carEngineInformation, "average" );
+            VehicleUtils.setHbefaEmissionsConcept( carEngineInformation, "average" );
+
+            scenario.getVehicles().addVehicleType(defaultVehicleType);
+
+            // use euclidean length for links
+            for (Link link : scenario.getNetwork().getLinks().values()) {
+                link.setLength(CoordUtils.calcEuclideanDistance(link.getFromNode().getCoord(), link.getToNode().getCoord()));
+                link.getAttributes().putAttribute("hbefa_road_type", "URB/Access/30");
+            }
+        });
+    }
+
+    private void runTest(String configPath, Consumer<Scenario> scenarioLoaded) {
+
         //--------------- prepare and run the set up -----------------------//
         var netCdfEmissionWriterConfigGroup = Utils.createNetcdfEmissionWriterConfigGroup();
-        var config = ConfigUtils.loadConfig(testUtils.getClassInputDirectory() + "config.xml", new EmissionsConfigGroup(), netCdfEmissionWriterConfigGroup);
+        var emissionConfigGroup = Utils.createUpEmissionsConfigGroup("C:\\Users\\Janekdererste\\repos\\shared-svn");
+        var config = ConfigUtils.loadConfig(configPath, emissionConfigGroup, netCdfEmissionWriterConfigGroup);
+        Utils.applySnapshotSettings(config);
         config.controler().setOutputDirectory(testUtils.getOutputDirectory());
+       // config.controler().setLastIteration(0);
+        config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.modeVehicleTypesFromVehiclesData);
 
         var scenario = ScenarioUtils.loadScenario(config);
+        scenarioLoaded.accept(scenario);
 
         var controler = new Controler(scenario);
 

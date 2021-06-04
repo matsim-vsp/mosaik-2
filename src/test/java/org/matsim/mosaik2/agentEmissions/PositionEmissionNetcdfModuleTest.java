@@ -7,6 +7,7 @@ import org.apache.commons.lang3.event.EventUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.api.core.v01.events.Event;
+import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
 import org.matsim.core.api.experimental.events.EventsManager;
@@ -21,6 +22,7 @@ import org.matsim.testcases.MatsimTestUtils;
 
 import javax.inject.Singleton;
 import java.lang.module.Configuration;
+import java.util.HashSet;
 import java.util.Set;
 
 import static org.junit.Assert.*;
@@ -63,23 +65,23 @@ PositionEmissionNetcdfModuleTest {
         var folder = testUtils.getOutputDirectory() + "ITERS/it." + config.controler().getLastIteration() + "/";
         var it = config.controler().getLastIteration();
 
-        var netCdfReader = new AgentEmissionNetCdfReader();
-        netCdfReader.read(folder + it + ".position-emissions.nc", folder + it + ".position-emissions-vehicleIdIndex.csv");
-        var netcdfResult = netCdfReader.getEventRecord();
+        var netCdfResult = AgentEmissionNetCdfReader.readToRecord(folder + it + ".position-emissions.nc", folder + it + ".position-emissions-vehicleIdIndex.csv");
 
         var manager = EventsUtils.createEventsManager();
-        var handler = new PositionEmissionRecordHandler(netcdfResult);
+        var handler = new PositionEmissionRecordHandler();
         manager.addHandler(handler);
         EventsUtils.readEvents(manager, folder + it + ".events.xml.gz");
 
-        assertTrue(netcdfResult.containsAll(handler.getExpectedRecords()));
+        assertTrue(netCdfResult.containsAll(handler.getExpectedRecords()));
+
+        AgentEmissionNetCdfReader.translateToCsv(folder + it + ".position-emissions.nc", folder + it + ".position-emissions-vehicleIdIndex.csv", testUtils.getOutputDirectory() + "position-emission-no2.csv");
     }
 
     @RequiredArgsConstructor
     private static class PositionEmissionRecordHandler implements BasicEventHandler {
 
         @Getter
-        private final Set<String> expectedRecords;
+        private final Set<String> expectedRecords = new HashSet<>();
 
         @Override
         public void handleEvent(Event event) {
@@ -88,8 +90,10 @@ PositionEmissionNetcdfModuleTest {
                 if (event.getAttributes().get("emissionType").equals("cold")) return; // ignore cold events for now, but think about it later
 
                 var record = "time=" + event.getTime() +
-                        "vehicleId=" + event.getAttributes().get("vehicleId");
-
+                        ",vehicleId=" + event.getAttributes().get("vehicleId") +
+                        ",x=" + event.getAttributes().get("x") +
+                        ",y=" + event.getAttributes().get("y") +
+                        ",no2=" + event.getAttributes().get(Pollutant.NO2.toString());
                 expectedRecords.add(record);
             }
         }

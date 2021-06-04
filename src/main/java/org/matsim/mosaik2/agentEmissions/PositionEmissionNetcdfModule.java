@@ -1,6 +1,11 @@
 package org.matsim.mosaik2.agentEmissions;
 
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import lombok.Getter;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.log4j.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
@@ -27,10 +32,9 @@ import ucar.nc2.NetcdfFileWriter;
 
 import javax.inject.Inject;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.Map;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class PositionEmissionNetcdfModule extends AbstractModule {
@@ -44,7 +48,7 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
 
     static class NetcdfEmissionWriterConfig extends ReflectiveConfigGroup {
 
-        public static final String GOUP_NAME = "netcdPositionEmission";
+        public static final String GOUP_NAME = "netcdfPositionEmission";
 
         private EnumMap<Pollutant, String> pollutantMapping = new EnumMap<>(Pollutant.class);
         private boolean calculateNOFromNOxAndNO2 = true;
@@ -112,7 +116,9 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
             if (netcdfHandler != null) {
                 eventsManager.removeHandler(netcdfHandler);
                 netcdfHandler.closeFile();
+                netcdfHandler.getVehicleIdIndex().writeToFile(outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "position-emissions-vehicleIdIndex.csv"));
                 netcdfHandler = null;
+
             }
         }
 
@@ -136,12 +142,60 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
         }
     }
 
+    public static class VehicleIdIndex {
+
+        private final Object2IntOpenHashMap<Id<Vehicle>> idMapping = new Object2IntOpenHashMap<>();
+
+        int addIfNecessary(Id<Vehicle> id) {
+           return idMapping.computeIfAbsent(id, key -> idMapping.size());
+        }
+
+        void writeToFile(String filename) {
+
+            try(var writer = Files.newBufferedWriter(Paths.get(filename)); var printer = CSVFormat.DEFAULT.withHeader("index", "vehicleId").print(writer)) {
+
+                idMapping.object2IntEntrySet().stream()
+                        .sorted(Comparator.comparingInt(Object2IntMap.Entry::getIntValue))
+                        .forEach(entry -> print(printer, entry));
+
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        static List<Id<Vehicle>> readFromFile(String filename) {
+
+            List<Id<Vehicle>> result = new ArrayList<>();
+            try(var reader = Files.newBufferedReader(Paths.get(filename)); var csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withHeader())){
+
+                for (var record : csvParser) {
+                   // var index = Integer.parseInt(record.get("index"));
+                    var id = record.get("vehicleId");
+                    result.add(Id.createVehicleId(id));
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return result;
+        }
+
+        private void print(CSVPrinter printer, Object2IntMap.Entry<?> entry) {
+            try {
+                printer.printRecord(entry.getIntValue(), entry.getKey());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
     private static class NetcdfWriterHandler implements BasicEventHandler, EventWriter {
 
         private final NetcdfFileWriter writer;
 
         // Mapping of string based matsim ids to successive integer (due to netcdf file format)
-        private final Object2IntOpenHashMap<Id<Vehicle>> idMapping = new Object2IntOpenHashMap<>();
+        //private final Object2IntOpenHashMap<Id<Vehicle>> idMapping = new Object2IntOpenHashMap<>();
+        @Getter
+        private final VehicleIdIndex vehicleIdIndex = new VehicleIdIndex();
 
         private final Map<Pollutant, String> pollutants;
         private final boolean calculateNO;
@@ -151,7 +205,6 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
         private double currentTimeStep = Double.NEGATIVE_INFINITY;
 
         private int currentVehicleIndex = 0;
-        private int lastIntId = 0;
 
         private final Array timeData = Array.factory(DataType.DOUBLE, new int[] {1});
         private final Array numberOfVehicles = Array.factory(DataType.INT, new int[] {1});
@@ -241,10 +294,7 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
                 // Set currentTimeStep to current event time if necessary
                 adjustTime(positionEmissionEvent.getTime());
 
-                int intId = idMapping.computeIfAbsent(positionEmissionEvent.getVehicleId(), id -> {
-                    lastIntId++;
-                    return lastIntId;
-                });
+                int intId = vehicleIdIndex.addIfNecessary(positionEmissionEvent.getVehicleId());
 
                 try {
                     vehicleIds.set(0, currentVehicleIndex, intId);
@@ -282,7 +332,6 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
             currentTimeIndex = new int[] {-1};
         }
 
-        // ToDo - Check here
         private void adjustTime(double time) {
             if (time > currentTimeStep) {
 
@@ -295,7 +344,6 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
         }
 
         private void writeData() {
-            // write all the stuff
             try {
                 timeData.setDouble(timeData.getIndex(), currentTimeStep);
                 writer.write("time", currentTimeIndex, timeData);
@@ -323,8 +371,6 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
             return new int[] { currentTimeIndex[0], 0};
         }
 
-
-        // ToDo - Check here
         private void beforeTimestep(double time) {
 
             // reset all the state

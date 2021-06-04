@@ -63,7 +63,7 @@
 		<param name="nonScenarioVehicles" value="abort" />
 		<param name="usingDetailedEmissionCalculation" value="null" />
 	</module>
-	<module name="netcdPositionEmission" >
+	<module name="netcdfPositionEmission" >
 		<param name="pollutants" value="CO->CO, CO2_TOTAL->CO2, NOx->NOx, NO2->NO2, PM->PM10" />
 	</module>
 	<module name="planCalcScore" >

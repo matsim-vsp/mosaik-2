@@ -34,14 +34,12 @@ public class OfflineEmissions {
 
         configGroup.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
         configGroup.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
-        configGroup.setAverageColdEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v3.2\\EFA_ColdStart_vehcat_2005average.txt");
-        configGroup.setAverageWarmEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v3.2\\EFA_HOT_vehcat_2005average.txt");
+        configGroup.setAverageColdEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_ColdStart_Vehcat_2020_Average.csv");
+        configGroup.setAverageWarmEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_HOT_Vehcat_2020_Average.csv");
         configGroup.setNonScenarioVehicles(EmissionsConfigGroup.NonScenarioVehicles.ignore);
 
         // we need the generated vehicles of the matsim run
-        config.vehicles().setVehiclesFile("Z:\\berlin\\output\\berlin-v5.5-1pct.output_vehicles.xml.gz");
-
-        //config.vehicles().setVehiclesFile("C:\\Users\\Janekdererste\\Desktop\\equil\\output\\output_vehicles.xml.gz");
+        config.vehicles().setVehiclesFile("Z:\\berlin\\output-berlin-v5.5.2-10pct-last-iteration\\berlin-v5.5-10pct.output_vehicles.xml.gz");
 
         var scenario = ScenarioUtils.loadScenario(config);
 
@@ -148,12 +146,12 @@ public class OfflineEmissions {
 
         EmissionModule emissionModule = injector.getInstance(EmissionModule.class);
 
-        EventWriterXML emissionEventWriter = new EventWriterXML("C:\\Users\\Janekdererste\\Desktop\\emissionEvents_berlin.xml.gz");
+        EventWriterXML emissionEventWriter = new EventWriterXML("C:\\Users\\Janekdererste\\Desktop\\emissionEvents_berlin_10pct.xml.gz");
         emissionModule.getEmissionEventsManager().addHandler(emissionEventWriter);
 
         eventsManager.initProcessing();
         MatsimEventsReader matsimEventsReader = new MatsimEventsReader(eventsManager);
-        matsimEventsReader.readFile("Z:\\berlin\\output\\berlin-v5.5-1pct.output_events.xml.gz");
+        matsimEventsReader.readFile("Z:\\berlin\\output-berlin-v5.5.2-10pct-last-iteration\\berlin-v5.5-10pct.output_events.xml.gz");
         eventsManager.finishProcessing();
 
         emissionEventWriter.closeFile();

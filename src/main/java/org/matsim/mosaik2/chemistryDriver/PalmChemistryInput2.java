@@ -70,8 +70,8 @@ public class PalmChemistryInput2 {
 
         var zValues = new ArrayDouble.D1(1);
         zValues.set(0, 1.0); // the original file sets this to 1 as well
-        var xValues = writeDoubleArray(raster.getBounds().getMinX(), raster.getBounds().getMaxX(), raster.getCellSize(), raster.getXLength());
-        var yValues = writeDoubleArray(raster.getBounds().getMinY(), raster.getBounds().getMaxY(), raster.getCellSize(), raster.getYLength());
+        var xValues = writeDoubleArray(0, raster.getCellSize(), raster.getXLength());
+        var yValues = writeDoubleArray(0, raster.getCellSize(), raster.getYLength());
 
         int numberOfConsecutiveTimeBins = (int) ((data.getEndTimeOfLastBin() - data.getStartTime()) / data.getBinSize());
         var times = new ArrayInt.D1(numberOfConsecutiveTimeBins, false);
@@ -165,12 +165,13 @@ public class PalmChemistryInput2 {
         writer.addGlobalAttribute("legacy_mode", "yes");
     }
 
-    private static ArrayDouble.D1 writeDoubleArray(double min, double max, double intervallSize, int size) {
+    private static ArrayDouble.D1 writeDoubleArray(double min, double intervalSize, int size) {
         var result = new ArrayDouble.D1(size);
-        var i = 0;
-        for (var v = min; v <= max; v += intervallSize) {
-            result.set(i, v);
-            i++;
+
+        for(int i = 0; i < size; i++) {
+
+            var value = min + i * intervalSize;
+            result.set(i, value);
         }
         return result;
     }

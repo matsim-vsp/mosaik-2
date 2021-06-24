@@ -15,6 +15,7 @@ import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
+import org.matsim.contrib.otfvis.OTFVisLiveModule;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
@@ -71,7 +72,7 @@ PositionEmissionNetcdfModuleTest {
 
     @Test
     public void testEquilSetup() {
-        var configPath = ExamplesUtils.getTestScenarioURL("equil").toString() + "config.xml";
+        var configPath = ExamplesUtils.getTestScenarioURL("equil") + "config.xml";
         runTest(configPath, scenario -> {
 
             var defaultVehicleType = VehicleUtils.createVehicleType(Id.create(TransportMode.car, VehicleType.class));
@@ -88,6 +89,13 @@ PositionEmissionNetcdfModuleTest {
                 link.setLength(CoordUtils.calcEuclideanDistance(link.getFromNode().getCoord(), link.getToNode().getCoord()));
                 link.getAttributes().putAttribute("hbefa_road_type", "URB/Access/30");
             }
+
+            // use only one agent
+           /* var person1 = scenario.getPopulation().getPersons().get(Id.createPersonId(1));
+            scenario.getPopulation().getPersons().clear();
+            scenario.getPopulation().addPerson(person1);
+
+            */
         });
     }
 
@@ -117,6 +125,8 @@ PositionEmissionNetcdfModuleTest {
                 bind(EventsManager.class).to(EventsManagerImpl.class).in(Singleton.class);
             }
         });
+
+        controler.addOverridingModule(new OTFVisLiveModule());
 
         controler.run();
 

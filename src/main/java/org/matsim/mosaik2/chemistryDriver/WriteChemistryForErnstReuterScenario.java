@@ -39,7 +39,7 @@ public class WriteChemistryForErnstReuterScenario {
     void write() {
 
         var nameConverter = new PollutantToPalmNameConverter(pollutants);
-        var bounds = new Raster.Bounds(385029.5, 5818412.0, 387075.5, 5820458);
+        var bounds = new Raster.Bounds(385030.5, 5818413.0, 387076.5, 5820459);
         var transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
 
 
@@ -53,7 +53,7 @@ public class WriteChemistryForErnstReuterScenario {
                 .cellSize(2)
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
-                .date("2017-07-31")
+                .date("2019-07-02")
                 .build();
 
         converter.write();

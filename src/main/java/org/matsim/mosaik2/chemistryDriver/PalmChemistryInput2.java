@@ -70,8 +70,8 @@ public class PalmChemistryInput2 {
 
         var zValues = new ArrayDouble.D1(1);
         zValues.set(0, 1.0); // the original file sets this to 1 as well
-        var xValues = writeDoubleArray(0, raster.getCellSize(), raster.getXLength());
-        var yValues = writeDoubleArray(0, raster.getCellSize(), raster.getYLength());
+        var xValues = writeDoubleArray(raster.getCellSize() / 2, raster.getCellSize(), raster.getXLength());
+        var yValues = writeDoubleArray(raster.getCellSize() / 2 , raster.getCellSize(), raster.getYLength());
 
         int numberOfConsecutiveTimeBins = (int) ((data.getEndTimeOfLastBin() - data.getStartTime()) / data.getBinSize());
         var times = new ArrayInt.D1(numberOfConsecutiveTimeBins, false);
@@ -189,6 +189,6 @@ public class PalmChemistryInput2 {
 
     private static String getTimestamp(String date, double time) {
         var startTimeDuration = Duration.ofSeconds((long) time);
-        return String.format(date + " %02d:%02d:%02d +002", startTimeDuration.toHours(), startTimeDuration.toMinutesPart(), startTimeDuration.toSecondsPart());
+        return String.format(date + " %02d:%02d:%02d +001", startTimeDuration.toHours(), startTimeDuration.toMinutesPart(), startTimeDuration.toSecondsPart());
     }
 }

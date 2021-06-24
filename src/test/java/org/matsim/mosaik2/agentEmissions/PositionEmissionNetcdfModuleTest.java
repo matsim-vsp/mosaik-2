@@ -107,11 +107,17 @@ PositionEmissionNetcdfModuleTest {
         var config = ConfigUtils.loadConfig(configPath, emissionConfigGroup, netCdfEmissionWriterConfigGroup);
         Utils.applySnapshotSettings(config);
         config.controler().setOutputDirectory(testUtils.getOutputDirectory());
+
        // config.controler().setLastIteration(0);
         config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.modeVehicleTypesFromVehiclesData);
 
         var scenario = ScenarioUtils.loadScenario(config);
+
+        // the following two options make vehicles travel on the center of a link without offsett to the right
+        config.qsim().setLinkWidthForVis(0);
+        scenario.getNetwork().setEffectiveLaneWidth(0);
         scenarioLoaded.accept(scenario);
+
 
         var controler = new Controler(scenario);
 

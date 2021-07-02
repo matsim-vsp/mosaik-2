@@ -38,8 +38,10 @@ public class FullFeaturedConverter {
 
     private final String date;
 
+    private final int numberOfDays;
+
     @Builder
-    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, String date) {
+    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, String date, int numberOfDays) {
         this.networkFile = networkFile;
         this.emissionEventsFile = emissionEventsFile;
         this.outputFile = outputFile;
@@ -50,6 +52,7 @@ public class FullFeaturedConverter {
         this.transformation = transformation;
         this.pollutantConverter = pollutantConverter;
         this.date = date == null ? "2017-07-31" : date;
+        this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
     }
 
     public void write() {
@@ -87,7 +90,7 @@ public class FullFeaturedConverter {
         //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
         addNoIfPossible(rasteredEmissions);
 
-        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
+        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date, numberOfDays);
     }
 
     private static boolean isCoveredBy(Link link, Raster.Bounds bounds) {

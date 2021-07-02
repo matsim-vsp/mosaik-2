@@ -2,6 +2,7 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 
@@ -54,6 +55,7 @@ public class WriteChemistryForErnstReuterScenario {
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
                 .date("2019-07-02")
+                .numberOfDays(2)
                 .build();
 
         converter.write();

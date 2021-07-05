@@ -132,8 +132,6 @@ PositionEmissionNetcdfModuleTest {
             }
         });
 
-        controler.addOverridingModule(new OTFVisLiveModule());
-
         controler.run();
 
         //---------------- now load and compare the events and netcdf file---------------//

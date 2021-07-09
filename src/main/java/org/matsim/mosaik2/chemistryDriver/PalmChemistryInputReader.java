@@ -16,6 +16,7 @@ public class PalmChemistryInputReader {
 
     static TimeBinMap<Map<String, Raster>> read(String filename) {
 
+        log.info("Try opening NetcdfFile at: " + filename);
         try (var file = NetcdfFile.open(filename)) {
 
             List<Integer> times = toIntList(file.findVariable(PalmChemistryInput2.TIME));
@@ -64,6 +65,8 @@ public class PalmChemistryInputReader {
                 }
             }
 
+            log.info("Finished reading NetcdfFile");
+            log.info("");
             return emissions;
 
         } catch (IOException | InvalidRangeException e) {

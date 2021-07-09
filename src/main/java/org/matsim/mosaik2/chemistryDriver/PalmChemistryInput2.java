@@ -29,10 +29,10 @@ public class PalmChemistryInput2 {
     public static final String EMISSION_VALUES = "emission_values";
 
     public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data) {
-        writeNetCdfFile(outputFile, data, "2017-07-31");
+        writeNetCdfFile(outputFile, data, "2017-07-31", 1);
     }
 
-    public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data, String date) {
+    public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data, String date, int numberOfDays) {
 
         // get the observed pollutants from first valid time bin
         var observedPollutants = data.getTimeBins().iterator().next().getValue().keySet();
@@ -48,14 +48,14 @@ public class PalmChemistryInput2 {
             writeGlobalAttributes(writer);
             writer.create();
 
-            writeData(writer, data, observedPollutants, raster, date);
+            writeData(writer, data, observedPollutants, raster, date, numberOfDays);
 
         } catch (IOException | InvalidRangeException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static void writeData(NetcdfFileWriter writer, TimeBinMap<Map<String, Raster>> data, Set<String> observedPollutants, Raster raster, String date) throws IOException, InvalidRangeException {
+    private static void writeData(NetcdfFileWriter writer, TimeBinMap<Map<String, Raster>> data, Set<String> observedPollutants, Raster raster, String date, int numberOfDays) throws IOException, InvalidRangeException {
 
         var pollutantToIndex = new ArrayList<>(observedPollutants);
         var emissionIndex = new ArrayInt.D1(pollutantToIndex.size(), false);
@@ -70,32 +70,37 @@ public class PalmChemistryInput2 {
 
         var zValues = new ArrayDouble.D1(1);
         zValues.set(0, 1.0); // the original file sets this to 1 as well
-        var xValues = writeDoubleArray(raster.getBounds().getMinX(), raster.getBounds().getMaxX(), raster.getCellSize(), raster.getXLength());
-        var yValues = writeDoubleArray(raster.getBounds().getMinY(), raster.getBounds().getMaxY(), raster.getCellSize(), raster.getYLength());
+        var xValues = writeDoubleArray(raster.getCellSize() / 2, raster.getCellSize(), raster.getXLength());
+        var yValues = writeDoubleArray(raster.getCellSize() / 2 , raster.getCellSize(), raster.getYLength());
 
-        int numberOfConsecutiveTimeBins = (int) ((data.getEndTimeOfLastBin() - data.getStartTime()) / data.getBinSize());
-        var times = new ArrayInt.D1(numberOfConsecutiveTimeBins, false);
-        var timestamps = new ArrayChar.D2(numberOfConsecutiveTimeBins, 64);
-        var emissionValues = new ArrayFloat.D5(numberOfConsecutiveTimeBins, 1, raster.getYLength(), raster.getXLength(), pollutantToIndex.size());
+        //int numberOfConsecutiveTimeBins = (int) ((data.getEndTimeOfLastBin() - data.getStartTime()) / data.getBinSize());
+        var numberOfTimeslices = 24 * numberOfDays;
+        var times = new ArrayInt.D1(numberOfTimeslices, false);
+        var timestamps = new ArrayChar.D2(numberOfTimeslices, 64);
+        var emissionValues = new ArrayFloat.D5(numberOfTimeslices, 1, raster.getYLength(), raster.getXLength(), pollutantToIndex.size());
 
-        for (var i = 0; i < numberOfConsecutiveTimeBins; i++) {
+       // palm needs some time to warm up. We put the same day into the input file twice
+        // cut of the emissions after 24 hours.
+        for (var day = 0; day < numberOfDays; day++ ) {
+            for (var i = 0; i < 24; i++) {
 
-            var bin = getTimeBin(data, i);
-            var tmp = i; // copy this into an effectively final variable since it is used inside a lambda function later
+                var bin = getTimeBin(data, i);
+                var timeIndex = i + 24 * day; // use 24 hours of one day and then keep on going for each additional day.
 
-            var timestamp = getTimestamp(date, bin.getStartTime());
-            logger.info("writing timestep: " + timestamp);
+                var timestamp = getTimestamp(date, bin.getStartTime());
+                logger.info("writing timestep: " + timestamp);
+                timestamps.setString(timeIndex, timestamp);
 
-            times.set(i, (int) bin.getStartTime());
-            timestamps.setString(i, timestamp);
+                // continue writing data after the first day has finished.
+                times.set(timeIndex, (int) bin.getStartTime() + day * 24 * 3600);
+                for (var pollutantEntry : bin.getValue().entrySet()) {
 
-            for (var pollutantEntry : bin.getValue().entrySet()) {
-
-                var pollutantRaster = pollutantEntry.getValue();
-                pollutantRaster.forEachIndex(((xi, yi, value) -> {
-                    var p = pollutantToIndex.indexOf(pollutantEntry.getKey());
-                    emissionValues.set(tmp, 0, yi, xi, p, (float) value);
-                }));
+                    var pollutantRaster = pollutantEntry.getValue();
+                    pollutantRaster.forEachIndex(((xi, yi, value) -> {
+                        var p = pollutantToIndex.indexOf(pollutantEntry.getKey());
+                        emissionValues.set(timeIndex, 0, yi, xi, p, (float) value);
+                    }));
+                }
             }
         }
 
@@ -165,12 +170,13 @@ public class PalmChemistryInput2 {
         writer.addGlobalAttribute("legacy_mode", "yes");
     }
 
-    private static ArrayDouble.D1 writeDoubleArray(double min, double max, double intervallSize, int size) {
+    private static ArrayDouble.D1 writeDoubleArray(double min, double intervalSize, int size) {
         var result = new ArrayDouble.D1(size);
-        var i = 0;
-        for (var v = min; v <= max; v += intervallSize) {
-            result.set(i, v);
-            i++;
+
+        for(int i = 0; i < size; i++) {
+
+            var value = min + i * intervalSize;
+            result.set(i, value);
         }
         return result;
     }
@@ -188,6 +194,6 @@ public class PalmChemistryInput2 {
 
     private static String getTimestamp(String date, double time) {
         var startTimeDuration = Duration.ofSeconds((long) time);
-        return String.format(date + " %02d:%02d:%02d +002", startTimeDuration.toHours(), startTimeDuration.toMinutesPart(), startTimeDuration.toSecondsPart());
+        return String.format(date + " %02d:%02d:%02d +001", startTimeDuration.toHours(), startTimeDuration.toMinutesPart(), startTimeDuration.toSecondsPart());
     }
 }

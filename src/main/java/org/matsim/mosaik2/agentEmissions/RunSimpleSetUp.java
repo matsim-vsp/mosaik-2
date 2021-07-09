@@ -1,5 +1,7 @@
 package org.matsim.mosaik2.agentEmissions;
 
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
@@ -30,6 +32,7 @@ import org.matsim.core.controler.events.ShutdownEvent;
 import org.matsim.core.controler.listener.AfterMobsimListener;
 import org.matsim.core.controler.listener.BeforeMobsimListener;
 import org.matsim.core.controler.listener.ShutdownListener;
+import org.matsim.core.events.EventsManagerImpl;
 import org.matsim.core.events.algorithms.EventWriter;
 import org.matsim.core.events.algorithms.EventWriterXML;
 import org.matsim.core.events.handler.BasicEventHandler;
@@ -54,9 +57,14 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 public class RunSimpleSetUp {
+
+
     public static void main(String[] args) throws IOException {
 
-        var emissionConfig = Utils.createUpEmissionsConfigGroup();
+        var arguments = new Utils.Args();
+        JCommander.newBuilder().addObject(arguments).build().parse(args);
+
+        var emissionConfig = Utils.createUpEmissionsConfigGroup(arguments.getSharedSvn());
         var netcdfWriterConfig = Utils.createNetcdfEmissionWriterConfigGroup();
 
         var config = ConfigUtils.createConfig(emissionConfig, netcdfWriterConfig);
@@ -103,14 +111,15 @@ public class RunSimpleSetUp {
         controler.addOverridingModule(new PositionEmissionsModule());
         controler.addOverridingModule(new PositionEmissionNetcdfModule());
 
-       /* controler.addOverridingModule(new AbstractModule() {
+        controler.addOverridingModule(new AbstractModule() {
             @Override
             public void install() {
-                bind(EventsManager.class).to(SimStepParallelEventsManagerImpl.class).in(Singleton.class);
+                // we need single threaded events manager because other wise it doesn't work
+                bind(EventsManager.class).to(EventsManagerImpl.class).in(Singleton.class);
             }
         });
 
-        */
+
 
         controler.run();
     }

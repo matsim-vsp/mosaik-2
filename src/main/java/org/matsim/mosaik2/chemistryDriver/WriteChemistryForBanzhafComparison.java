@@ -7,7 +7,7 @@ import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 
 import java.util.Map;
 
-public class WriteChemistryForErnsReuterScenario {
+public class WriteChemistryForBanzhafComparison {
 
     private static final Map<Pollutant, String> pollutants = Map.of(
             Pollutant.NO2, "NO2",
@@ -26,9 +26,12 @@ public class WriteChemistryForErnsReuterScenario {
     @Parameter(names = "-o", required = true)
     private String outputFile = "";
 
+    @Parameter(names = "-s")
+    private double scaleFactor = 10;
+
     public static void main(String[] args) {
 
-        var writer = new WriteChemistryForErnsReuterScenario();
+        var writer = new WriteChemistryForBanzhafComparison();
         JCommander.newBuilder().addObject(writer).build().parse(args);
         writer.write();
     }
@@ -36,7 +39,7 @@ public class WriteChemistryForErnsReuterScenario {
     void write() {
 
         var nameConverter = new PollutantToPalmNameConverter(pollutants);
-        var bounds = new Raster.Bounds(385029.5, 5818412.0, 387075.5, 5820458);
+        var bounds = new Raster.Bounds(385171.5, 5818734.0, 386770.5, 5820333);
         var transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
 
 
@@ -47,8 +50,8 @@ public class WriteChemistryForErnsReuterScenario {
                 .pollutantConverter(nameConverter)
                 .bounds(bounds)
                 .transformation(transformation)
-                .cellSize(2)
-                .scaleFactor(100)
+                .cellSize(10)
+                .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
                 .date("2017-07-31")
                 .build();

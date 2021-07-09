@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.agentEmissions;
 
+import com.beust.jcommander.JCommander;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
@@ -19,7 +20,10 @@ public class RunBerlinSetUp {
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
     public static void main(String[] args) {
 
-        var emissionsConfig = Utils.createUpEmissionsConfigGroup();
+        var arguments = new Utils.Args();
+        JCommander.newBuilder().addObject(arguments).build().parse(args);
+
+        var emissionsConfig = Utils.createUpEmissionsConfigGroup(arguments.getSharedSvn());
         var positionEmissionNetcdfConfig = Utils.createNetcdfEmissionWriterConfigGroup();
         var config = RunBerlinScenario.prepareConfig(args, emissionsConfig, positionEmissionNetcdfConfig);
 

@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.agentEmissions;
 
+import com.beust.jcommander.JCommander;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.contrib.emissions.EmissionModule;
@@ -20,8 +21,11 @@ public class RunEquilSetUp {
 
     public static void main(String[] args) {
 
+        var arguments = new Utils.Args();
+        JCommander.newBuilder().addObject(arguments).build().parse(args);
+
         var configPath = ExamplesUtils.getTestScenarioURL("equil").toString() + "/config.xml";
-        var emissionConfig = Utils.createUpEmissionsConfigGroup();
+        var emissionConfig = Utils.createUpEmissionsConfigGroup(arguments.getSharedSvn());
         var netcdfConfig = Utils.createNetcdfEmissionWriterConfigGroup();
         var config = ConfigUtils.loadConfig(configPath, emissionConfig, netcdfConfig);
 

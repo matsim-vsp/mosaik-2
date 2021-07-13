@@ -1,67 +1,45 @@
 package org.matsim.mosaik2.agentEmissions;
 
 import com.beust.jcommander.JCommander;
-import com.beust.jcommander.Parameter;
-import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
-import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
-import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.Node;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.PopulationFactory;
 import org.matsim.contrib.emissions.EmissionUtils;
-import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
-import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.config.ConfigUtils;
-import org.matsim.core.config.ReflectiveConfigGroup;
-import org.matsim.core.config.groups.ControlerConfigGroup;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.config.groups.StrategyConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Controler;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
-import org.matsim.core.controler.events.AfterMobsimEvent;
-import org.matsim.core.controler.events.BeforeMobsimEvent;
-import org.matsim.core.controler.events.ShutdownEvent;
-import org.matsim.core.controler.listener.AfterMobsimListener;
-import org.matsim.core.controler.listener.BeforeMobsimListener;
-import org.matsim.core.controler.listener.ShutdownListener;
 import org.matsim.core.events.EventsManagerImpl;
-import org.matsim.core.events.algorithms.EventWriter;
-import org.matsim.core.events.algorithms.EventWriterXML;
-import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.routes.RouteUtils;
 import org.matsim.core.scenario.MutableScenario;
 import org.matsim.core.scenario.ScenarioUtils;
-import org.matsim.core.utils.collections.Tuple;
 import org.matsim.vehicles.EngineInformation;
 import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
-import ucar.ma2.*;
-import ucar.nc2.Attribute;
-import ucar.nc2.NetcdfFileWriter;
 
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Map;
 
 public class RunSimpleSetUp {
 
 
     public static void main(String[] args) throws IOException {
 
-        var arguments = new Utils.Args();
+        var arguments = new Utils.SharedSvnArg();
         JCommander.newBuilder().addObject(arguments).build().parse(args);
 
         var emissionConfig = Utils.createUpEmissionsConfigGroup(arguments.getSharedSvn());
@@ -85,7 +63,7 @@ public class RunSimpleSetUp {
 
         config.strategy().addParameterSet(strategy);
 
-        Utils.applySnapshotSettings(config);
+        Utils.applySnapshotSettings(config, 1);
 
         config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
 

@@ -3,7 +3,6 @@ package org.matsim.mosaik2.agentEmissions;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.apache.commons.lang3.event.EventUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.api.core.v01.Id;
@@ -14,10 +13,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
-import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
-import org.matsim.contrib.otfvis.OTFVisLiveModule;
 import org.matsim.core.api.experimental.events.EventsManager;
-import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.controler.AbstractModule;
@@ -34,12 +30,11 @@ import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
 
 import javax.inject.Singleton;
-import java.lang.module.Configuration;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertTrue;
 
 @Log4j2
 public class
@@ -105,7 +100,7 @@ PositionEmissionNetcdfModuleTest {
         var netCdfEmissionWriterConfigGroup = Utils.createNetcdfEmissionWriterConfigGroup();
         var emissionConfigGroup = Utils.createUpEmissionsConfigGroup("C:\\Users\\Janekdererste\\repos\\shared-svn");
         var config = ConfigUtils.loadConfig(configPath, emissionConfigGroup, netCdfEmissionWriterConfigGroup);
-        Utils.applySnapshotSettings(config);
+        Utils.applySnapshotSettings(config, 1);
         config.controler().setOutputDirectory(testUtils.getOutputDirectory());
 
        // config.controler().setLastIteration(0);

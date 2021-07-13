@@ -16,6 +16,7 @@ import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.core.utils.geometry.CoordUtils;
 import org.matsim.examples.ExamplesUtils;
 import org.matsim.vehicles.VehicleType;
+import org.matsim.vis.snapshotwriters.SnapshotWritersModule;
 
 import javax.inject.Singleton;
 
@@ -23,28 +24,34 @@ public class RunEquilSetUp {
 
     public static void main(String[] args) {
 
-        var arguments = new Utils.Args();
-        JCommander.newBuilder().addObject(arguments).build().parse(args);
+		var arguments = new Utils.SharedSvnArg();
+		JCommander.newBuilder().addObject(arguments).build().parse(args);
 
-        var configPath = ExamplesUtils.getTestScenarioURL("equil").toString() + "config.xml";
-        var emissionConfig = Utils.createUpEmissionsConfigGroup(arguments.getSharedSvn());
-        var netcdfConfig = Utils.createNetcdfEmissionWriterConfigGroup();
-        var config = ConfigUtils.loadConfig(configPath, emissionConfig, netcdfConfig);
+		var configPath = ExamplesUtils.getTestScenarioURL("equil") + "config.xml";
+		var emissionConfig = Utils.createUpEmissionsConfigGroup(arguments.getSharedSvn());
+		var netcdfConfig = Utils.createNetcdfEmissionWriterConfigGroup();
+		var config = ConfigUtils.loadConfig(configPath, emissionConfig, netcdfConfig);
 
-        config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
-        config.controler().setOutputDirectory("test/output/position-emission");
-        config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.modeVehicleTypesFromVehiclesData);
-        Utils.applySnapshotSettings(config);
+		config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
+		config.controler().setOutputDirectory("test/output/position-emission");
+		config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.modeVehicleTypesFromVehiclesData);
+		config.qsim().setFilterSnapshots(QSimConfigGroup.FilterSnapshots.withLinkAttributes);
+		Utils.applySnapshotSettings(config, 1);
 
-        config.controler().setLastIteration(10);
+		config.controler().setLastIteration(0);
 
-        var scenario = ScenarioUtils.loadScenario(config);
+		var scenario = ScenarioUtils.loadScenario(config);
 
-        // use euclidean length for links
-        for (Link link : scenario.getNetwork().getLinks().values()) {
-            link.setLength(CoordUtils.calcEuclideanDistance(link.getFromNode().getCoord(), link.getToNode().getCoord()));
-            link.getAttributes().putAttribute("hbefa_road_type", "URB/Access/30");
-        }
+		// use euclidean length for links
+		for (Link link : scenario.getNetwork().getLinks().values()) {
+			link.setLength(CoordUtils.calcEuclideanDistance(link.getFromNode().getCoord(), link.getToNode().getCoord()));
+			link.getAttributes().putAttribute("hbefa_road_type", "URB/Access/30");
+
+			// only generate snapshots for link 6
+			if (link.getId().equals(Id.createLinkId("6"))) {
+				link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, "");
+			}
+		}
 
         Utils.applyNetworkAttributes(scenario.getNetwork());
 

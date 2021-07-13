@@ -22,15 +22,28 @@ import java.util.Set;
 
 public class Utils {
 
-    @Getter
-    public static class Args {
-        @Parameter(names = "-svn", required = true)
-        private String sharedSvn;
-    }
+	static void applySnapshotSettings(Config config, int snapshotPeriod) {
+		// activate snapshots
+		config.qsim().setSnapshotPeriod(snapshotPeriod);
+		config.qsim().setSnapshotStyle(QSimConfigGroup.SnapshotStyle.kinematicWaves);
+		config.qsim().setLinkWidthForVis(0);
+		config.controler().setWriteSnapshotsInterval(1);
+		config.controler().setSnapshotFormat(Set.of(ControlerConfigGroup.SnapshotFormat.positionevents));
+//        config.controler().setFirstIteration(0);
+//        config.controler().setLastIteration(0);
+		// we want simstepparalleleventsmanagerimpl
+		config.parallelEventHandling().setSynchronizeOnSimSteps(true);
+	}
 
-    static EmissionsConfigGroup createUpEmissionsConfigGroup(String sharedSvn) {
-        var emissionConfig = new EmissionsConfigGroup();
-        emissionConfig.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
+	@Getter
+	public static class SharedSvnArg {
+		@Parameter(names = "-sharedSvn", required = true)
+		private String sharedSvn;
+	}
+
+	static EmissionsConfigGroup createUpEmissionsConfigGroup(String sharedSvn) {
+		var emissionConfig = new EmissionsConfigGroup();
+		emissionConfig.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
         emissionConfig.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.tryDetailedThenTechnologyAverageThenAverageTable);
         // vsp default is to let shared-svn reside next to all git projects in the git directory. This should find the mosaik-2 project folder and go from there to shared-svn
         emissionConfig.setDetailedColdEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
@@ -44,37 +57,30 @@ public class Utils {
     static PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig createNetcdfEmissionWriterConfigGroup() {
         var netcdfWriterConfig = new PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig();
         netcdfWriterConfig.setPollutants(Map.of(
-                Pollutant.NO2, "NO2",
-                Pollutant.CO2_TOTAL, "CO2",
-                Pollutant.PM, "PM10",
-                Pollutant.CO, "CO",
-                Pollutant.NOx, "NOx"
-        ));
-        netcdfWriterConfig.setCalculateNOFromNOxAndNO2(true);
-        return netcdfWriterConfig;
-    }
+				Pollutant.NO2, "NO2",
+				Pollutant.CO2_TOTAL, "CO2",
+				Pollutant.PM, "PM10",
+				Pollutant.CO, "CO",
+				Pollutant.NOx, "NOx"
+		));
+		netcdfWriterConfig.setCalculateNOFromNOxAndNO2(true);
+		return netcdfWriterConfig;
+	}
 
-    static void applySnapshotSettings(Config config) {
-        // activate snapshots
-        config.qsim().setSnapshotPeriod(1);
-        config.qsim().setSnapshotStyle(QSimConfigGroup.SnapshotStyle.kinematicWaves);
-        config.qsim().setLinkWidthForVis(0);
-        config.controler().setWriteSnapshotsInterval(1);
-        config.controler().setSnapshotFormat(Set.of(ControlerConfigGroup.SnapshotFormat.positionevents));
-        config.controler().setFirstIteration(0);
-//        config.controler().setLastIteration(0);
-        // we want simstepparalleleventsmanagerimpl
-        config.parallelEventHandling().setSynchronizeOnSimSteps(true);
-    }
+	@Getter
+	public static class PublicSvnArg {
+		@Parameter(names = "-publicSvn", required = true)
+		private String publicSvn;
+	}
 
-    static void applyNetworkAttributes(Network network) {
-        // network
-        for (Link link : network.getLinks().values()) {
+	static void applyNetworkAttributes(Network network) {
+		// network
+		for (Link link : network.getLinks().values()) {
 
-            double freespeed;
+			double freespeed;
 
-            if (link.getFreespeed() <= 13.888889) {
-                freespeed = link.getFreespeed() * 2;
+			if (link.getFreespeed() <= 13.888889) {
+				freespeed = link.getFreespeed() * 2;
                 // for non motorway roads, the free speed level was reduced
             } else {
                 freespeed = link.getFreespeed();

@@ -1,53 +1,89 @@
 package org.matsim.mosaik2.agentEmissions;
 
 import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
+import org.apache.commons.lang3.StringUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 import org.matsim.api.core.v01.Scenario;
+import org.matsim.api.core.v01.events.Event;
+import org.matsim.api.core.v01.events.LinkEnterEvent;
+import org.matsim.api.core.v01.events.LinkLeaveEvent;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
+import org.matsim.contrib.emissions.events.ColdEmissionEvent;
+import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.api.experimental.events.EventsManager;
+import org.matsim.core.config.groups.ControlerConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
+import org.matsim.core.controler.events.BeforeMobsimEvent;
+import org.matsim.core.controler.listener.BeforeMobsimListener;
 import org.matsim.core.events.EventsManagerImpl;
+import org.matsim.core.events.algorithms.EventWriter;
+import org.matsim.core.events.algorithms.EventWriterXML;
+import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.run.RunBerlinScenario;
 import org.matsim.vehicles.VehicleUtils;
+import org.matsim.vis.snapshotwriters.PositionEvent;
 import org.matsim.vis.snapshotwriters.SnapshotWritersModule;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.nio.file.Paths;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 
 public class RunBerlinSetUp {
 
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
     private static final String configPath = "matsim/scenarios/countries/de/berlin/berlin-v5.5-1pct/input/berlin-v5.5-1pct.config.xml";
 
+    private static class ConfigPath {
+
+        @Parameter(names = "-config", required = true)
+        private String path;
+    }
+
+    private static class OutputPath {
+
+        @Parameter(names = "-output")
+        private String outputPath;
+    }
+
     public static void main(String[] args) {
 
         var sharedSvn = new Utils.SharedSvnArg();
-        var publicSvn = new Utils.PublicSvnArg();
+        var configPath = new ConfigPath();
+        var outputPath = new OutputPath();
+
         JCommander.newBuilder()
                 .addObject(sharedSvn)
-                .addObject(publicSvn)
+                .addObject(configPath)
+                .addObject(outputPath)
                 .build().parse(args);
 
         var emissionsConfig = Utils.createUpEmissionsConfigGroup(sharedSvn.getSharedSvn());
         var positionEmissionNetcdfConfig = Utils.createNetcdfEmissionWriterConfigGroup();
         var config = RunBerlinScenario.prepareConfig(
-                new String[]{Paths.get(publicSvn.getPublicSvn()).resolve(configPath).toString()},
+                new String[]{ configPath.path },
                 emissionsConfig, positionEmissionNetcdfConfig);
 
         config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
-        config.controler().setOutputDirectory("test/output/berlin-position-emissions");
-        config.controler().setLastIteration(1);
+        if (!StringUtils.isBlank(outputPath.outputPath))
+            config.controler().setOutputDirectory(outputPath.outputPath);
+
+        // tell the default event writer to not write any events
+        config.controler().setWriteEventsInterval(0);
+        config.controler().setFirstIteration(0);
+        config.controler().setLastIteration(0);
 
         Utils.applySnapshotSettings(config, 1);
 
@@ -81,6 +117,7 @@ public class RunBerlinSetUp {
 
         controler.addOverridingModule(new PositionEmissionsModule());
         controler.addOverridingModule(new PositionEmissionNetcdfModule());
+        controler.addOverridingModule(new EventWriterModule());
 
         controler.addOverridingModule(new AbstractModule() {
             @Override
@@ -145,5 +182,84 @@ public class RunBerlinSetUp {
     private static boolean isCoveredBy(Link link, PreparedGeometry geometry) {
         return geometry.covers(MGC.coord2Point(link.getFromNode().getCoord()))
                 && geometry.covers(MGC.coord2Point(link.getToNode().getCoord()));
+    }
+
+    private static class EventWriterModule extends AbstractModule {
+
+        @Override
+        public void install() {
+            addControlerListenerBinding().to(WriterSetUp.class);
+        }
+    }
+
+    private static class WriterSetUp implements BeforeMobsimListener {
+
+        @Inject
+        private OutputDirectoryHierarchy outputDirectoryHierarchy;
+
+        @Inject
+        private EventsManager eventsManager;
+
+        @Inject
+        private ControlerConfigGroup controlerConfig;
+
+        @Override
+        public void notifyBeforeMobsim(BeforeMobsimEvent event) {
+
+            if (event.getIteration() != controlerConfig.getLastIteration()) return;
+
+
+            var eventsFile = outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "events.xml.gz");
+            var emissionEventsFile = outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "poition-emission-events.xml.gz");
+
+            // write everything except: positions, position-emissions, warm-emissions, cold-emissions, also leave out link enter leave events
+            var normalWriter = new FilterEventsWriter(
+                    e -> (
+                            !e.getEventType().equals(LinkEnterEvent.EVENT_TYPE)
+                            && !e.getEventType().equals(LinkLeaveEvent.EVENT_TYPE)
+                            && !e.getEventType().equals(PositionEvent.EVENT_TYPE)
+                            && !e.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE)
+                            && !e.getEventType().equals(WarmEmissionEvent.EVENT_TYPE)
+                            && !e.getEventType().equals(ColdEmissionEvent.EVENT_TYPE)
+
+                    ), eventsFile);
+
+            // write only position-emissions
+            var emissionWriter = new FilterEventsWriter(e -> e.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE), emissionEventsFile);
+
+            eventsManager.addHandler(normalWriter);
+            eventsManager.addHandler(emissionWriter);
+        }
+    }
+
+    private static class FilterEventsWriter implements BasicEventHandler, EventWriter {
+
+        private final Predicate<Event> filter;
+        private final EventWriterXML writer;
+        private final String filename;
+
+        private final AtomicInteger counter = new AtomicInteger();
+
+        public FilterEventsWriter(Predicate<Event> filter, String outFilename) {
+            this.filter = filter;
+            this.writer = new EventWriterXML(outFilename);
+            this.filename = outFilename;
+        }
+
+        @Override
+        public void closeFile() {
+            writer.closeFile();
+        }
+
+        @Override
+        public void handleEvent(Event event) {
+
+            if (filter.test(event)){
+                if (counter.incrementAndGet() % 1000 == 0) {
+                    System.out.println(filename + ": " + counter);
+                }
+                writer.handleEvent(event);
+            }
+        }
     }
 }

@@ -6,19 +6,37 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
 import org.matsim.api.core.v01.Id;
 import org.matsim.vehicles.Vehicle;
-import ucar.ma2.*;
+import ucar.ma2.ArrayDouble;
+import ucar.ma2.ArrayInt;
+import ucar.ma2.DataType;
+import ucar.ma2.InvalidRangeException;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 @Log4j2
 public class AgentEmissionNetCdfReader {
+    
+    public static void main(String... args) {
+
+        log.info("translating from netcdf to csv");
+        
+        translateToCsv(
+                "C:/Users/Janek/Desktop/berlin-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions.nc",
+                "C:/Users/Janek/Desktop/berlin-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions-vehicleIdIndex.csv",
+                "C:/Users/Janek/Desktop/berlin-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions.csv"
+                );
+    }
 
     public static Set<String> readToRecord(String filename, String indexFilename) {
 
@@ -37,10 +55,16 @@ public class AgentEmissionNetCdfReader {
 
     public static void translateToCsv(String filename, String indexFilename, String csvOutput) {
 
+        var counter = new AtomicInteger();
+
         try(var writer = Files.newBufferedWriter(Paths.get(csvOutput)); var printer = CSVFormat.DEFAULT.withHeader("time", "vehicleId", "x", "y", "no2").print(writer)) {
 
             read(filename, indexFilename, record -> {
                 try {
+                    var count = counter.incrementAndGet();
+                    if (count % 100000 == 0) {
+                        log.info("Record # " + count);
+                    }
                     printer.printRecord(record.getTime(), record.getVehicleId(), record.getX(), record.getY(), record.getNo2());
                 } catch (IOException e) {
                     throw new RuntimeException(e);

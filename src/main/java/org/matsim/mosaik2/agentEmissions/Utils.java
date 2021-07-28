@@ -17,14 +17,15 @@ import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
 
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 
 public class Utils {
 
-	static void applySnapshotSettings(Config config, int snapshotPeriod) {
+	static void applySnapshotSettings(Config config) {
 		// activate snapshots
-		config.qsim().setSnapshotPeriod(snapshotPeriod);
+		config.qsim().setSnapshotPeriod(1);
 		config.qsim().setSnapshotStyle(QSimConfigGroup.SnapshotStyle.kinematicWaves);
 		config.qsim().setLinkWidthForVis(0);
 		config.controler().setWriteSnapshotsInterval(1);
@@ -54,17 +55,30 @@ public class Utils {
         return emissionConfig;
     }
 
+    static void applyEmissionSettings(EmissionsConfigGroup config, Path hbefaDirectory) {
+
+		config.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
+		config.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
+		config.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
+		config.setAverageColdEmissionFactorsFile(hbefaDirectory.resolve("EFA_ColdStart_Vehcat_2020_Average.csv").toString());
+		config.setAverageWarmEmissionFactorsFile(hbefaDirectory.resolve("EFA_HOT_Vehcat_2020_Average.csv").toString());
+	}
+
     static PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig createNetcdfEmissionWriterConfigGroup() {
         var netcdfWriterConfig = new PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig();
-        netcdfWriterConfig.setPollutants(Map.of(
+       applyNetCdfWriterConfig(netcdfWriterConfig);
+		return netcdfWriterConfig;
+	}
+
+	static void applyNetCdfWriterConfig(PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig config) {
+		config.setPollutants(Map.of(
 				Pollutant.NO2, "NO2",
 				Pollutant.CO2_TOTAL, "CO2",
 				Pollutant.PM, "PM10",
 				Pollutant.CO, "CO",
 				Pollutant.NOx, "NOx"
 		));
-		netcdfWriterConfig.setCalculateNOFromNOxAndNO2(true);
-		return netcdfWriterConfig;
+		config.setCalculateNOFromNOxAndNO2(true);
 	}
 
 	@Getter

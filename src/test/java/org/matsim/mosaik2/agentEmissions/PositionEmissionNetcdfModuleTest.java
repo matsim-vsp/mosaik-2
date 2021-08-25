@@ -100,7 +100,7 @@ PositionEmissionNetcdfModuleTest {
         var netCdfEmissionWriterConfigGroup = Utils.createNetcdfEmissionWriterConfigGroup();
         var emissionConfigGroup = Utils.createUpEmissionsConfigGroup("C:\\Users\\Janekdererste\\repos\\shared-svn");
         var config = ConfigUtils.loadConfig(configPath, emissionConfigGroup, netCdfEmissionWriterConfigGroup);
-        Utils.applySnapshotSettings(config, 1);
+        Utils.applySnapshotSettings(config);
         config.controler().setOutputDirectory(testUtils.getOutputDirectory());
 
        // config.controler().setLastIteration(0);

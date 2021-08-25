@@ -10,7 +10,6 @@ import ucar.ma2.Array;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
 
-import javax.xml.stream.events.Characters;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,7 +49,6 @@ public class PositionEmissionNetCdfToCSV {
         PositionEmissionNetCdfToCSV converter = new PositionEmissionNetCdfToCSV( input.netCdfFile );
         List<List<String>> row2columns = converter.processNetCdfToRowList();
         converter.printResults(row2columns, input.outputCsvFile);
-
     }
 
 
@@ -115,9 +113,7 @@ public class PositionEmissionNetCdfToCSV {
                 oneLine.add(pm10s.get(time2VehicleAndValue.getKey()).get(vehicleAndValue.getKey()));
                 oneLine.add(nos.get(time2VehicleAndValue.getKey()).get(vehicleAndValue.getKey()));
                 row2columns.add(oneLine.stream().map(CharSequence::toString).collect(Collectors.toList()));
-
             }
-
         }
 
         return row2columns;

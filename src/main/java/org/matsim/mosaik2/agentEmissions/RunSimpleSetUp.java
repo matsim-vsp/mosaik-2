@@ -1,6 +1,5 @@
 package org.matsim.mosaik2.agentEmissions;
 
-import com.beust.jcommander.JCommander;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.TransportMode;
@@ -9,16 +8,10 @@ import org.matsim.api.core.v01.network.Node;
 import org.matsim.api.core.v01.population.Person;
 import org.matsim.api.core.v01.population.PopulationFactory;
 import org.matsim.contrib.emissions.EmissionUtils;
-import org.matsim.contrib.emissions.PositionEmissionsModule;
-import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.config.groups.PlanCalcScoreConfigGroup;
 import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.config.groups.StrategyConfigGroup;
-import org.matsim.core.controler.AbstractModule;
-import org.matsim.core.controler.Controler;
-import org.matsim.core.controler.OutputDirectoryHierarchy;
-import org.matsim.core.events.EventsManagerImpl;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.routes.RouteUtils;
@@ -29,26 +22,23 @@ import org.matsim.vehicles.Vehicle;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
 
-import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
-public class RunSimpleSetUp {
-
+public class RunSimpleSetUp extends AbstractRunPositionEmissions{
 
     public static void main(String[] args) throws IOException {
 
-        var arguments = new Utils.SharedSvnArg();
-        JCommander.newBuilder().addObject(arguments).build().parse(args);
+        new RunSimpleSetUp().run(args);
+    }
 
-        var emissionConfig = Utils.createUpEmissionsConfigGroup(arguments.getSharedSvn());
-        var netcdfWriterConfig = Utils.createNetcdfEmissionWriterConfigGroup();
+    void run(String[] args) {
 
-        var config = ConfigUtils.createConfig(emissionConfig, netcdfWriterConfig);
-        config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
-        config.controler().setOutputDirectory("test/output/position-emission");
-        config.controler().setLastIteration(0);
+        var config = ConfigUtils.createConfig(getConfigGroups());
+        var hbefaConfig = (HbefaConfigGroup) config.getModules().get(HbefaConfigGroup.GROUP_NAME);
+        hbefaConfig.setHbefaDirectory("C:\\Users\\Janek\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1");
+        applyConfig(config);
 
         final PlanCalcScoreConfigGroup.ActivityParams homeParams = new PlanCalcScoreConfigGroup.ActivityParams("home")
                 .setTypicalDuration(20);
@@ -60,12 +50,12 @@ public class RunSimpleSetUp {
         var strategy = new StrategyConfigGroup.StrategySettings();
         strategy.setStrategyName("ChangeExpBeta");
         strategy.setWeight(1.0);
-
         config.strategy().addParameterSet(strategy);
 
-        Utils.applySnapshotSettings(config, 1);
-
+        config.controler().setOutputDirectory("test/output/position-emission");
+        config.controler().setLastIteration(0);
         config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.fromVehiclesData);
+        config.transit().setUseTransit(true);
 
         // create a scenario:
         final MutableScenario scenario = ScenarioUtils.createMutableScenario(config);
@@ -84,23 +74,16 @@ public class RunSimpleSetUp {
         VehicleUtils.insertVehicleIdsIntoAttributes(person, Map.of(vehicle.getType().getNetworkMode(), vehicle.getId()));
         VehicleUtils.insertVehicleIdsIntoAttributes(person2, Map.of(vehicle.getType().getNetworkMode(), vehicle2.getId()));
 
-        var controler = new Controler(scenario);
+        scenario.setTransitVehicles(VehicleUtils.createVehiclesContainer());
 
-        controler.addOverridingModule(new PositionEmissionsModule());
-        controler.addOverridingModule(new PositionEmissionNetcdfModule());
+        applyScenario(scenario);
 
-        controler.addOverridingModule(new AbstractModule() {
-            @Override
-            public void install() {
-                // we need single threaded events manager because other wise it doesn't work
-                bind(EventsManager.class).to(EventsManagerImpl.class).in(Singleton.class);
-            }
-        });
-
-
-
+        var controler = loadControler(scenario);
         controler.run();
     }
+
+
+
 
     private static VehicleType createVehicleType() {
         VehicleType vehicleType = VehicleUtils.createVehicleType(Id.create("dieselCarFullSpecified", VehicleType.class));

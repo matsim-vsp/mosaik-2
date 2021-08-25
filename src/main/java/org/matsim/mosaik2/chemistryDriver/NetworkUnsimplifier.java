@@ -21,6 +21,7 @@ import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
+import org.matsim.pt.transitSchedule.TransitScheduleUtils;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -159,6 +160,7 @@ public class NetworkUnsimplifier {
                 .count();
 
         log.info(unmatched + "/" + network.getLinks().size() + " couldn't be matched :-(");
+
         return result;
     }
 

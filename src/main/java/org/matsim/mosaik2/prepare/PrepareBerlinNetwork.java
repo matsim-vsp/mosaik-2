@@ -45,13 +45,13 @@ import java.util.Set;
 public class PrepareBerlinNetwork {
 
     private static final String countNodesMapping = "studies/countries/de/open_berlin_scenario/be_3/counts/counts_OSM-nodes.csv";
-    private static final String osmFile = "projects\\mosaik-2\\raw-data\\osm\\berlin-brandenburg-200507.osm.pbf";
+    private static final String osmFile = "projects\\mosaik-2\\raw-data\\osm\\berlin-brandenburg-20210825.osm.pbf";
     private static final String stateShapeFile = "projects\\mosaik-2\\raw-data\\shapes\\bundeslaender\\VG250_LAN.shp";
     private static final String gtfsFile = "matsim\\scenarios\\countries\\de\\berlin\\berlin-v5.5-10pct\\original-data\\GTFS-VBB-20181214\\GTFS-VBB-20181214.zip";
 
-    private static final String networkOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-network-with-geometries.xml.gz";
-    private static final String scheduleOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-schedule-with-geometries.xml.gz";
-    private static final String vehiclesOutputFile ="projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-transit-vehicles-with-geometries.xml.gz";
+    public static final String networkOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-network-with-geometries.xml.gz";
+    public static final String scheduleOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-schedule-with-geometries.xml.gz";
+    public static final String vehiclesOutputFile ="projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-transit-vehicles-with-geometries.xml.gz";
 
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84, TransformationFactory.DHDN_GK4);
     private static final Set<String> networkModes = Set.of(TransportMode.car, TransportMode.ride, "freight");

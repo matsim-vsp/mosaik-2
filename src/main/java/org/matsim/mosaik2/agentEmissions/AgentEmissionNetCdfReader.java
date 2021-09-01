@@ -1,5 +1,7 @@
 package org.matsim.mosaik2.agentEmissions;
 
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
@@ -26,16 +28,36 @@ import java.util.stream.Collectors;
 
 @Log4j2
 public class AgentEmissionNetCdfReader {
+
+    static class Input {
+
+        @Parameter(names = "-netcdf", required = true)
+        String netCdfFile;
+        @Parameter(names = "-vehIndex", required = true)
+        String vehicleIndexFile;
+        @Parameter(names = "-output", required = true)
+        String outputFile;
+    }
     
     public static void main(String... args) {
 
+        var input = new Input();
+        JCommander.newBuilder().addObject(input).build().parse(args);
         log.info("translating from netcdf to csv");
-        
+
         translateToCsv(
-                "C:/Users/Janek/Desktop/berlin-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions.nc",
-                "C:/Users/Janek/Desktop/berlin-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions-vehicleIdIndex.csv",
-                "C:/Users/Janek/Desktop/berlin-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions.csv"
+                input.netCdfFile,
+                input.vehicleIndexFile,
+                input.outputFile
+        );
+        
+      /*  translateToCsv(
+                "C:/Users/Janekdererste/Desktop/berlin-position-emission-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions.nc",
+                "C:/Users/Janekdererste/Desktop/berlin-position-emission-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions-vehicleIdIndex.csv",
+                "C:/Users/Janekdererste/Desktop/berlin-position-emission-test/berlin-v5.5-1pct.0.position-emissions.csv"
                 );
+
+       */
     }
 
     public static Set<String> readToRecord(String filename, String indexFilename) {

@@ -87,7 +87,7 @@ public class RunBerlinSetUp {
         config.controler().setFirstIteration(0);
         config.controler().setLastIteration(0);
 
-        Utils.applySnapshotSettings(config, 1);
+        Utils.applySnapshotSettings(config);
 
         var scenario = RunBerlinScenario.prepareScenario(config);
 
@@ -132,9 +132,18 @@ public class RunBerlinSetUp {
         controler.run();
 
         // write things to a csv file so we can look at it in via
-        var folder = config.controler().getOutputDirectory() + "/ITERS/it." + config.controler().getLastIteration() + "/";
         var it = config.controler().getLastIteration();
-        AgentEmissionNetCdfReader.translateToCsv(folder + it + ".position-emissions.nc", folder + it + ".position-emissions-vehicleIdIndex.csv", config.controler().getOutputDirectory() + "/position-emission-no2.csv");
+        var runId = config.controler().getRunId();
+        var folder = Paths.get(config.controler().getOutputDirectory())
+                .resolve("ITERS")
+                .resolve("it." + it);
+        var netCdfName = folder.resolve(runId + "." + it + ".position-emissions.nc");
+        var vehicleIndexName = folder.resolve(runId + "." + it + ".position-emissions-vehicleIdIndex.csv");
+
+        AgentEmissionNetCdfReader.translateToCsv(
+                netCdfName.toString(),
+                vehicleIndexName.toString(),
+                config.controler().getOutputDirectory() + "/position-emission-no2.csv");
     }
 
     private static void applyCoordinateTransformation(Scenario scenario, CoordinateTransformation transformation) {
@@ -165,7 +174,11 @@ public class RunBerlinSetUp {
         var bbox = createBoundingBox();
         network.getLinks().values().parallelStream()
                 .filter(link -> isCoveredBy(link, bbox))
-                .forEach(link -> link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, ""));
+                .forEach(link -> link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, "yes"));
+
+        network.getLinks().values().parallelStream()
+                .filter(link -> link.getAttributes().getAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY) == null)
+                .forEach(link -> link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, "no"));
     }
 
     private static PreparedGeometry createBoundingBox() {

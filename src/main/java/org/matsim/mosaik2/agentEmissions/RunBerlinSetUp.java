@@ -20,6 +20,7 @@ import org.matsim.contrib.emissions.events.ColdEmissionEvent;
 import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.config.groups.ControlerConfigGroup;
+import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
 import org.matsim.core.controler.events.BeforeMobsimEvent;
@@ -94,7 +95,10 @@ public class RunBerlinSetUp {
         // work with UTM-33
         applyCoordinateTransformation(scenario, transformation);
         Utils.applyNetworkAttributes(scenario.getNetwork());
+
+        // we only want to generate postion events in the filter area
         applyNetworkFilter(scenario.getNetwork());
+        config.qsim().setFilterSnapshots(QSimConfigGroup.FilterSnapshots.withLinkAttributes);
 
         // add engine information
         for (var vehicleType : scenario.getVehicles().getVehicleTypes().values()) {
@@ -227,12 +231,10 @@ public class RunBerlinSetUp {
             var eventsFile = outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "events.xml.gz");
             var emissionEventsFile = outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "poition-emission-events.xml.gz");
 
-            // write everything except: positions, position-emissions, warm-emissions, cold-emissions, also leave out link enter leave events
+            // write everything except: positions, position-emissions, warm-emissions, cold-emissions
             var normalWriter = new FilterEventsWriter(
                     e -> (
-                            !e.getEventType().equals(LinkEnterEvent.EVENT_TYPE)
-                            && !e.getEventType().equals(LinkLeaveEvent.EVENT_TYPE)
-                            && !e.getEventType().equals(PositionEvent.EVENT_TYPE)
+                            !e.getEventType().equals(PositionEvent.EVENT_TYPE)
                             && !e.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE)
                             && !e.getEventType().equals(WarmEmissionEvent.EVENT_TYPE)
                             && !e.getEventType().equals(ColdEmissionEvent.EVENT_TYPE)

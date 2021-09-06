@@ -145,6 +145,8 @@ public class NetworkUnsimplifierTest {
                 .build()
                 .read(inputFile);
 
+        new NetworkWriter(simplifiedNetwork).write("C:\\Users\\Janek\\Desktop\\simplified-network.xml.gz");
+
         // read in a network but with no simplification. This network is taken as comparison
         var completeNetwork = new SupersonicOsmNetworkReader.Builder()
                 .setCoordinateTransformation(transformation)
@@ -152,7 +154,15 @@ public class NetworkUnsimplifierTest {
                 .build()
                 .read(inputFile);
 
+        new NetworkWriter(completeNetwork).write("C:\\Users\\Janek\\Desktop\\complete-network.xml.gz");
+
         var result = NetworkUnsimplifier.unsimplifyNetwork(simplifiedNetwork, inputFile, "EPSG:25833");
+
+        var unsimplified = result.values().stream()
+                .flatMap(Collection::stream)
+                .collect(NetworkUtils.getCollector());
+
+        new NetworkWriter(unsimplified).write("C:\\Users\\Janek\\Desktop\\unsimplified-network.xml.gz");
 
         // now, test that each matsim link has the same number of original links attached as we can find matsim links with the same
         // orig id in the unsimplified network

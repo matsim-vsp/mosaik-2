@@ -11,9 +11,7 @@ import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 
-import java.util.Collection;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Log4j2
 public class FullFeaturedConverter {
@@ -83,8 +81,6 @@ public class FullFeaturedConverter {
         var palmEmissions = pollutantConverter.convert(emissions);
 
         // put emissions onto a raster
-
-
         var rasteredEmissions = EmissionRasterer.raster(palmEmissions, segmentNetwork, bounds, cellSize);
 
         //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);

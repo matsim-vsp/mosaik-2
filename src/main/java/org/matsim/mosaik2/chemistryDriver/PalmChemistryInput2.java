@@ -192,7 +192,7 @@ public class PalmChemistryInput2 {
         return bin;
     }
 
-    private static String getTimestamp(String date, double time) {
+    public static String getTimestamp(String date, double time) {
         var startTimeDuration = Duration.ofSeconds((long) time);
         return String.format(date + " %02d:%02d:%02d +001", startTimeDuration.toHours(), startTimeDuration.toMinutesPart(), startTimeDuration.toSecondsPart());
     }

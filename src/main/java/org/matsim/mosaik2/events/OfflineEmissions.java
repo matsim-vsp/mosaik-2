@@ -1,47 +1,93 @@
 package org.matsim.mosaik2.events;
 
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.TransportMode;
+import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.emissions.EmissionModule;
 import org.matsim.contrib.emissions.HbefaVehicleCategory;
+import org.matsim.contrib.emissions.events.ColdEmissionEvent;
+import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
 import org.matsim.core.api.experimental.events.EventsManager;
+import org.matsim.core.config.Config;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.Injector;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.MatsimEventsReader;
 import org.matsim.core.events.algorithms.EventWriterXML;
+import org.matsim.core.network.io.MatsimNetworkReader;
+import org.matsim.core.population.io.PopulationReader;
 import org.matsim.core.scenario.ScenarioUtils;
+import org.matsim.mosaik2.Utils;
 import org.matsim.vehicles.EngineInformation;
 import org.matsim.vehicles.VehicleType;
 import org.matsim.vehicles.VehicleUtils;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Random;
+import java.util.function.Predicate;
+
 public class OfflineEmissions {
+
+    private static final String hbefaAverageWarm = "projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_HOT_Vehcat_2020_Average.csv";
+    private static final String hbefaAverageCold = "projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_ColdStart_Vehcat_2020_Average.csv";
+
+    private static class OutputArgs {
+
+        @Parameter(names = "-runId")
+        private String runId;
+
+        @Parameter(names = "-outputDir")
+        private String outputDir;
+    }
+
+    private static String getOutputFile(Path outputDir, String runId, String filename) {
+        return outputDir.resolve(runId + ".output_" + filename + ".xml.gz").toString();
+    }
 
     public static void main(String[] args) {
 
-        if (args.length != 1) {
-            throw new RuntimeException("path to config required");
-        }
+        var sharedSvnArgs = new Utils.SharedSvnARg();
+        var outputArgs = new OutputArgs();
+        JCommander.newBuilder()
+                .addObject(sharedSvnArgs)
+                .addObject(outputArgs)
+                .build()
+                .parse(args);
 
-        var config = ConfigUtils.loadConfig(args[0]);
+        var sharedSvn = Paths.get(sharedSvnArgs.getSharedSvn());
+        var outputDir = Paths.get(outputArgs.outputDir);
+        var runId = outputArgs.runId;
 
-        var configGroup = new EmissionsConfigGroup();
-        config.addModule(configGroup);
+        var config = ConfigUtils.createConfig();
+        var emissionConfigGroup = new EmissionsConfigGroup();
+        config.addModule(emissionConfigGroup);
 
-        configGroup.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
-        configGroup.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
-        configGroup.setAverageColdEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_ColdStart_Vehcat_2020_Average.csv");
-        configGroup.setAverageWarmEmissionFactorsFile("C:\\Users\\Janekdererste\\repos\\shared-svn\\projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_HOT_Vehcat_2020_Average.csv");
-        configGroup.setNonScenarioVehicles(EmissionsConfigGroup.NonScenarioVehicles.ignore);
+        emissionConfigGroup.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
+        emissionConfigGroup.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
+        emissionConfigGroup.setAverageColdEmissionFactorsFile(sharedSvn.resolve(hbefaAverageCold).toString());
+        emissionConfigGroup.setAverageWarmEmissionFactorsFile(sharedSvn.resolve(hbefaAverageWarm).toString());
+        emissionConfigGroup.setNonScenarioVehicles(EmissionsConfigGroup.NonScenarioVehicles.ignore);
 
         // we need the generated vehicles of the matsim run
-        config.vehicles().setVehiclesFile("Z:\\berlin\\output-berlin-v5.5.2-10pct-last-iteration\\berlin-v5.5-10pct.output_vehicles.xml.gz");
+
+        config.vehicles().setVehiclesFile(getOutputFile(outputDir, runId, "vehicles"));
+        config.network().setInputFile(getOutputFile(outputDir, runId, "network"));
+        config.network().setInputCRS("EPSG:25832");
+        config.global().setCoordinateSystem("EPSG:25832");
+        config.plans().setInputFile(getOutputFile(outputDir, runId, "plans"));
+        config.facilities().setInputFile(getOutputFile(outputDir, runId, "facilities"));
+        config.transit().setTransitScheduleFile(getOutputFile(outputDir, runId, "transitSchedule"));
+        config.transit().setVehiclesFile(getOutputFile(outputDir, runId, "transitVehicles"));
 
         var scenario = ScenarioUtils.loadScenario(config);
+
 
         for (Link link : scenario.getNetwork().getLinks().values()) {
 
@@ -106,6 +152,8 @@ public class OfflineEmissions {
         var carVehicleType = scenario.getVehicles().getVehicleTypes().get(carVehicleTypeId);
         Id<VehicleType> freightVehicleTypeId = Id.create("freight", VehicleType.class);
         VehicleType freightVehicleType = scenario.getVehicles().getVehicleTypes().get(freightVehicleTypeId);
+        Id<VehicleType> bikeVehicleTypeId = Id.create("bike", VehicleType.class);
+        VehicleType bikeVehicleType = scenario.getVehicles().getVehicleTypes().get(bikeVehicleTypeId);
 
         EngineInformation carEngineInformation = carVehicleType.getEngineInformation();
         VehicleUtils.setHbefaVehicleCategory( carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
@@ -118,6 +166,13 @@ public class OfflineEmissions {
         VehicleUtils.setHbefaTechnology( freightEngineInformation, "average" );
         VehicleUtils.setHbefaSizeClass( freightEngineInformation, "average" );
         VehicleUtils.setHbefaEmissionsConcept( freightEngineInformation, "average" );
+
+        // bikes don't have emissions
+        EngineInformation bikeEngineInformation = bikeVehicleType.getEngineInformation();
+        VehicleUtils.setHbefaVehicleCategory( bikeEngineInformation, HbefaVehicleCategory.NON_HBEFA_VEHICLE.toString());
+        VehicleUtils.setHbefaTechnology( bikeEngineInformation, "average" );
+        VehicleUtils.setHbefaSizeClass( bikeEngineInformation, "average" );
+        VehicleUtils.setHbefaEmissionsConcept( bikeEngineInformation, "average" );
 
         // public transit vehicles should be considered as non-hbefa vehicles
         for (VehicleType type : scenario.getTransitVehicles().getVehicleTypes().values()) {
@@ -146,14 +201,37 @@ public class OfflineEmissions {
 
         EmissionModule emissionModule = injector.getInstance(EmissionModule.class);
 
-        EventWriterXML emissionEventWriter = new EventWriterXML("C:\\Users\\Janekdererste\\Desktop\\emissionEvents_berlin_10pct.xml.gz");
-        emissionModule.getEmissionEventsManager().addHandler(emissionEventWriter);
+        var onlyEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(1.0), getOutputFile(outputDir, runId, "only_emission_events"));
+        var sample10pctEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(0.1), getOutputFile(outputDir, runId,"only_01_emission_events"));
+        var sample1pctEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(0.01), getOutputFile(outputDir, runId,"only_001_emission_events"));
+
+        emissionModule.getEmissionEventsManager().addHandler(onlyEmissionEventsWriter);
+        emissionModule.getEmissionEventsManager().addHandler(sample10pctEmissionEventsWriter);
+        emissionModule.getEmissionEventsManager().addHandler(sample1pctEmissionEventsWriter);
 
         eventsManager.initProcessing();
         MatsimEventsReader matsimEventsReader = new MatsimEventsReader(eventsManager);
-        matsimEventsReader.readFile("Z:\\berlin\\output-berlin-v5.5.2-10pct-last-iteration\\berlin-v5.5-10pct.output_events.xml.gz");
+        matsimEventsReader.readFile(getOutputFile(outputDir, runId, "events"));
         eventsManager.finishProcessing();
 
-        emissionEventWriter.closeFile();
+        onlyEmissionEventsWriter.closeFile();
+        sample10pctEmissionEventsWriter.closeFile();
+        sample1pctEmissionEventsWriter.closeFile();
+    }
+
+    private static class DownsamplingEmissionEventsFilter implements Predicate<Event> {
+
+        private final Random random = new Random();
+        private final double scaleFactor;
+        private final Predicate<Event> filter = e -> e.getEventType().equals(WarmEmissionEvent.EVENT_TYPE) || e.getEventType().equals(ColdEmissionEvent.EVENT_TYPE);
+
+        public DownsamplingEmissionEventsFilter(double scaleFactor) {
+            this.scaleFactor = scaleFactor;
+        }
+
+        @Override
+        public boolean test(Event event) {
+            return random.nextDouble() <= scaleFactor && filter.test(event);
+        }
     }
 }

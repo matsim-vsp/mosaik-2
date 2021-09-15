@@ -26,6 +26,9 @@ public class WriteChemistryForStuttgartScenario {
     @Parameter(names = {"-o3", "-outputNest3"}, required = true)
     private String nest3OutputFile = "";
 
+    @Parameter(names = {"-o2", "-outputNest2"}, required = true)
+    private String nest2OutputFile = "";
+
     @Parameter(names = "-s")
     private double scaleFactor = 10;
 
@@ -34,26 +37,46 @@ public class WriteChemistryForStuttgartScenario {
         var writer = new WriteChemistryForStuttgartScenario();
         JCommander.newBuilder().addObject(writer).build().parse(args);
         writer.writeNest3();
+        writer.writeNest2();
     }
 
-    /*
-    Writes the most detailed domain of the stuttgart scenario
+    /**
+        Writes the most detailed domain of the stuttgart scenario
      */
     void writeNest3() {
 
         var cellSize = 2;
+        var originX = 513000.0;
+        var originY = 5402360.0;
+        var bounds = new Raster.Bounds(originX, originY, originX + 960 * cellSize, originY + 1200 * cellSize);
+        write(bounds, cellSize, nest3OutputFile);
+    }
+
+    /**
+     * Write the middle domain
+     */
+    void writeNest2() {
+        var cellSize = 10;
+        var originX = 501000.0;
+        var originY = 5392000.0;
+        var bounds = new Raster.Bounds(originX, originY, originX + 2400 * cellSize, originY + 2296 * cellSize);
+        write(bounds, cellSize, nest2OutputFile);
+    }
+
+    void write(Raster.Bounds bounds, double cellSize, String outputFileName) {
+
         var nameConverter = new PollutantToPalmNameConverter(Map.of(Pollutant.NO2, "NO2", Pollutant.NOx, "NOx"));
-        var bounds = new Raster.Bounds(513000.0, 5402360.0, 513000.0 + 960 * cellSize, 5402360.0 + 1200 * cellSize);
+        // everything is in EPSG:25832
         var transformation = new IdentityTransformation();
 
         var converter = FullFeaturedConverter.builder()
                 .networkFile(networkFile)
                 .emissionEventsFile(emissionEventsFile)
-                .outputFile(nest3OutputFile)
+                .outputFile(outputFileName)
                 .pollutantConverter(nameConverter)
                 .bounds(bounds)
                 .transformation(transformation)
-                .cellSize(1)
+                .cellSize(cellSize)
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
                 .date("2019-07-02")
@@ -62,4 +85,6 @@ public class WriteChemistryForStuttgartScenario {
 
         converter.write();
     }
+
+
 }

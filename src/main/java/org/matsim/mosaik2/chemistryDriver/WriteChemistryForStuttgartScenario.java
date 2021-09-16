@@ -29,6 +29,9 @@ public class WriteChemistryForStuttgartScenario {
     @Parameter(names = {"-o2", "-outputNest2"}, required = true)
     private String nest2OutputFile = "";
 
+    @Parameter(names = {"-o1", "-outputNest1"}, required = true)
+    private String nest1OutputFile;
+
     @Parameter(names = "-s")
     private double scaleFactor = 10;
 
@@ -38,6 +41,7 @@ public class WriteChemistryForStuttgartScenario {
         JCommander.newBuilder().addObject(writer).build().parse(args);
         writer.writeNest3();
         writer.writeNest2();
+        writer.writeNest1();
     }
 
     /**
@@ -61,6 +65,18 @@ public class WriteChemistryForStuttgartScenario {
         var originY = 5392000.0;
         var bounds = new Raster.Bounds(originX, originY, originX + 2400 * cellSize, originY + 2296 * cellSize);
         write(bounds, cellSize, nest2OutputFile);
+    }
+
+    /**
+     * Write parent domain
+     */
+    void writeNest1() {
+
+     var cellSize = 40;
+     var originX = 488020.0;
+     var originY = 5378820.0;
+     var bounds = new Raster.Bounds(originX, originY, originX + 1248 * cellSize, originY + 1232 * cellSize);
+     write(bounds, cellSize, nest1OutputFile);
     }
 
     void write(Raster.Bounds bounds, double cellSize, String outputFileName) {

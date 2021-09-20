@@ -5,6 +5,7 @@ import com.beust.jcommander.Parameter;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 public class WriteChemistryForStuttgartScenario {
@@ -95,8 +96,8 @@ public class WriteChemistryForStuttgartScenario {
                 .cellSize(cellSize)
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
-                .date("2019-07-02")
-                .numberOfDays(1)
+                .date(LocalDateTime.of(2019,7,2, 0, 0))
+                .numberOfDays(2)
                 .build();
 
         converter.write();

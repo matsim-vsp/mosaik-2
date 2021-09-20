@@ -13,7 +13,12 @@ import java.util.Map;
 @Log4j2
 public class MergeBackgroundAndTrafficEmissions {
 
-    private static final LocalDateTime date = LocalDateTime.of(2018, 7, 8, 0, 0);
+    // the date of the stuttgart run. This date is chosen by the team of LUH
+    private static final LocalDateTime dateOfStudy = LocalDateTime.of(2018, 7, 8, 0, 0);
+
+    // the background emissions are from 2015. Since the week days have other dates than 2018 we have picked this date which is also
+    // a sunday during summer. Since we are simulating 48 hours. We will also have a workday within the PALM simulation run.
+    private static final LocalDateTime dateOfBackgroundEmissions = LocalDateTime.of(2015, 6, 5, 0, 0);
 
     @Parameter(names = "-backgroundFile", required = true)
     private String backgroundFile;
@@ -33,8 +38,8 @@ public class MergeBackgroundAndTrafficEmissions {
 
     void merge() {
 
-        var fromTime = getSecondsSinceBeginningOfYear(date);
-        var toTime = fromTime + 23 * 3600; // take 23 hours (starting at 0 I guess)
+        var fromTime = getSecondsSinceBeginningOfYear(dateOfBackgroundEmissions);
+        var toTime = fromTime + 47 * 3600; // take 48 hours (starting at 0 I guess)
 
         var fromTimeIndex = (int) fromTime / 3600;
         var toTimeIndex = (int) toTime / 3600;
@@ -72,7 +77,7 @@ public class MergeBackgroundAndTrafficEmissions {
             }
         }
 
-        PalmChemistryInput2.writeNetCdfFile(outputFile, mergeResult);
+        PalmChemistryInput2.writeNetCdfFile(outputFile, mergeResult, dateOfStudy);
     }
 
     static TimeBinMap<Map<String, Raster>> setTimesRelativeToDay(TimeBinMap<Map<String, Raster>> source) {
@@ -89,7 +94,6 @@ public class MergeBackgroundAndTrafficEmissions {
     }
 
     static long getSecondsSinceBeginningOfYear(LocalDateTime date) {
-
 
         var year = date.getYear();
         var beginningOfYear = LocalDateTime.of(year, 1, 1, 0, 0);

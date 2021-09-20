@@ -9,6 +9,7 @@ import ucar.nc2.Variable;
 
 import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -181,7 +182,7 @@ public class PalmChemistryInputReader {
 
     private static List<String> getTimestamps(List<Integer> times) {
 
-        var date = LocalDate.now();
-        return times.stream().map(time -> PalmChemistryInput2.getTimestamp(date.toString(), time)).collect(Collectors.toList());
+        var date = LocalDateTime.now();
+        return times.stream().map(time -> PalmChemistryInput2.getTimestamp(date, time)).collect(Collectors.toList());
     }
 }

@@ -6,6 +6,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 public class WriteChemistryForErnstReuterScenario {
@@ -54,7 +55,7 @@ public class WriteChemistryForErnstReuterScenario {
                 .cellSize(2)
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
-                .date("2019-07-02")
+                .date(LocalDateTime.of(2019,7,2,0,0))
                 .numberOfDays(2)
                 .build();
 

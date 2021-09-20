@@ -5,6 +5,7 @@ import com.beust.jcommander.Parameter;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 public class WriteChemistryForBanzhafComparison {
@@ -53,7 +54,7 @@ public class WriteChemistryForBanzhafComparison {
                 .cellSize(10)
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
-                .date("2017-07-31")
+                .date(LocalDateTime.of(2017,7,31, 0, 0))
                 .build();
 
         converter.write();

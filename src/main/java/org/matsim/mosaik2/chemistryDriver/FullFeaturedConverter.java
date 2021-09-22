@@ -11,6 +11,8 @@ import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.Map;
 
 @Log4j2
@@ -34,12 +36,12 @@ public class FullFeaturedConverter {
 
     private final PollutantToPalmNameConverter pollutantConverter;
 
-    private final String date;
+    private final LocalDateTime date;
 
     private final int numberOfDays;
 
     @Builder
-    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, String date, int numberOfDays) {
+    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, LocalDateTime date, int numberOfDays) {
         this.networkFile = networkFile;
         this.emissionEventsFile = emissionEventsFile;
         this.outputFile = outputFile;
@@ -49,7 +51,7 @@ public class FullFeaturedConverter {
         this.bounds = bounds;
         this.transformation = transformation;
         this.pollutantConverter = pollutantConverter;
-        this.date = date == null ? "2017-07-31" : date;
+        this.date = date == null ? LocalDateTime.of(2017, 7, 31, 0, 0) : date;
         this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
     }
 
@@ -86,7 +88,24 @@ public class FullFeaturedConverter {
         //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
         addNoIfPossible(rasteredEmissions);
 
-        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date, numberOfDays);
+        rasteredEmissions = cuttofulldays(rasteredEmissions, numberOfDays);
+
+        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
+    }
+
+    private static TimeBinMap<Map<String, Raster>> cuttofulldays(TimeBinMap<Map<String, Raster>> rasteredEmissions, int numberOfDays) {
+
+        TimeBinMap<Map<String, Raster>> result = new TimeBinMap<>(3600);
+        for (int day = 0; day < numberOfDays; day++) {
+            for (int hour = 0; hour < 24; hour++) {
+                var seconds = hour * 3600 + 86400 * day;
+                var bin = rasteredEmissions.getTimeBin(seconds);
+                Map<String, Raster> value = bin.hasValue() ? bin.getValue() : Map.of();
+                result.getTimeBin(seconds).setValue(value);
+            }
+        }
+
+        return result;
     }
 
     private static boolean isCoveredBy(Link link, Raster.Bounds bounds) {

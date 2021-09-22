@@ -8,6 +8,9 @@ import ucar.nc2.NetcdfFileWriter;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,10 +32,10 @@ public class PalmChemistryInput2 {
     public static final String EMISSION_VALUES = "emission_values";
 
     public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data) {
-        writeNetCdfFile(outputFile, data, "2017-07-31", 1);
+        writeNetCdfFile(outputFile, data, LocalDateTime.of(2017, 7, 31, 0, 0));
     }
 
-    public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data, String date, int numberOfDays) {
+    public static void writeNetCdfFile(String outputFile, TimeBinMap<Map<String, Raster>> data, LocalDateTime date) {
 
         // get the observed pollutants from first valid time bin
         var observedPollutants = data.getTimeBins().iterator().next().getValue().keySet();
@@ -48,14 +51,14 @@ public class PalmChemistryInput2 {
             writeGlobalAttributes(writer);
             writer.create();
 
-            writeData(writer, data, observedPollutants, raster, date, numberOfDays);
+            writeData(writer, data, observedPollutants, raster, date);
 
         } catch (IOException | InvalidRangeException e) {
             throw new RuntimeException(e);
         }
     }
 
-    private static void writeData(NetcdfFileWriter writer, TimeBinMap<Map<String, Raster>> data, Set<String> observedPollutants, Raster raster, String date, int numberOfDays) throws IOException, InvalidRangeException {
+    private static void writeData(NetcdfFileWriter writer, TimeBinMap<Map<String, Raster>> data, Set<String> observedPollutants, Raster raster, LocalDateTime date) throws IOException, InvalidRangeException {
 
         var pollutantToIndex = new ArrayList<>(observedPollutants);
         var emissionIndex = new ArrayInt.D1(pollutantToIndex.size(), false);
@@ -74,25 +77,20 @@ public class PalmChemistryInput2 {
         var yValues = writeDoubleArray(raster.getCellSize() / 2 , raster.getCellSize(), raster.getYLength());
 
         //int numberOfConsecutiveTimeBins = (int) ((data.getEndTimeOfLastBin() - data.getStartTime()) / data.getBinSize());
-        var numberOfTimeslices = 24 * numberOfDays;
+        var numberOfTimeslices = data.getTimeBins().size();
         var times = new ArrayInt.D1(numberOfTimeslices, false);
         var timestamps = new ArrayChar.D2(numberOfTimeslices, 64);
         var emissionValues = new ArrayFloat.D5(numberOfTimeslices, 1, raster.getYLength(), raster.getXLength(), pollutantToIndex.size());
 
-       // palm needs some time to warm up. We put the same day into the input file twice
-        // cut of the emissions after 24 hours.
-        for (var day = 0; day < numberOfDays; day++ ) {
-            for (var i = 0; i < 24; i++) {
 
-                var bin = getTimeBin(data, i);
-                var timeIndex = i + 24 * day; // use 24 hours of one day and then keep on going for each additional day.
+        for (var bin : data.getTimeBins()) {
 
-                var timestamp = getTimestamp(date, bin.getStartTime());
+                var timestamp = getTimestamp(date, bin.getStartTime()); // same here add the seconds of the previous days the timebins
+                int timeIndex = (int) (bin.getStartTime() / data.getBinSize());
                 logger.info("writing timestep: " + timestamp);
                 timestamps.setString(timeIndex, timestamp);
 
-                // continue writing data after the first day has finished.
-                times.set(timeIndex, (int) bin.getStartTime() + day * 24 * 3600);
+                times.set(timeIndex, (int) bin.getStartTime());
                 for (var pollutantEntry : bin.getValue().entrySet()) {
 
                     var pollutantRaster = pollutantEntry.getValue();
@@ -101,7 +99,6 @@ public class PalmChemistryInput2 {
                         emissionValues.set(timeIndex, 0, yi, xi, p, (float) value);
                     }));
                 }
-            }
         }
 
         // still don't know why we need two of these indices
@@ -192,8 +189,10 @@ public class PalmChemistryInput2 {
         return bin;
     }
 
-    private static String getTimestamp(String date, double time) {
-        var startTimeDuration = Duration.ofSeconds((long) time);
-        return String.format(date + " %02d:%02d:%02d +001", startTimeDuration.toHours(), startTimeDuration.toMinutesPart(), startTimeDuration.toSecondsPart());
+    public static String getTimestamp(LocalDateTime date, double time) {
+        var duration = Duration.ofSeconds((long)time);
+        var dateTime = date.plus(duration);
+
+        return String.format("%04d-%02d-%02d %02d:%02d:%02d +001", dateTime.getYear(), dateTime.getMonthValue(), dateTime.getDayOfMonth(), dateTime.getHour(), dateTime.getMinute(), dateTime.getSecond());
     }
 }

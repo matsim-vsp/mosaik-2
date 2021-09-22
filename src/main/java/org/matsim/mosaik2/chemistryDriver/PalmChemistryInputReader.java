@@ -8,6 +8,8 @@ import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -15,6 +17,10 @@ import java.util.stream.Collectors;
 public class PalmChemistryInputReader {
 
     static TimeBinMap<Map<String, Raster>> read(String filename) {
+        return read(filename, 0, Integer.MAX_VALUE);
+    }
+
+    static TimeBinMap<Map<String, Raster>> read(String filename, int fromTimeIndex, int toTimeIndex) {
 
         log.info("Try opening NetcdfFile at: " + filename);
         try (var file = NetcdfFile.open(filename)) {
@@ -23,17 +29,20 @@ public class PalmChemistryInputReader {
             List<Double> x = toDoubleArray(file.findVariable(PalmChemistryInput2.X));
             List<Double> y = toDoubleArray(file.findVariable(PalmChemistryInput2.Y));
             List<String> emissionNames = toStringArray(file.findVariable(PalmChemistryInput2.EMISSION_NAME));
-            List<String> timestamps = toStringArray(file.findVariable(PalmChemistryInput2.TIMESTAMP));
+            var timestampVariable = file.findVariable(PalmChemistryInput2.TIMESTAMP);
+
+            // the input file we've received from stuttgart doesn"t have timestamps. If not available, just guess them
+            List<String> timestamps = timestampVariable != null ? toStringArray(timestampVariable) : getTimestamps(times);
 
             Variable emissionValues = file.findVariable(PalmChemistryInput2.EMISSION_VALUES);
             Dimension zDimension = new Dimension(PalmChemistryInput2.Z, 1);
             emissionValues = emissionValues.reduce(List.of(zDimension));// remove z dimension, since it is not used
 
-            TimeBinMap<Map<String, Raster>> emissions = createTimeBinMap(times);
+            TimeBinMap<Map<String, Raster>> emissions = createTimeBinMap(times, fromTimeIndex);
             Raster.Bounds bounds = createBounds(x, y);
             double cellSize = getCellSize(x, y);
 
-            for (int ti = 0; ti < times.size(); ti++) {
+            for (int ti = fromTimeIndex; ti < times.size() && ti <= toTimeIndex; ti++) {
                 log.info("Parsing timestep: " + timestamps.get(ti));
 
                 var timeBin = emissions.getTimeBin(times.get(ti));
@@ -50,12 +59,12 @@ public class PalmChemistryInputReader {
                     // we read the data for one timestep and one pollutant but all cells of the raster
                     // the documentation suggest to use 'reduce' to eliminate dimensions with a length of 1. We can't use this here
                     // because we might have grids with a width of one tile
-                    ArrayFloat.D4 emissionData = (ArrayFloat.D4) emissionValues.read(new int[] {ti, 0, 0, ei }, new int[] { 1, y.size(), x.size(), 1 });
+                    ArrayFloat.D4 emissionData = (ArrayFloat.D4) emissionValues.read(new int[]{ti, 0, 0, ei}, new int[]{1, y.size(), x.size(), 1});
 
                     // now, iterate over all cells of the raster and write the values into our raster data structure
                     for (int xi = 0; xi < x.size(); xi++) {
                         for (int yi = 0; yi < y.size(); yi++) {
-                            float value = emissionData.get(0, yi, xi,0);
+                            float value = emissionData.get(0, yi, xi, 0);
                             raster.adjustValueForIndex(xi, yi, value);
                         }
                     }
@@ -74,12 +83,12 @@ public class PalmChemistryInputReader {
         }
     }
 
-    private static TimeBinMap<Map<String, Raster>> createTimeBinMap(List<Integer> fromTimes) {
+    private static TimeBinMap<Map<String, Raster>> createTimeBinMap(List<Integer> fromTimes, int fromTimeIndex) {
 
         int interval = -1;
-        int startTime = fromTimes.get(0); // assuming the list is populated
+        int startTime = fromTimes.get(fromTimeIndex); // assuming the list is populated
 
-        for (int i = 1 ; i < fromTimes.size(); i++) {
+        for (int i = 1; i < fromTimes.size(); i++) {
 
             var newInterval = fromTimes.get(i) - fromTimes.get(i - 1);
             if (interval >= 0 && newInterval != interval) {
@@ -116,10 +125,12 @@ public class PalmChemistryInputReader {
         double xInterval = getInterval(x);
         double yInterval = getInterval(y);
 
-        if (xInterval > 0 && yInterval > 0 && xInterval != yInterval) throw new RuntimeException("x and y interval are not equal. The code currently assumes square grid");
+        if (xInterval > 0 && yInterval > 0 && xInterval != yInterval)
+            throw new RuntimeException("x and y interval are not equal. The code currently assumes square grid");
 
         return xInterval;
     }
+
     private static double getInterval(List<Double> numbers) {
 
         double interval = -1;
@@ -142,8 +153,15 @@ public class PalmChemistryInputReader {
 
     private static List<Double> toDoubleArray(Variable oneDimensionalVariable) throws IOException {
 
-        if (oneDimensionalVariable.getRank() != 1 || oneDimensionalVariable.getDataType() != DataType.DOUBLE)
+        if (oneDimensionalVariable.getRank() != 1)
             throw new IllegalArgumentException("only 1 dimensional variables in this method");
+        if (oneDimensionalVariable.getDataType() != DataType.DOUBLE) {
+            // try parsing as integer
+            var integers = toIntList(oneDimensionalVariable);
+            return integers.stream()
+                    .map(Integer::doubleValue)
+                    .collect(Collectors.toList());
+        }
 
         double[] values = (double[]) oneDimensionalVariable.read().copyTo1DJavaArray();
         return Arrays.stream(values).boxed().collect(Collectors.toList());
@@ -160,5 +178,11 @@ public class PalmChemistryInputReader {
             result.add(s);
         }
         return result;
+    }
+
+    private static List<String> getTimestamps(List<Integer> times) {
+
+        var date = LocalDateTime.now();
+        return times.stream().map(time -> PalmChemistryInput2.getTimestamp(date, time)).collect(Collectors.toList());
     }
 }

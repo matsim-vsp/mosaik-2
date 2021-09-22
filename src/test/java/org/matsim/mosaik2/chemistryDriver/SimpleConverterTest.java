@@ -12,6 +12,7 @@ import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.testcases.MatsimTestUtils;
+import scala.Int;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
@@ -37,7 +38,7 @@ public class SimpleConverterTest {
 
         SimpleConverter.write(props);
 
-        var readResult = PalmChemistryInputReader.read(testFilePath);
+        var readResult = PalmChemistryInputReader.read(testFilePath, 0, Integer.MAX_VALUE);
 
         assertEquals(3, readResult.getTimeBins().size());
         assertEquals(3600, readResult.getBinSize(), 0.000001);

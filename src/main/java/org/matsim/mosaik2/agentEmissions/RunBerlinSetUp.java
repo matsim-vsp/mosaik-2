@@ -9,8 +9,6 @@ import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.events.Event;
-import org.matsim.api.core.v01.events.LinkEnterEvent;
-import org.matsim.api.core.v01.events.LinkLeaveEvent;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.Activity;
@@ -32,7 +30,6 @@ import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
-import org.matsim.mosaik2.prepare.PrepareBerlinNetwork;
 import org.matsim.run.RunBerlinScenario;
 import org.matsim.vehicles.VehicleUtils;
 import org.matsim.vis.snapshotwriters.PositionEvent;
@@ -178,11 +175,11 @@ public class RunBerlinSetUp {
         var bbox = createBoundingBox();
         network.getLinks().values().parallelStream()
                 .filter(link -> isCoveredBy(link, bbox))
-                .forEach(link -> link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, "yes"));
+                .forEach(link -> link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, true));
 
         network.getLinks().values().parallelStream()
                 .filter(link -> link.getAttributes().getAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY) == null)
-                .forEach(link -> link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, "no"));
+                .forEach(link -> link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, false));
     }
 
     private static PreparedGeometry createBoundingBox() {

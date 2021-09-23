@@ -104,7 +104,7 @@ public class FullFeaturedConverter {
                 // the input time marks the time bin from which we take emissions. This should always be within the first 24hours
                 // since we are copying the first 24h to the consecutive days.
                 var inputSeconds = hour * 3600;
-                var bin = rasteredEmissions.getTimeBin(resultSeconds);
+                var bin = rasteredEmissions.getTimeBin(inputSeconds);
                 Map<String, Raster> value = bin.hasValue() ? bin.getValue() : Map.of();
                 result.getTimeBin(resultSeconds).setValue(value);
             }

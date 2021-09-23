@@ -82,7 +82,7 @@ public class WriteChemistryForStuttgartScenario {
 
     void write(Raster.Bounds bounds, double cellSize, String outputFileName) {
 
-        var nameConverter = new PollutantToPalmNameConverter(Map.of(Pollutant.NO2, "NO2", Pollutant.NOx, "NOx"));
+        var nameConverter = new PollutantToPalmNameConverter(Map.of(Pollutant.NO2, "NO2", Pollutant.NOx, "NOx", Pollutant.PM, "PM10"));
         // everything is in EPSG:25832
         var transformation = new IdentityTransformation();
 
@@ -96,7 +96,7 @@ public class WriteChemistryForStuttgartScenario {
                 .cellSize(cellSize)
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
-                .date(LocalDateTime.of(2019,7,2, 0, 0))
+                .date(LocalDateTime.of(2018, 7, 8, 0, 0))
                 .numberOfDays(2)
                 .build();
 

@@ -98,10 +98,15 @@ public class FullFeaturedConverter {
         TimeBinMap<Map<String, Raster>> result = new TimeBinMap<>(3600);
         for (int day = 0; day < numberOfDays; day++) {
             for (int hour = 0; hour < 24; hour++) {
-                var seconds = hour * 3600 + 86400 * day;
-                var bin = rasteredEmissions.getTimeBin(seconds);
+
+                // the seconds for the resulting time bin map have to go on through the whole time period
+                var resultSeconds = hour * 3600 + 86400 * day;
+                // the input time marks the time bin from which we take emissions. This should always be within the first 24hours
+                // since we are copying the first 24h to the consecutive days.
+                var inputSeconds = hour * 3600;
+                var bin = rasteredEmissions.getTimeBin(resultSeconds);
                 Map<String, Raster> value = bin.hasValue() ? bin.getValue() : Map.of();
-                result.getTimeBin(seconds).setValue(value);
+                result.getTimeBin(resultSeconds).setValue(value);
             }
         }
 

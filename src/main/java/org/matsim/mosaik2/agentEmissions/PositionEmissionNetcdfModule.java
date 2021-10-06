@@ -188,7 +188,7 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
         }
     }
 
-    private static class NetcdfWriterHandler implements BasicEventHandler, EventWriter {
+    static class NetcdfWriterHandler implements BasicEventHandler, EventWriter {
 
         private final NetcdfFileWriter writer;
 
@@ -214,7 +214,7 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
         private final Map<String, ArrayDouble.D2> emissions = new HashMap<>();
 
 
-        private NetcdfWriterHandler(String filename, int numberOfAgents, Map<Pollutant, String> pollutants, boolean calculateNO) throws IOException {
+        NetcdfWriterHandler(String filename, int numberOfAgents, Map<Pollutant, String> pollutants, boolean calculateNO) throws IOException {
             log.info("Opening Netcdf Writer at: " + filename);
             writer = NetcdfFileWriter.createNew(NetcdfFileWriter.Version.netcdf3, filename);
             writer.setFill(true);

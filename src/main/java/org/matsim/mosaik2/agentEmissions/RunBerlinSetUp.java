@@ -8,7 +8,6 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 import org.matsim.api.core.v01.Scenario;
-import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.population.Activity;
@@ -21,15 +20,18 @@ import org.matsim.core.config.groups.ControlerConfigGroup;
 import org.matsim.core.config.groups.QSimConfigGroup;
 import org.matsim.core.controler.AbstractModule;
 import org.matsim.core.controler.OutputDirectoryHierarchy;
+import org.matsim.core.controler.events.AfterMobsimEvent;
 import org.matsim.core.controler.events.BeforeMobsimEvent;
+import org.matsim.core.controler.events.ShutdownEvent;
+import org.matsim.core.controler.listener.AfterMobsimListener;
 import org.matsim.core.controler.listener.BeforeMobsimListener;
+import org.matsim.core.controler.listener.ShutdownListener;
 import org.matsim.core.events.EventsManagerImpl;
 import org.matsim.core.events.algorithms.EventWriter;
-import org.matsim.core.events.algorithms.EventWriterXML;
-import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
+import org.matsim.mosaik2.events.FilterEventsWriter;
 import org.matsim.run.RunBerlinScenario;
 import org.matsim.vehicles.VehicleUtils;
 import org.matsim.vis.snapshotwriters.PositionEvent;
@@ -38,8 +40,8 @@ import org.matsim.vis.snapshotwriters.SnapshotWritersModule;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.nio.file.Paths;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Predicate;
+import java.util.HashSet;
+import java.util.Set;
 
 public class RunBerlinSetUp {
 
@@ -208,7 +210,7 @@ public class RunBerlinSetUp {
         }
     }
 
-    private static class WriterSetUp implements BeforeMobsimListener {
+    private static class WriterSetUp implements BeforeMobsimListener, AfterMobsimListener, ShutdownListener {
 
         @Inject
         private OutputDirectoryHierarchy outputDirectoryHierarchy;
@@ -219,6 +221,8 @@ public class RunBerlinSetUp {
         @Inject
         private ControlerConfigGroup controlerConfig;
 
+        private final Set<EventWriter> writers = new HashSet<>();
+
         @Override
         public void notifyBeforeMobsim(BeforeMobsimEvent event) {
 
@@ -226,7 +230,7 @@ public class RunBerlinSetUp {
 
 
             var eventsFile = outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "events.xml.gz");
-            var emissionEventsFile = outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "poition-emission-events.xml.gz");
+            var emissionEventsFile = outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "position-emission-events.xml.gz");
 
             // write everything except: positions, position-emissions, warm-emissions, cold-emissions
             var normalWriter = new FilterEventsWriter(
@@ -243,36 +247,25 @@ public class RunBerlinSetUp {
 
             eventsManager.addHandler(normalWriter);
             eventsManager.addHandler(emissionWriter);
-        }
-    }
-
-    private static class FilterEventsWriter implements BasicEventHandler, EventWriter {
-
-        private final Predicate<Event> filter;
-        private final EventWriterXML writer;
-        private final String filename;
-
-        private final AtomicInteger counter = new AtomicInteger();
-
-        public FilterEventsWriter(Predicate<Event> filter, String outFilename) {
-            this.filter = filter;
-            this.writer = new EventWriterXML(outFilename);
-            this.filename = outFilename;
+            writers.add(normalWriter);
+            writers.add(emissionWriter);
         }
 
         @Override
-        public void closeFile() {
-            writer.closeFile();
+        public void notifyAfterMobsim(AfterMobsimEvent event) {
+            closeWriters();
         }
 
         @Override
-        public void handleEvent(Event event) {
+        public void notifyShutdown(ShutdownEvent event) {
+            if (event.isUnexpected()) {
+                closeWriters();
+            }
+        }
 
-            if (filter.test(event)){
-                if (counter.incrementAndGet() % 1000 == 0) {
-                    System.out.println(filename + ": " + counter);
-                }
-                writer.handleEvent(event);
+        private void closeWriters() {
+            for (EventWriter writer : writers) {
+                writer.closeFile();
             }
         }
     }

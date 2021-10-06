@@ -37,3 +37,7 @@ hs_err_pid*
 
 # test files
 /test/output
+
+# default matsim output folders
+/output
+/scenarios

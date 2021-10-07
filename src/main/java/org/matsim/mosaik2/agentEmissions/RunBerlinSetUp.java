@@ -104,6 +104,7 @@ public class RunBerlinSetUp {
             Utils.applyVehicleInformation(vehicleType);
 
             if (vehicleType.getId().toString().equals("freight")) {
+                Utils.applyVehicleInformation(vehicleType);
                 VehicleUtils.setHbefaVehicleCategory(vehicleType.getEngineInformation(), HbefaVehicleCategory.HEAVY_GOODS_VEHICLE.toString());
             }
         }

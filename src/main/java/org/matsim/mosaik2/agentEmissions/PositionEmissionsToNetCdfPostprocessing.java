@@ -3,19 +3,15 @@ package org.matsim.mosaik2.agentEmissions;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import lombok.Getter;
-import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.events.Event;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.MatsimEventsReader;
 import org.matsim.core.events.handler.BasicEventHandler;
-import org.matsim.vehicles.Vehicle;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 public class PositionEmissionsToNetCdfPostprocessing {
 
@@ -46,9 +42,10 @@ public class PositionEmissionsToNetCdfPostprocessing {
 		var reader = new MatsimEventsReader(manager);
 		reader.addCustomEventMapper(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE, positionEventMapper);
 		reader.readFile(positionEmissionEventsFile);
+		counterHandler.finish();
 
 		// do a second pass where we actually read the emissions and put them into a netcdf file
-		var numberOfVehicles = counterHandler.getVehicles().size();
+		var numberOfVehicles = counterHandler.getMaxVehCount();
 		var pollutants = Map.of(
 				Pollutant.NO2, "NO2",
 				Pollutant.CO2_TOTAL, "CO2",
@@ -79,20 +76,39 @@ public class PositionEmissionsToNetCdfPostprocessing {
 
 	private static class VehicleCounter implements BasicEventHandler {
 
-		@Getter
-		private final Set<Id<Vehicle>> vehicles = new HashSet<>();
+		private double currentTime = 0;
+		private int vehCountForCurrentTime;
 
+		@Getter
+		private int maxVehCount = 0;
 
 		@Override
 		public void handleEvent(Event event) {
+
+			if (event.getTime() != currentTime) {
+				onNextTimestep(event.getTime());
+			}
 
 			if (event.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE)) {
 				var positionEmissionEvent = (PositionEmissionsModule.PositionEmissionEvent)event;
 
 				if (positionEmissionEvent.getEmissionType().equals("cold")) return; // ignore cold events for now, but think about it later
 
-				vehicles.add(positionEmissionEvent.getVehicleId());
+				vehCountForCurrentTime++;
 			}
+		}
+
+		public void finish() {
+			// make sure the count of the last timestep is considered in case it had the most vehicles
+			onNextTimestep(Double.POSITIVE_INFINITY);
+		}
+
+		private void onNextTimestep(double nextTimestep) {
+			if (vehCountForCurrentTime > maxVehCount) {
+				maxVehCount = vehCountForCurrentTime;
+			}
+			vehCountForCurrentTime = 0;
+			currentTime = nextTimestep;
 		}
 	}
 }

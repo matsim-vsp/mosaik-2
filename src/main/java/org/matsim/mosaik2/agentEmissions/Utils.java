@@ -49,7 +49,7 @@ public class Utils {
         // vsp default is to let shared-svn reside next to all git projects in the git directory. This should find the mosaik-2 project folder and go from there to shared-svn
         emissionConfig.setDetailedColdEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
         emissionConfig.setDetailedWarmEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
-        emissionConfig.setAverageColdEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Vehcat_2020_Average.csv");
+        emissionConfig.setAverageColdEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Vehcat_2020_Average_with_zeor_values_for_unknown_types.csv");
         emissionConfig.setAverageWarmEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv");
         emissionConfig.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
         return emissionConfig;

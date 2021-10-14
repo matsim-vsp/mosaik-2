@@ -127,7 +127,7 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
             if (event.isLastIteration()) {
                 try {
                     netcdfHandler = new NetcdfWriterHandler(outputDirectoryHierarchy.getIterationFilename(event.getIteration(), "position-emissions.nc"),
-                            scenario.getPopulation().getPersons().size(), config.getPollutantMapping(), config.getCalculateNOFromNOxAndNO2());
+                            scenario.getPopulation().getPersons().size(), -1, config.getPollutantMapping(), config.getCalculateNOFromNOxAndNO2());
                     eventsManager.addHandler(netcdfHandler);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
@@ -214,39 +214,53 @@ public class PositionEmissionNetcdfModule extends AbstractModule {
         private final Map<String, ArrayDouble.D2> emissions = new HashMap<>();
 
 
-        NetcdfWriterHandler(String filename, int numberOfAgents, Map<Pollutant, String> pollutants, boolean calculateNO) throws IOException {
+        /**
+         *
+         * @param filename output file path
+         * @param numberOfAgents max number of agents the file should make room for. To achieve small file sizes this should be the maximum number of vehicles on the network per timestep
+         * @param numberOfTimesteps number of timesteps. To achieve faster read speeds of the netCdf file it is better to have limited dimensions. If the number of timesteps is known in advance
+         *                          this should be set. Pass -1 if not known in advance. The time dimension will be unlimited then.
+         * @param pollutants Mapping of MATSim pollutants to string identifiers used by PALM
+         * @param calculateNO flag to decide whether NO should be calculated from NOx and NO2. Only works if NOx and NO2 are present in the pollutant mapping
+         * @throws IOException The constructor immediately creates a file. This is why an IOException might be thrown here.
+         */
+        NetcdfWriterHandler(String filename, int numberOfAgents, int numberOfTimesteps, Map<Pollutant, String> pollutants, boolean calculateNO) throws IOException {
             log.info("Opening Netcdf Writer at: " + filename);
             writer = NetcdfFileWriter.createNew(NetcdfFileWriter.Version.netcdf3, filename);
             writer.setFill(true);
             this.pollutants = pollutants;
             this.calculateNO = calculateNO;
-            writeDimensions(numberOfAgents);
+            writeDimensions(numberOfAgents, numberOfTimesteps);
             writeVariables();
             writeAttributes();
             writer.create();
         }
 
-        private void writeDimensions(int numberOfAgents) {
+        private void writeDimensions(int numberOfAgents, int numberOfTimesteps) {
 
-            writer.addUnlimitedDimension("time");
+            if (numberOfTimesteps >= 0) {
+                writer.addDimension("time", numberOfTimesteps);
+            } else {
+                writer.addUnlimitedDimension("time");
+            }
             writer.addDimension("agents", numberOfAgents);
         }
 
         private void writeVariables() {
 
-            writer.addVariable("time", DataType.DOUBLE, "time");
+            writer.addVariable("time", DataType.FLOAT, "time");
             writer.addVariable("number_of_vehicles", DataType.INT, "time");
             writer.addVariable("vehicle_id", DataType.INT, "time agents");
-            writer.addVariable("x", DataType.DOUBLE, "time agents");
-            writer.addVariable("y", DataType.DOUBLE, "time agents");
+            writer.addVariable("x", DataType.FLOAT, "time agents");
+            writer.addVariable("y", DataType.FLOAT, "time agents");
 
             // next think about emissions
             for (var pollutant : pollutants.entrySet()) {
-                writer.addVariable(pollutant.getValue(), DataType.DOUBLE, "time agents");
+                writer.addVariable(pollutant.getValue(), DataType.FLOAT, "time agents");
             }
 
             if (calculateNO) {
-                writer.addVariable("NO", DataType.DOUBLE, "time agents");
+                writer.addVariable("NO", DataType.FLOAT, "time agents");
             }
         }
 

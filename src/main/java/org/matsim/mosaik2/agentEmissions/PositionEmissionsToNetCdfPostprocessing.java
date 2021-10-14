@@ -46,6 +46,7 @@ public class PositionEmissionsToNetCdfPostprocessing {
 
 		// do a second pass where we actually read the emissions and put them into a netcdf file
 		var numberOfVehicles = counterHandler.getMaxVehCount();
+		var numberOfTimesteps = counterHandler.getTimestepCount();
 		var pollutants = Map.of(
 				Pollutant.NO2, "NO2",
 				Pollutant.CO2_TOTAL, "CO2",
@@ -57,7 +58,7 @@ public class PositionEmissionsToNetCdfPostprocessing {
 		PositionEmissionNetcdfModule.NetcdfWriterHandler netCdfWriter = null;
 		try {
 			netCdfWriter = new PositionEmissionNetcdfModule.NetcdfWriterHandler(
-					netCdfOutput, numberOfVehicles, pollutants, true
+					netCdfOutput, numberOfVehicles, numberOfTimesteps, pollutants, true
 			);
 			manager = EventsUtils.createEventsManager();
 			manager.addHandler(netCdfWriter);
@@ -81,6 +82,9 @@ public class PositionEmissionsToNetCdfPostprocessing {
 
 		@Getter
 		private int maxVehCount = 0;
+
+		@Getter
+		private int timestepCount = 0;
 
 		@Override
 		public void handleEvent(Event event) {
@@ -109,6 +113,7 @@ public class PositionEmissionsToNetCdfPostprocessing {
 			}
 			vehCountForCurrentTime = 0;
 			currentTime = nextTimestep;
+			timestepCount++;
 		}
 	}
 }

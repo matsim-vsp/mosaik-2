@@ -14,6 +14,7 @@ public class WriteChemistryForStuttgartScenario {
             Pollutant.NO2, "NO2",
             Pollutant.CO2_TOTAL, "CO2",
             Pollutant.PM, "PM10",
+            Pollutant.PM_non_exhaust, "PM10",
             Pollutant.CO, "CO",
             Pollutant.NOx, "NOx"
     );// NO is missing for now, it would have to be calculated from NOx - NO2

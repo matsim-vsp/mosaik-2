@@ -7,9 +7,11 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.network.Node;
 import org.matsim.api.core.v01.population.Activity;
 import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
@@ -28,9 +30,11 @@ import org.matsim.core.controler.listener.BeforeMobsimListener;
 import org.matsim.core.controler.listener.ShutdownListener;
 import org.matsim.core.events.EventsManagerImpl;
 import org.matsim.core.events.algorithms.EventWriter;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
+import org.matsim.mosaik2.chemistryDriver.NetworkUnsimplifier;
 import org.matsim.mosaik2.events.FilterEventsWriter;
 import org.matsim.run.RunBerlinScenario;
 import org.matsim.vehicles.VehicleUtils;
@@ -40,18 +44,25 @@ import org.matsim.vis.snapshotwriters.SnapshotWritersModule;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.nio.file.Paths;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public class RunBerlinSetUp {
 
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
     private static final String configPath = "matsim/scenarios/countries/de/berlin/berlin-v5.5-1pct/input/berlin-v5.5-1pct.config.xml";
 
-    private static class ConfigPath {
+    private static class InputPaths {
 
         @Parameter(names = "-config", required = true)
-        private String path;
+        private String config;
+
+        @Parameter(names = "-networkFolder")
+        private String networkAndSchedule;
+
+        boolean hasNetworkAndSchedule() {
+            return !StringUtils.isBlank(networkAndSchedule);
+        }
     }
 
     private static class OutputPath {
@@ -60,10 +71,26 @@ public class RunBerlinSetUp {
         private String outputPath;
     }
 
+    private static String[] createInputArgsForBerlinScenario(InputPaths inputPaths) {
+
+        Map<String, String> result = new HashMap<>();
+        result.put("", inputPaths.config);
+
+        if (inputPaths.hasNetworkAndSchedule()) {
+            result.put("--config:network.inputNetworkFile", Paths.get(inputPaths.config).resolve("berlin-5.5.2-network-with-geometries.xml.gz").toString());
+            result.put("--config:transit.transitScheduleFile", Paths.get(inputPaths.config).resolve("berlin-5.5.2-schedule-with-geometries.xml.gz").toString());
+            result.put("--config:transit.vehiclesFile", Paths.get(inputPaths.config).resolve("berlin-5.5.2-transit-vehicles-with-geometries.xml.gz").toString());
+        }
+        return result.entrySet().stream()
+                .map(entry -> List.of(entry.getKey(), entry.getValue()))
+                .flatMap(Collection::stream)
+                .toArray(String[]::new);
+    }
+
     public static void main(String[] args) {
 
         var sharedSvn = new Utils.SharedSvnArg();
-        var configPath = new ConfigPath();
+        var configPath = new InputPaths();
         var outputPath = new OutputPath();
 
         JCommander.newBuilder()
@@ -75,7 +102,7 @@ public class RunBerlinSetUp {
         var emissionsConfig = Utils.createUpEmissionsConfigGroup(sharedSvn.getSharedSvn());
         var positionEmissionNetcdfConfig = Utils.createNetcdfEmissionWriterConfigGroup();
         var config = RunBerlinScenario.prepareConfig(
-                new String[]{ configPath.path },
+                createInputArgsForBerlinScenario(configPath),
                 emissionsConfig, positionEmissionNetcdfConfig);
 
         config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
@@ -122,7 +149,6 @@ public class RunBerlinSetUp {
         var controler = RunBerlinScenario.prepareControler(scenario);
 
         controler.addOverridingModule(new PositionEmissionsModule());
-        controler.addOverridingModule(new PositionEmissionNetcdfModule());
         controler.addOverridingModule(new EventWriterModule());
 
         controler.addOverridingModule(new AbstractModule() {

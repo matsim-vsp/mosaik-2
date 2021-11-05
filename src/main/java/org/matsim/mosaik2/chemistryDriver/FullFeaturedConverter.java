@@ -7,6 +7,7 @@ import org.matsim.api.core.v01.network.NetworkWriter;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
+import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
@@ -58,9 +59,9 @@ public class FullFeaturedConverter {
     public void write() {
 
         // read network, transform to destination crs and filter only links that are within bounds
-        var network = NetworkUtils.readNetwork(networkFile, transformation).getLinks().values().stream()
+        var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
                 .filter(link -> isCoveredBy(link, bounds))
-                .collect(NetworkUtils.getCollector());
+                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
 
         log.info("Unsimplifying network");
         var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);

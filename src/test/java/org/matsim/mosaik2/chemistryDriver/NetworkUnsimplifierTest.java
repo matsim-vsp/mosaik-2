@@ -14,6 +14,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.NetworkWriter;
 import org.matsim.api.core.v01.network.Node;
 import org.matsim.contrib.osm.networkReader.SupersonicOsmNetworkReader;
+import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
@@ -160,7 +161,7 @@ public class NetworkUnsimplifierTest {
 
         var unsimplified = result.values().stream()
                 .flatMap(Collection::stream)
-                .collect(NetworkUtils.getCollector());
+                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
 
         new NetworkWriter(unsimplified).write("C:\\Users\\Janek\\Desktop\\unsimplified-network.xml.gz");
 
@@ -218,7 +219,7 @@ public class NetworkUnsimplifierTest {
         // filter transformed network
         var filteredNetwork = simplifiedNetworkFromScenario.getLinks().values().parallelStream()
                 .filter(link -> isCoveredBy(link, bounds))
-                .collect(NetworkUtils.getCollector());
+                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
 
         new NetworkWriter(filteredNetwork).write("C:\\Users\\Janek\\Desktop\\berlin-simplified.xml.gz");
 
@@ -229,7 +230,7 @@ public class NetworkUnsimplifierTest {
 
         var resultNetwork = result.values().stream()
                 .flatMap(Collection::stream)
-                .collect(NetworkUtils.getCollector());
+                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
 
         new NetworkWriter(resultNetwork).write("C:\\Users\\Janek\\Desktop\\berlin-unsimplified.xml.gz");
     }

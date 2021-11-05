@@ -152,8 +152,6 @@ public class OfflineEmissions {
         var carVehicleType = scenario.getVehicles().getVehicleTypes().get(carVehicleTypeId);
         Id<VehicleType> freightVehicleTypeId = Id.create("freight", VehicleType.class);
         VehicleType freightVehicleType = scenario.getVehicles().getVehicleTypes().get(freightVehicleTypeId);
-        Id<VehicleType> bikeVehicleTypeId = Id.create("bike", VehicleType.class);
-        VehicleType bikeVehicleType = scenario.getVehicles().getVehicleTypes().get(bikeVehicleTypeId);
 
         EngineInformation carEngineInformation = carVehicleType.getEngineInformation();
         VehicleUtils.setHbefaVehicleCategory( carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
@@ -167,12 +165,16 @@ public class OfflineEmissions {
         VehicleUtils.setHbefaSizeClass( freightEngineInformation, "average" );
         VehicleUtils.setHbefaEmissionsConcept( freightEngineInformation, "average" );
 
-        // bikes don't have emissions
-        EngineInformation bikeEngineInformation = bikeVehicleType.getEngineInformation();
-        VehicleUtils.setHbefaVehicleCategory( bikeEngineInformation, HbefaVehicleCategory.NON_HBEFA_VEHICLE.toString());
-        VehicleUtils.setHbefaTechnology( bikeEngineInformation, "average" );
-        VehicleUtils.setHbefaSizeClass( bikeEngineInformation, "average" );
-        VehicleUtils.setHbefaEmissionsConcept( bikeEngineInformation, "average" );
+        Id<VehicleType> bikeVehicleTypeId = Id.create("bike", VehicleType.class);
+        if (scenario.getVehicles().getVehicleTypes().containsKey(bikeVehicleTypeId)) {
+            // bikes don't have emissions
+            VehicleType bikeVehicleType = scenario.getVehicles().getVehicleTypes().get(bikeVehicleTypeId);
+            EngineInformation bikeEngineInformation = bikeVehicleType.getEngineInformation();
+            VehicleUtils.setHbefaVehicleCategory(bikeEngineInformation, HbefaVehicleCategory.NON_HBEFA_VEHICLE.toString());
+            VehicleUtils.setHbefaTechnology(bikeEngineInformation, "average");
+            VehicleUtils.setHbefaSizeClass(bikeEngineInformation, "average");
+            VehicleUtils.setHbefaEmissionsConcept(bikeEngineInformation, "average");
+        }
 
         // public transit vehicles should be considered as non-hbefa vehicles
         for (VehicleType type : scenario.getTransitVehicles().getVehicleTypes().values()) {

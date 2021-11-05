@@ -6,7 +6,9 @@ import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import lombok.extern.log4j.Log4j2;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.referencing.CRS;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 import org.matsim.api.core.v01.Id;
@@ -15,13 +17,14 @@ import org.matsim.api.core.v01.TransportMode;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.gtfs.RunGTFS2MATSim;
-import org.matsim.contrib.gtfs.TransitSchedulePostProcessTools;
 import org.matsim.contrib.osm.networkReader.LinkProperties;
 import org.matsim.contrib.osm.networkReader.SupersonicOsmNetworkReader;
 import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.network.algorithms.NetworkCleaner;
 import org.matsim.core.network.io.NetworkWriter;
 import org.matsim.core.scenario.ScenarioUtils;
+import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
@@ -38,8 +41,10 @@ import org.opengis.referencing.operation.TransformException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Log4j2
 public class PrepareBerlinNetwork {
@@ -53,7 +58,7 @@ public class PrepareBerlinNetwork {
     public static final String scheduleOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-schedule-with-geometries.xml.gz";
     public static final String vehiclesOutputFile ="projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-transit-vehicles-with-geometries.xml.gz";
 
-    private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84, TransformationFactory.DHDN_GK4);
+    private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84,"EPSG:25833");
     private static final Set<String> networkModes = Set.of(TransportMode.car, TransportMode.ride, "freight");
 
     public static void main(String[] args) {
@@ -94,14 +99,129 @@ public class PrepareBerlinNetwork {
                     // city of berlin has all the streets
                     return berlin.covers(MGC.coord2Point(coord));
                 })
-                .setAfterLinkCreated((link, map, direction) -> {
-                    link.setAllowedModes(networkModes);
-                })
+                .setAfterLinkCreated((link, map, direction) -> link.setAllowedModes(networkModes))
                 .build()
                 .read(Paths.get(svnArg.sharedSvn).resolve(osmFile));
 
         new NetworkCleaner().run(network);
+
+        useOriginalGeometryWithinGeometry(network, createStudyArea());
+
         return network;
+    }
+
+    private static void useOriginalGeometryWithinGeometry(Network network, PreparedGeometry bbox) {
+
+
+        // if links are within the bounding box and if their original geometry is more complex than
+        // the current link, mark them for being replaced
+        var linksToReplace = network.getLinks().values().stream()
+                .filter(link -> isCoveredBy(link, bbox))
+                .filter(link -> NetworkUtils.getOriginalGeometry(link).size() > 2)
+                .collect(Collectors.toList());
+
+        // add all the nodes which we need for the enhanced geometries
+        linksToReplace.stream()
+                .flatMap(link -> NetworkUtils.getOriginalGeometry(link).stream())
+                .filter(node -> !network.getNodes().containsKey(node.getId()))
+                .forEach(network::addNode);
+
+        // now, add the links in between the original geometries
+        var linksToAdd = linksToReplace.stream()
+                .flatMap(link -> {
+
+                    var originalGeometry = NetworkUtils.getOriginalGeometry(link);
+                    var attributes = link.getAttributes().getAsMap();
+
+                    // for each node in the original geometry add one link end at second to last node
+                    List<Link> newLinks = new ArrayList<>();
+                    for (int i = 0; i < originalGeometry.size() - 1; i++) {
+
+                        // all the nodes are in the network already. fetch them from the network via id, so that we pass
+                        // the correct object reference to the newLink
+                        var from = network.getNodes().get(originalGeometry.get(i).getId());
+                        var to = network.getNodes().get(originalGeometry.get(i + 1).getId());
+                        var newLink = network.getFactory().createLink(Id.createLinkId(link.getId().toString() + "_" + i), from, to);
+
+                        // copy all values of the original link
+                        newLink.setAllowedModes(link.getAllowedModes());
+                        newLink.setCapacity(link.getCapacity());
+                        newLink.setFreespeed(link.getFreespeed());
+                        newLink.setNumberOfLanes(link.getNumberOfLanes());
+
+                        // copy all unstructured attributes
+                        attributes.forEach((key, value) -> newLink.getAttributes().putAttribute(key, value));
+
+                        newLinks.add(newLink);
+                    }
+                    return newLinks.stream();
+                })
+                .collect(Collectors.toList());
+
+        // now delete the links simplified links
+        for (var link : linksToReplace) {
+            network.removeLink(link.getId());
+        }
+
+        // add the new links to the network
+        for (var link : linksToAdd) {
+            network.addLink(link);
+        }
+
+        new NetworkWriter(network).write("C:/Users/Janekdererste/Desktop/berlin-test.xml.gz");
+    }
+
+    private static PreparedGeometry getBerlinShape(Path stateShapeFile) {
+
+        var berlinGeometry = ShapeFileReader.getAllFeatures(stateShapeFile.toString()).stream()
+                .filter(feature -> feature.getAttribute("GEN").equals("Berlin"))
+                .map(feature -> (Geometry)feature.getDefaultGeometry())
+                .findAny()
+                .orElseThrow();
+
+        try {
+            var sourceCRS = CRS.decode("EPSG:25832");
+            var targetCRS = MGC.getCRS("EPSG:25833");
+
+            var mathTransform = CRS.findMathTransform(sourceCRS, targetCRS);
+            var transformed = JTS.transform(berlinGeometry, mathTransform);
+            var geometryFactory = new PreparedGeometryFactory();
+            return geometryFactory.create(transformed);
+        } catch (FactoryException | TransformException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static PreparedGeometry createStudyArea() {
+
+        var geometry = new GeometryFactory().createPolygon(
+                new Coordinate[]{
+                        new Coordinate(385030.5, 5818413.0), new Coordinate(385030.5, 5820459),
+                        new Coordinate(387076.5, 5820459), new Coordinate(385030.5, 5820459),
+                        new Coordinate(385030.5, 5818413.0)
+                }
+        );
+        return new PreparedGeometryFactory().create(geometry);
+
+        /*
+        try {
+            var sourceCRS = CRS.decode("EPSG:25833");
+            var targetCRS = MGC.getCRS(TransformationFactory.DHDN_GK4);
+
+            var mathTransform = CRS.findMathTransform(sourceCRS, targetCRS);
+            var transformed = JTS.transform(geometry, mathTransform);
+            var geometryFactory = new PreparedGeometryFactory();
+            return geometryFactory.create(transformed);
+        } catch (FactoryException | TransformException e) {
+            throw new RuntimeException(e);
+        }
+
+         */
+    }
+
+    private static boolean isCoveredBy(Link link, PreparedGeometry geometry) {
+        return geometry.covers(MGC.coord2Point(link.getFromNode().getCoord()))
+                && geometry.covers(MGC.coord2Point(link.getToNode().getCoord()));
     }
 
     private static void createSchedule(Scenario scenario, Input svnArgs) {
@@ -182,8 +302,8 @@ public class PrepareBerlinNetwork {
             capacity.setSeats( 100 );
             capacity.setStandingRoom( 100 );
             VehicleUtils.setDoorOperationMode(ferryVehicleType, VehicleType.DoorOperationMode.serial); // first finish boarding, then start alighting
-            VehicleUtils.setAccessTime(ferryVehicleType, 1.0 / 1.0); // 1s per boarding agent, distributed on 1 door
-            VehicleUtils.setEgressTime(ferryVehicleType, 1.0 / 1.0); // 1s per alighting agent, distributed on 1 door
+            VehicleUtils.setAccessTime(ferryVehicleType, 1.0); // 1s per boarding agent, distributed on 1 door
+            VehicleUtils.setEgressTime(ferryVehicleType, 1.0); // 1s per alighting agent, distributed on 1 door
             scenario.getTransitVehicles().addVehicleType( ferryVehicleType );
         }
         // set link speeds and create vehicles according to pt mode
@@ -197,19 +317,10 @@ public class PrepareBerlinNetwork {
                 gtfsTransitType = Integer.parseInt( (String) line.getAttributes().getAttribute("gtfs_route_type"));
             } catch (NumberFormatException e) {
                 log.error("unknown transit mode! Line id was " + line.getId().toString() +
-                        "; gtfs route type was " + (String) line.getAttributes().getAttribute("gtfs_route_type"));
+                        "; gtfs route type was " + line.getAttributes().getAttribute("gtfs_route_type"));
                 throw new RuntimeException("unknown transit mode");
             }
-
-            int agencyId;
-            try {
-                agencyId = Integer.parseInt( (String) line.getAttributes().getAttribute("gtfs_agency_id"));
-            } catch (NumberFormatException e) {
-                log.error("invalid transit agency! Line id was " + line.getId().toString() +
-                        "; gtfs agency was " + (String) line.getAttributes().getAttribute("gtfs_agency_id"));
-                throw new RuntimeException("invalid transit agency");
-            }
-
+            
             switch (gtfsTransitType) {
                 // the vbb gtfs file generally uses the new gtfs route types, but some lines use the old enum in the range 0 to 7
                 // see https://sites.google.com/site/gtfschanges/proposals/route-type
@@ -244,7 +355,7 @@ public class PrepareBerlinNetwork {
                     break;
                 default:
                     log.error("unknown transit mode! Line id was " + line.getId().toString() +
-                            "; gtfs route type was " + (String) line.getAttributes().getAttribute("gtfs_route_type"));
+                            "; gtfs route type was " + line.getAttributes().getAttribute("gtfs_route_type"));
                     throw new RuntimeException("unknown transit mode");
             }
 
@@ -328,27 +439,7 @@ public class PrepareBerlinNetwork {
         return result;
     }
 
-    private static PreparedGeometry getBerlinShape(Path stateShapeFile) {
 
-        var berlinGeometry = ShapeFileReader.getAllFeatures(stateShapeFile.toString()).stream()
-                .filter(feature -> feature.getAttribute("GEN").equals("Berlin"))
-                .map(feature -> (Geometry)feature.getDefaultGeometry())
-                .findAny()
-                .orElseThrow();
-
-        try {
-
-            var sourceCRS = CRS.decode("EPSG:25832");
-            var targetCRS = MGC.getCRS(TransformationFactory.DHDN_GK4);
-
-            var mathTransform = CRS.findMathTransform(sourceCRS, targetCRS);
-            var transformed = JTS.transform(berlinGeometry, mathTransform);
-            var geometryFactory = new PreparedGeometryFactory();
-            return geometryFactory.create(transformed);
-        } catch (FactoryException | TransformException e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     private static class Input {
 

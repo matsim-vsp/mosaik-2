@@ -106,7 +106,7 @@ public class PrepareBerlinNetwork {
         new NetworkCleaner().run(network);
 
         useOriginalGeometryWithinGeometry(network, createStudyArea());
-
+        network.getAttributes().putAttribute("coordinateReferenceSystem", "EPSG:25833");
         return network;
     }
 
@@ -181,7 +181,7 @@ public class PrepareBerlinNetwork {
 
         try {
             var sourceCRS = CRS.decode("EPSG:25832");
-            var targetCRS = MGC.getCRS("EPSG:25833");
+            var targetCRS = CRS.decode("EPSG:25833");
 
             var mathTransform = CRS.findMathTransform(sourceCRS, targetCRS);
             var transformed = JTS.transform(berlinGeometry, mathTransform);
@@ -202,21 +202,6 @@ public class PrepareBerlinNetwork {
                 }
         );
         return new PreparedGeometryFactory().create(geometry);
-
-        /*
-        try {
-            var sourceCRS = CRS.decode("EPSG:25833");
-            var targetCRS = MGC.getCRS(TransformationFactory.DHDN_GK4);
-
-            var mathTransform = CRS.findMathTransform(sourceCRS, targetCRS);
-            var transformed = JTS.transform(geometry, mathTransform);
-            var geometryFactory = new PreparedGeometryFactory();
-            return geometryFactory.create(transformed);
-        } catch (FactoryException | TransformException e) {
-            throw new RuntimeException(e);
-        }
-
-         */
     }
 
     private static boolean isCoveredBy(Link link, PreparedGeometry geometry) {
@@ -320,7 +305,7 @@ public class PrepareBerlinNetwork {
                         "; gtfs route type was " + line.getAttributes().getAttribute("gtfs_route_type"));
                 throw new RuntimeException("unknown transit mode");
             }
-            
+
             switch (gtfsTransitType) {
                 // the vbb gtfs file generally uses the new gtfs route types, but some lines use the old enum in the range 0 to 7
                 // see https://sites.google.com/site/gtfschanges/proposals/route-type

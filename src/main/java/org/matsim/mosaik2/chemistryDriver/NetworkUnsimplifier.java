@@ -7,6 +7,7 @@ import de.topobyte.osm4j.core.model.iface.OsmNode;
 import de.topobyte.osm4j.core.model.iface.OsmRelation;
 import de.topobyte.osm4j.core.model.iface.OsmWay;
 import de.topobyte.osm4j.pbf.seq.PbfReader;
+import lombok.ConfigurationKeys;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.apache.log4j.Logger;
@@ -17,6 +18,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.api.core.v01.network.NetworkFactory;
 import org.matsim.api.core.v01.network.Node;
+import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
@@ -87,7 +89,7 @@ public class NetworkUnsimplifier {
     static Network segmentsToNetwork(Map<Id<Link>, List<Link>> segments) {
         return segments.values().stream()
                 .flatMap(Collection::stream)
-                .collect(NetworkUtils.getCollector());
+                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
     }
 
     static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, final String osmFile, final String destinationCrs) throws FileNotFoundException, OsmInputException {

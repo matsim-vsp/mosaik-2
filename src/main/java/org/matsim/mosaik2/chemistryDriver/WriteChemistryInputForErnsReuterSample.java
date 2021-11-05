@@ -17,6 +17,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.NetworkFactory;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
+import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.CoordUtils;
@@ -156,7 +157,7 @@ public class WriteChemistryInputForErnsReuterSample {
         var filteredNetwork = network.getLinks().values().parallelStream()
                 .map(link -> transformLink(link, originUTM33, network.getFactory()))
                 .filter(link -> isCoveredBy(link, bounds))
-                .collect(NetworkUtils.getCollector());
+                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
 
         // var linkToUnsimplifiedLinks = NetworkUnsimplifier.unsimplifyNetwork(filteredNetwork, osmFile, "EPSG:25833");
 

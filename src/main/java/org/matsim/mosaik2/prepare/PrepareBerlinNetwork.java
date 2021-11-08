@@ -24,7 +24,6 @@ import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.network.algorithms.NetworkCleaner;
 import org.matsim.core.network.io.NetworkWriter;
 import org.matsim.core.scenario.ScenarioUtils;
-import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
@@ -167,8 +166,6 @@ public class PrepareBerlinNetwork {
         for (var link : linksToAdd) {
             network.addLink(link);
         }
-
-        new NetworkWriter(network).write("C:/Users/Janekdererste/Desktop/berlin-test.xml.gz");
     }
 
     private static PreparedGeometry getBerlinShape(Path stateShapeFile) {

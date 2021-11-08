@@ -1,15 +1,12 @@
 package org.matsim.mosaik2.chemistryDriver;
 
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.collections.Tuple;
-import visad.browser.Convert;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;

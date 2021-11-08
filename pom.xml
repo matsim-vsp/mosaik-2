@@ -72,20 +72,7 @@
             </exclusions>
         </dependency>
 
-        <!-- netcdf support -->
-        <dependency>
-            <groupId>edu.ucar</groupId>
-            <artifactId>cdm</artifactId>
-            <version>5.0.0</version>
-            <scope>compile</scope>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
 
-            </exclusions>
-        </dependency>
 
         <dependency>
             <groupId>junit</groupId>
@@ -112,23 +99,11 @@
             <version>8.4.3</version>
         </dependency>
 
-        <!-- https://mvnrepository.com/artifact/edu.ucar/netcdf -->
         <dependency>
             <groupId>edu.ucar</groupId>
-            <artifactId>netcdf</artifactId>
-            <version>4.2</version>
-
-            <exclusions>
-                <exclusion>
-                    <groupId>org.slf4j</groupId>
-                    <artifactId>slf4j-log4j12</artifactId>
-                </exclusion>
-                <exclusion>
-                    <groupId>log4j</groupId>
-                    <artifactId>log4j</artifactId>
-                </exclusion>
-            </exclusions>
-
+            <artifactId>cdm-core</artifactId>
+            <version>5.4.2</version>
+            <scope>compile</scope>
         </dependency>
 
     </dependencies>
@@ -219,6 +194,12 @@
         <repository>
             <id>SBB</id>
             <url>https://schweizerischebundesbahnen.bintray.com/simba.mvn</url>
+        </repository>
+
+        <repository>
+            <id>unidata-all</id>
+            <name>Unidata All</name>
+            <url>https://artifacts.unidata.ucar.edu/repository/unidata-all/</url>
         </repository>
     </repositories>
 

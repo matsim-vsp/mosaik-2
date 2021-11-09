@@ -16,10 +16,6 @@ public class MergeBackgroundAndTrafficEmissions {
     // the date of the stuttgart run. This date is chosen by the team of LUH
     private static final LocalDateTime dateOfStudy = LocalDateTime.of(2018, 7, 8, 0, 0);
 
-    // the background emissions are from 2015. Since the week days have other dates than 2018 we have picked this date which is also
-    // a sunday during summer. Since we are simulating 48 hours. We will also have a workday within the PALM simulation run.
-    private static final LocalDateTime dateOfBackgroundEmissions = LocalDateTime.of(2015, 6, 5, 0, 0);
-
     @Parameter(names = "-backgroundFile", required = true)
     private String backgroundFile;
 
@@ -38,18 +34,10 @@ public class MergeBackgroundAndTrafficEmissions {
 
     void merge() {
 
-        var fromTime = getSecondsSinceBeginningOfYear(dateOfBackgroundEmissions);
-        var toTime = fromTime + 47 * 3600; // take 48 hours (starting at 0 I guess)
+        var backgroundEmissions = PalmChemistryInputReader.read(this.backgroundFile);
+        var trafficEmissions = PalmChemistryInputReader.read(this.trafficFile);
 
-        var fromTimeIndex = (int) fromTime / 3600;
-        var toTimeIndex = (int) toTime / 3600;
-        var rawBackgroundEmissions = PalmChemistryInputReader.read(this.backgroundFile, fromTimeIndex, toTimeIndex);
-
-        var backgroundEmissions = setTimesRelativeToDay(rawBackgroundEmissions);
-
-        var trafficEmissions = PalmChemistryInputReader.read(this.trafficFile, 0, Integer.MAX_VALUE);
-
-        TimeBinMap<Map<String, Raster>> mergeResult = new TimeBinMap<>(rawBackgroundEmissions.getBinSize(), 0);
+        TimeBinMap<Map<String, Raster>> mergeResult = new TimeBinMap<>(backgroundEmissions.getBinSize(), 0);
 
         // merge the values
         for (TimeBinMap.TimeBin<Map<String, Raster>> backgroundEmissionsTimeBin : backgroundEmissions.getTimeBins()) {
@@ -78,26 +66,5 @@ public class MergeBackgroundAndTrafficEmissions {
         }
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, mergeResult, dateOfStudy);
-    }
-
-    static TimeBinMap<Map<String, Raster>> setTimesRelativeToDay(TimeBinMap<Map<String, Raster>> source) {
-        TimeBinMap<Map<String, Raster>> result = new TimeBinMap<>(source.getBinSize(), 0); // we start at 0
-
-        for (var sourceBin : source.getTimeBins()) {
-
-            var newTime = sourceBin.getStartTime() - source.getStartTime();
-            var copyBin = result.getTimeBin(newTime);
-            copyBin.setValue(sourceBin.getValue());
-        }
-
-        return result;
-    }
-
-    static long getSecondsSinceBeginningOfYear(LocalDateTime date) {
-
-        var year = date.getYear();
-        var beginningOfYear = LocalDateTime.of(year, 1, 1, 0, 0);
-        var duration = Duration.between(beginningOfYear, date);
-        return duration.getSeconds();
     }
 }

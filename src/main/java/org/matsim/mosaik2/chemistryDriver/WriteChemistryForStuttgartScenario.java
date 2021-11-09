@@ -10,15 +10,6 @@ import java.util.Map;
 
 public class WriteChemistryForStuttgartScenario {
 
-    private static final Map<Pollutant, String> pollutants = Map.of(
-            Pollutant.NO2, "NO2",
-            Pollutant.CO2_TOTAL, "CO2",
-            Pollutant.PM, "PM10",
-            Pollutant.PM_non_exhaust, "PM10",
-            Pollutant.CO, "CO",
-            Pollutant.NOx, "NOx"
-    );// NO is missing for now, it would have to be calculated from NOx - NO2
-
     @Parameter(names = "-n", required = true)
     private String networkFile = "";
 
@@ -83,7 +74,7 @@ public class WriteChemistryForStuttgartScenario {
 
     void write(Raster.Bounds bounds, double cellSize, String outputFileName) {
 
-        var nameConverter = new PollutantToPalmNameConverter(Map.of(Pollutant.NO2, "NO2", Pollutant.NOx, "NOx", Pollutant.PM, "PM10"));
+        var nameConverter = new PollutantToPalmNameConverter(Map.of(Pollutant.NO2, "NO2", Pollutant.NOx, "NOx", Pollutant.PM, "PM10", Pollutant.PM_non_exhaust, "PM10"));
         // everything is in EPSG:25832
         var transformation = new IdentityTransformation();
 

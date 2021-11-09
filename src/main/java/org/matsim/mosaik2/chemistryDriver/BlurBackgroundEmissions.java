@@ -5,12 +5,10 @@ import com.beust.jcommander.Parameter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math3.util.CombinatoricsUtils;
 import org.matsim.contrib.analysis.time.TimeBinMap;
-import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.collections.Tuple;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,7 +23,8 @@ public class BlurBackgroundEmissions {
     // a sunday during summer. Since we are simulating 48 hours. We will also have a workday within the PALM simulation run.
     private static final LocalDateTime dateOfBackgroundEmissions = LocalDateTime.of(2015, 6, 5, 0, 0);
 
-    private static final Set<String> pollutants = Set.of("NO2", "NOx", "PM10");
+    private static final Set<String> pollutants = Set.of("NO2", "NO", "PM10");
+   //private static final Set<String> pollutants = Set.of("NO2"); // use only one pollutant for debugging
 
     @Parameter(names = "-input", required = true)
     private String input;
@@ -47,6 +46,7 @@ public class BlurBackgroundEmissions {
 
         var fromTime = getSecondsSinceBeginningOfYear(dateOfBackgroundEmissions);
         var toTime = fromTime + 47 * 3600; // take 48 hours (starting at 0 I guess)
+        //var toTime = fromTime + 1 * 3600; // take one hour for debugging
 
         var fromTimeIndex = (int) fromTime / 3600;
         var toTimeIndex = (int) toTime / 3600;
@@ -62,7 +62,7 @@ public class BlurBackgroundEmissions {
             var blurredValue = timeBin.getValue().entrySet().stream()
                     .filter(entry -> pollutants.contains(entry.getKey()))
                     .map(entry -> {
-                        var blurredRaster = blur(entry.getValue(), radius);
+                        var blurredRaster = blurMultipleTimes(entry.getValue(), radius);
                         return Tuple.of(entry.getKey(), blurredRaster);
                     })
                     .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
@@ -72,6 +72,17 @@ public class BlurBackgroundEmissions {
         }
 
         PalmChemistryInput2.writeNetCdfFile(output, result, dateOfStudy);
+    }
+
+    static Raster blurMultipleTimes(Raster raster, int radius) {
+
+        var result = raster;
+
+        for (int i = 0; i < 100; i++) {
+            result = blur(result, radius);
+        }
+
+        return result;
     }
 
     static Raster blur(Raster raster, int radius) {

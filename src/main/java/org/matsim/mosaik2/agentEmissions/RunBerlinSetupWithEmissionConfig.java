@@ -1,22 +1,16 @@
 package org.matsim.mosaik2.agentEmissions;
 
-import com.beust.jcommander.JCommander;
-import com.beust.jcommander.Parameter;
-import org.apache.commons.lang3.StringUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
-import org.matsim.api.core.v01.Id;
-import org.matsim.api.core.v01.Scenario;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
-import org.matsim.api.core.v01.network.Node;
-import org.matsim.api.core.v01.population.Activity;
 import org.matsim.contrib.emissions.HbefaVehicleCategory;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
 import org.matsim.contrib.emissions.events.ColdEmissionEvent;
 import org.matsim.contrib.emissions.events.WarmEmissionEvent;
+import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
 import org.matsim.core.api.experimental.events.EventsManager;
 import org.matsim.core.config.groups.ControlerConfigGroup;
 import org.matsim.core.config.groups.QSimConfigGroup;
@@ -30,11 +24,7 @@ import org.matsim.core.controler.listener.BeforeMobsimListener;
 import org.matsim.core.controler.listener.ShutdownListener;
 import org.matsim.core.events.EventsManagerImpl;
 import org.matsim.core.events.algorithms.EventWriter;
-import org.matsim.core.network.NetworkUtils;
-import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
-import org.matsim.core.utils.geometry.transformations.TransformationFactory;
-import org.matsim.mosaik2.chemistryDriver.NetworkUnsimplifier;
 import org.matsim.mosaik2.events.FilterEventsWriter;
 import org.matsim.run.RunBerlinScenario;
 import org.matsim.vehicles.VehicleUtils;
@@ -44,72 +34,17 @@ import org.matsim.vis.snapshotwriters.SnapshotWritersModule;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.nio.file.Paths;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.HashSet;
+import java.util.Set;
 
-public class RunBerlinSetUp {
-
-    private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
-    private static final String configPath = "matsim/scenarios/countries/de/berlin/berlin-v5.5-1pct/input/berlin-v5.5-1pct.config.xml";
-
-    private static class InputPaths {
-
-        @Parameter(names = "-config", required = true)
-        private String config;
-
-        @Parameter(names = "-networkFolder")
-        private String networkAndSchedule;
-
-        boolean hasNetworkAndSchedule() {
-            return !StringUtils.isBlank(networkAndSchedule);
-        }
-    }
-
-    private static class OutputPath {
-
-        @Parameter(names = "-output")
-        private String outputPath;
-    }
-
-    private static String[] createInputArgsForBerlinScenario(InputPaths inputPaths) {
-
-        Map<String, String> result = new HashMap<>();
-        result.put("", inputPaths.config);
-
-        if (inputPaths.hasNetworkAndSchedule()) {
-            result.put("--config:network.inputNetworkFile", Paths.get(inputPaths.config).resolve("berlin-5.5.2-network-with-geometries.xml.gz").toString());
-            result.put("--config:transit.transitScheduleFile", Paths.get(inputPaths.config).resolve("berlin-5.5.2-schedule-with-geometries.xml.gz").toString());
-            result.put("--config:transit.vehiclesFile", Paths.get(inputPaths.config).resolve("berlin-5.5.2-transit-vehicles-with-geometries.xml.gz").toString());
-        }
-        return result.entrySet().stream()
-                .map(entry -> List.of(entry.getKey(), entry.getValue()))
-                .flatMap(Collection::stream)
-                .toArray(String[]::new);
-    }
+public class RunBerlinSetupWithEmissionConfig {
 
     public static void main(String[] args) {
 
-        var sharedSvn = new Utils.SharedSvnArg();
-        var configPath = new InputPaths();
-        var outputPath = new OutputPath();
-
-        JCommander.newBuilder()
-                .addObject(sharedSvn)
-                .addObject(configPath)
-                .addObject(outputPath)
-                .build().parse(args);
-
-        var emissionsConfig = Utils.createUpEmissionsConfigGroup(sharedSvn.getSharedSvn());
-        var positionEmissionNetcdfConfig = Utils.createNetcdfEmissionWriterConfigGroup();
-        var config = RunBerlinScenario.prepareConfig(
-                createInputArgsForBerlinScenario(configPath),
-                emissionsConfig, positionEmissionNetcdfConfig);
-
+        var emissionConfig = new EmissionsConfigGroup();
+        var config = RunBerlinScenario.prepareConfig(args, emissionConfig);
         config.global().setCoordinateSystem("EPSG:25833");
-
         config.controler().setOverwriteFileSetting(OutputDirectoryHierarchy.OverwriteFileSetting.deleteDirectoryIfExists);
-        if (!StringUtils.isBlank(outputPath.outputPath))
-            config.controler().setOutputDirectory(outputPath.outputPath);
 
         // tell the default event writer to not write any events
         config.controler().setWriteEventsInterval(0);
@@ -119,13 +54,8 @@ public class RunBerlinSetUp {
         Utils.applySnapshotSettings(config);
 
         var scenario = RunBerlinScenario.prepareScenario(config);
-
-        // work with UTM-33
-        //applyCoordinateTransformation(scenario, transformation);
         Utils.applyNetworkAttributes(scenario.getNetwork());
-
-        // we only want to generate postion events in the filter area
-        applyNetworkFilter(scenario.getNetwork());
+        RunBerlinSetupWithEmissionConfig.applyNetworkFilter(scenario.getNetwork());
         config.qsim().setFilterSnapshots(QSimConfigGroup.FilterSnapshots.withLinkAttributes);
 
         // add engine information
@@ -146,7 +76,6 @@ public class RunBerlinSetUp {
         // the following two options make vehicles travel on the center of a link without offsett to the right
         config.qsim().setLinkWidthForVis(0);
         scenario.getNetwork().setEffectiveLaneWidth(0);
-
 
         var controler = RunBerlinScenario.prepareControler(scenario);
 
@@ -176,29 +105,6 @@ public class RunBerlinSetUp {
                 netCdfName.toString(),
                 vehicleIndexName.toString(),
                 config.controler().getOutputDirectory() + "/position-emission-no2.csv");
-    }
-
-    private static void applyCoordinateTransformation(Scenario scenario, CoordinateTransformation transformation) {
-        scenario.getNetwork().getNodes().values().parallelStream()
-                .forEach(node -> node.setCoord(transformation.transform(node.getCoord())));
-
-        scenario.getPopulation().getPersons().values().parallelStream()
-                .flatMap(person -> person.getPlans().stream())
-                .flatMap(plan -> plan.getPlanElements().stream())
-                .filter(element -> element instanceof Activity)
-                .map(element -> (Activity) element)
-                .filter(activity -> activity.getCoord() != null)
-                .forEach(activity -> activity.setCoord(transformation.transform(activity.getCoord())));
-
-        if (!scenario.getActivityFacilities().getFacilities().isEmpty()) {
-            scenario.getActivityFacilities().getFacilities().values().parallelStream()
-                    .filter(facility -> facility.getCoord() != null)
-                    .forEach(facility -> facility.setCoord(transformation.transform(facility.getCoord())));
-        }
-
-        scenario.getTransitSchedule().getFacilities().values().parallelStream()
-                .filter(transitStopFacility -> transitStopFacility.getCoord() != null)
-                .forEach(tf -> tf.setCoord(transformation.transform(tf.getCoord())));
     }
 
     private static void applyNetworkFilter(Network network) {
@@ -265,9 +171,9 @@ public class RunBerlinSetUp {
             var normalWriter = new FilterEventsWriter(
                     e -> (
                             !e.getEventType().equals(PositionEvent.EVENT_TYPE)
-                            && !e.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE)
-                            && !e.getEventType().equals(WarmEmissionEvent.EVENT_TYPE)
-                            && !e.getEventType().equals(ColdEmissionEvent.EVENT_TYPE)
+                                    && !e.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE)
+                                    && !e.getEventType().equals(WarmEmissionEvent.EVENT_TYPE)
+                                    && !e.getEventType().equals(ColdEmissionEvent.EVENT_TYPE)
 
                     ), eventsFile);
 
@@ -298,4 +204,5 @@ public class RunBerlinSetUp {
             }
         }
     }
+
 }

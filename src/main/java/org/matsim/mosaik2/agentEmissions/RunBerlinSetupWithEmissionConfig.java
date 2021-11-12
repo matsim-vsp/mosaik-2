@@ -52,11 +52,12 @@ public class RunBerlinSetupWithEmissionConfig {
         config.controler().setLastIteration(0);
 
         Utils.applySnapshotSettings(config);
+        config.qsim().setFilterSnapshots(QSimConfigGroup.FilterSnapshots.withLinkAttributes);
 
         var scenario = RunBerlinScenario.prepareScenario(config);
         Utils.applyNetworkAttributes(scenario.getNetwork());
         RunBerlinSetupWithEmissionConfig.applyNetworkFilter(scenario.getNetwork());
-        config.qsim().setFilterSnapshots(QSimConfigGroup.FilterSnapshots.withLinkAttributes);
+
 
         // add engine information
         for (var vehicleType : scenario.getVehicles().getVehicleTypes().values()) {

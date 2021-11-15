@@ -24,6 +24,9 @@ public class PositionEmissionsToNetCdfPostprocessing {
 	@Parameter(names = "-vehicleIndexOutput", required = true)
 	private String vehicleIndexOutput;
 
+	@Parameter(names = "-csvOutput", required = true)
+	private String csvOutput;
+
 	public static void main(String[] args) throws IOException {
 
 		var processor = new PositionEmissionsToNetCdfPostprocessing();
@@ -48,11 +51,12 @@ public class PositionEmissionsToNetCdfPostprocessing {
 		var numberOfVehicles = counterHandler.getMaxVehCount();
 		var numberOfTimesteps = counterHandler.getTimestepCount();
 		var pollutants = Map.of(
+				Pollutant.NOx, "NOx",
 				Pollutant.NO2, "NO2",
 				Pollutant.CO2_TOTAL, "CO2",
-				Pollutant.PM, "PM10",
 				Pollutant.CO, "CO",
-				Pollutant.NOx, "NOx"
+				Pollutant.PM, "PM10",
+				Pollutant.PM_non_exhaust, "PM10_non_exhaust"
 		);
 
 		PositionEmissionNetcdfModule.NetcdfWriterHandler netCdfWriter = null;
@@ -73,6 +77,8 @@ public class PositionEmissionsToNetCdfPostprocessing {
 				netCdfWriter.getVehicleIdIndex().writeToFile(vehicleIndexOutput);
 			}
 		}
+
+		AgentEmissionNetCdfReader.translateToCsv(netCdfOutput, vehicleIndexOutput, csvOutput);
 	}
 
 	private static class VehicleCounter implements BasicEventHandler {

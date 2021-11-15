@@ -8,10 +8,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
 import org.matsim.api.core.v01.Id;
 import org.matsim.vehicles.Vehicle;
-import ucar.ma2.ArrayDouble;
-import ucar.ma2.ArrayInt;
-import ucar.ma2.DataType;
-import ucar.ma2.InvalidRangeException;
+import ucar.ma2.*;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
 
@@ -50,14 +47,7 @@ public class AgentEmissionNetCdfReader {
                 input.vehicleIndexFile,
                 input.outputFile
         );
-        
-      /*  translateToCsv(
-                "C:/Users/Janekdererste/Desktop/berlin-position-emission-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions.nc",
-                "C:/Users/Janekdererste/Desktop/berlin-position-emission-test/ITERS/it.0/berlin-v5.5-1pct.0.position-emissions-vehicleIdIndex.csv",
-                "C:/Users/Janekdererste/Desktop/berlin-position-emission-test/berlin-v5.5-1pct.0.position-emissions.csv"
-                );
-
-       */
+        log.info("Done.");
     }
 
     public static Set<String> readToRecord(String filename, String indexFilename) {
@@ -92,9 +82,11 @@ public class AgentEmissionNetCdfReader {
                     throw new RuntimeException(e);
                 }
             });
+            log.info("Done reading.");
         } catch (IOException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
+        log.info("Done translating.");
     }
 
     public static void read(String filename, String indexFilename, Consumer<AgentEmissionRecord> consumer) {
@@ -103,25 +95,25 @@ public class AgentEmissionNetCdfReader {
 
         try (var file = NetcdfFile.open(filename)) {
 
-            List<Double> times = toDoubleList(file.findVariable("time"));
-            List<Integer> numberOfVehiclesPerTimestep = toIntList(file.findVariable("number_of_vehicles") );
+            float[] times = toFloatArray(file.findVariable("time"));
+            int[] numberOfVehiclesPerTimestep = toInArray(file.findVariable("number_of_vehicles") );
 
             Variable vehicleId = file.findVariable("vehicle_id");
             Variable xVar = file.findVariable("x");
             Variable yVar = file.findVariable("y");
             Variable no2Var = file.findVariable("NO2");
 
-            for (int ti = 0; ti < times.size(); ti++) {
+            for (int ti = 0; ti < times.length; ti++) {
 
-                var time = times.get(ti);
-                var numberOfVehicles = numberOfVehiclesPerTimestep.get(ti);
+                var time = times[ti];
+                var numberOfVehicles = numberOfVehiclesPerTimestep[ti];
 
                 var position = new int[] {ti, 0};
                 var shape = new int[] {1, numberOfVehicles};
                 ArrayInt.D2 vehicleIds = (ArrayInt.D2) vehicleId.read(position, shape);
-                ArrayDouble.D2 x = (ArrayDouble.D2) xVar.read(position, shape);
-                ArrayDouble.D2 y = (ArrayDouble.D2) yVar.read(position, shape);
-                ArrayDouble.D2 no2 = (ArrayDouble.D2) no2Var.read(position, shape);
+                ArrayFloat.D2 x = (ArrayFloat.D2) xVar.read(position, shape);
+                ArrayFloat.D2 y = (ArrayFloat.D2) yVar.read(position, shape);
+                ArrayFloat.D2 no2 = (ArrayFloat.D2) no2Var.read(position, shape);
 
                 for (int vi = 0; vi < numberOfVehicles; vi++) {
 
@@ -137,25 +129,23 @@ public class AgentEmissionNetCdfReader {
                 }
             }
         } catch (IOException | InvalidRangeException e) {
-            e.printStackTrace();
+            throw new RuntimeException(e);
         }
     }
 
-    private static List<Integer> toIntList(Variable oneDimensionalVariable) throws IOException {
+    private static int[] toInArray(Variable oneDimensionalVariable) throws IOException {
 
         if (oneDimensionalVariable.getRank() != 1 || oneDimensionalVariable.getDataType() != DataType.INT)
             throw new IllegalArgumentException("variable was either not one dimensional or not Integer");
 
-        int[] values = (int[]) oneDimensionalVariable.read().copyTo1DJavaArray();
-        return Arrays.stream(values).boxed().collect(Collectors.toList());
+        return (int[]) oneDimensionalVariable.read().copyTo1DJavaArray();
     }
 
-    private static List<Double> toDoubleList(Variable oneDimensionalVariable) throws IOException {
-         if (oneDimensionalVariable.getRank() != 1 || oneDimensionalVariable.getDataType() != DataType.DOUBLE)
+    private static float[] toFloatArray(Variable oneDimensionalVariable) throws IOException {
+         if (oneDimensionalVariable.getRank() != 1 || oneDimensionalVariable.getDataType() != DataType.FLOAT)
             throw new IllegalArgumentException("variable was either not one dimensional or not Double");
 
-         double[] values = (double[]) oneDimensionalVariable.read().copyTo1DJavaArray();
-         return Arrays.stream(values).boxed().collect(Collectors.toList());
+         return (float[]) oneDimensionalVariable.read().copyTo1DJavaArray();
     }
 
     @RequiredArgsConstructor

@@ -6,7 +6,12 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.lang3.StringUtils;
+import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
+import org.matsim.core.utils.geometry.CoordinateTransformation;
+import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
+import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.vehicles.Vehicle;
 import ucar.ma2.*;
 import ucar.nc2.NetcdfFile;
@@ -34,6 +39,10 @@ public class AgentEmissionNetCdfReader {
         String vehicleIndexFile;
         @Parameter(names = "-output", required = true)
         String outputFile;
+        @Parameter(names = "-targetCrs")
+        String targetCrs;
+        @Parameter(names = "-sourceCrs")
+        String sourceCrs;
     }
     
     public static void main(String... args) {
@@ -42,10 +51,14 @@ public class AgentEmissionNetCdfReader {
         JCommander.newBuilder().addObject(input).build().parse(args);
         log.info("translating from netcdf to csv");
 
+        var transformation = (StringUtils.isBlank(input.sourceCrs) || StringUtils.isBlank(input.targetCrs)) ?
+                new IdentityTransformation() : TransformationFactory.getCoordinateTransformation(input.sourceCrs, input.targetCrs);
+
         translateToCsv(
                 input.netCdfFile,
                 input.vehicleIndexFile,
-                input.outputFile
+                input.outputFile,
+                transformation
         );
         log.info("Done.");
     }
@@ -66,6 +79,10 @@ public class AgentEmissionNetCdfReader {
     }
 
     public static void translateToCsv(String filename, String indexFilename, String csvOutput) {
+        translateToCsv(filename, indexFilename, csvOutput, new IdentityTransformation());
+    }
+
+    public static void translateToCsv(String filename, String indexFilename, String csvOutput, CoordinateTransformation transformation) {
 
         var counter = new AtomicInteger();
 
@@ -77,7 +94,9 @@ public class AgentEmissionNetCdfReader {
                     if (count % 100000 == 0) {
                         log.info("Record # " + count);
                     }
-                    printer.printRecord(record.getTime(), record.getVehicleId(), record.getX(), record.getY(), record.getNo2());
+
+                    var transformed = transformation.transform(new Coord(record.getX(), record.getY()));
+                    printer.printRecord(record.getTime(), record.getVehicleId(), transformed.getX(), transformed.getY(), record.getNo2());
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }

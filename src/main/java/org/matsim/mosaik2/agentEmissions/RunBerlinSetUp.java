@@ -213,7 +213,7 @@ public class RunBerlinSetUp {
                 .forEach(link -> link.getAttributes().putAttribute(SnapshotWritersModule.GENERATE_SNAPSHOT_FOR_LINK_KEY, false));
     }
 
-    private static PreparedGeometry createBoundingBox() {
+    public static PreparedGeometry createBoundingBox() {
 
         var geometry = new GeometryFactory().createPolygon(
                 new Coordinate[]{

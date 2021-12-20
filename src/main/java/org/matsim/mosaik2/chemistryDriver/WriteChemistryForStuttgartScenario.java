@@ -90,6 +90,7 @@ public class WriteChemistryForStuttgartScenario {
                 .timeBinSize(3600)
                 .date(LocalDateTime.of(2018, 7, 8, 0, 0))
                 .numberOfDays(2)
+                .offset(2)
                 .build();
 
         converter.write();

@@ -21,7 +21,9 @@ public class AverageBackgroundEmissions {
 
     // the background emissions are from 2015. Since the week days have other dates than 2018 we have picked this date which is also
     // a sunday during summer. Since we are simulating 48 hours. We will also have a workday within the PALM simulation run.
-    private static final LocalDateTime dateOfBackgroundEmissions = LocalDateTime.of(2015, 6, 5, 0, 0);
+    // since we are simulating the run in utc time, we have a two hour offset compared to the utc-000 time zone. Hence, the
+    // 2 hour value
+    private static final LocalDateTime dateOfBackgroundEmissions = LocalDateTime.of(2015, 6, 5, 2, 0);
 
     private static final Set<String> pollutants = Set.of("NO2", "NO", "PM10");
     //private static final Set<String> pollutants = Set.of("NO2"); // use only one pollutant for debugging

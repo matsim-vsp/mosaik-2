@@ -13,7 +13,6 @@ import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.Map;
 
 @Log4j2
@@ -41,8 +40,10 @@ public class FullFeaturedConverter {
 
     private final int numberOfDays;
 
+    private final int offset;
+
     @Builder
-    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, LocalDateTime date, int numberOfDays) {
+    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, LocalDateTime date, int numberOfDays, int offset) {
         this.networkFile = networkFile;
         this.emissionEventsFile = emissionEventsFile;
         this.outputFile = outputFile;
@@ -54,6 +55,7 @@ public class FullFeaturedConverter {
         this.pollutantConverter = pollutantConverter;
         this.date = date == null ? LocalDateTime.of(2017, 7, 31, 0, 0) : date;
         this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
+        this.offset = offset;
     }
 
     public void write() {
@@ -89,12 +91,12 @@ public class FullFeaturedConverter {
         //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
         addNoIfPossible(rasteredEmissions);
 
-        rasteredEmissions = cuttofulldays(rasteredEmissions, numberOfDays);
+        rasteredEmissions = cuttofulldays(rasteredEmissions, numberOfDays, offset);
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
     }
 
-    private static TimeBinMap<Map<String, Raster>> cuttofulldays(TimeBinMap<Map<String, Raster>> rasteredEmissions, int numberOfDays) {
+    private static TimeBinMap<Map<String, Raster>> cuttofulldays(TimeBinMap<Map<String, Raster>> rasteredEmissions, int numberOfDays, int offset) {
 
         TimeBinMap<Map<String, Raster>> result = new TimeBinMap<>(3600);
         for (int day = 0; day < numberOfDays; day++) {
@@ -103,8 +105,11 @@ public class FullFeaturedConverter {
                 // the seconds for the resulting time bin map have to go on through the whole time period
                 var resultSeconds = hour * 3600 + 86400 * day;
                 // the input time marks the time bin from which we take emissions. This should always be within the first 24hours
-                // since we are copying the first 24h to the consecutive days.
-                var inputSeconds = hour * 3600;
+                // since we are copying the first 24h to the consecutive days. Also, since the stuttgart palm run runs with
+                // global utc time, we have to incorporate an offset of 2hours. We start with the matsim output
+                // from 2am and append the first two hours of input to the end of the day. This is really messy, but it was
+                // necessary because this became apparent only in the last minute when the evaluation run had to be started.
+                var inputSeconds = getInputSeconds(hour, offset);
                 var bin = rasteredEmissions.getTimeBin(inputSeconds);
                 Map<String, Raster> value = bin.hasValue() ? bin.getValue() : Map.of();
                 result.getTimeBin(resultSeconds).setValue(value);
@@ -112,6 +117,17 @@ public class FullFeaturedConverter {
         }
 
         return result;
+    }
+
+    /**
+     * This really kinda hard codes the 24h thing into this converter. On the other hand, maybe that's just what we want
+     */
+    private static int getInputSeconds(int hour, int offset) {
+        if (hour < 24 - offset) {
+            return (hour + offset) * 3600;
+        } else {
+            return (hour - 24 + offset) * 3600;
+        }
     }
 
     private static boolean isCoveredBy(Link link, Raster.Bounds bounds) {

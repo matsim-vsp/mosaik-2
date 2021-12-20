@@ -193,6 +193,6 @@ public class PalmChemistryInput2 {
         var duration = Duration.ofSeconds((long)time);
         var dateTime = date.plus(duration);
 
-        return String.format("%04d-%02d-%02d %02d:%02d:%02d +001", dateTime.getYear(), dateTime.getMonthValue(), dateTime.getDayOfMonth(), dateTime.getHour(), dateTime.getMinute(), dateTime.getSecond());
+        return String.format("%04d-%02d-%02d %02d:%02d:%02d +00", dateTime.getYear(), dateTime.getMonthValue(), dateTime.getDayOfMonth(), dateTime.getHour(), dateTime.getMinute(), dateTime.getSecond());
     }
 }

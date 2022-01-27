@@ -3,8 +3,13 @@ package org.matsim.mosaik2.analysis;
 import org.apache.commons.math3.special.Erf;
 import org.junit.Test;
 import org.matsim.api.core.v01.Coord;
+import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.analysis.spatial.SpatialInterpolation;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.geotools.MGC;
+
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -35,5 +40,25 @@ public class SmoothingRadiusEstimateTest {
 
         // we don't have old code for the derived function. This compares the result to a calculation by hand.
         assertEquals(1.325E-42, result, 1.0E-42);
+    }
+
+    @Test
+    public void estimateR() {
+
+        // now, take the emissions and values of the previous example for estimating R
+        var emissions = Map.of(getLink("link", from, to), E);
+        var xj = 6.593662989359226E-45;
+
+        var result = SmoothingRadiusEstimate.estimateR(emissions, receiverPoint, 20, xj);
+
+        assertEquals(R, result, 0.01);
+    }
+
+    private static Link getLink(String id, Coord from, Coord to) {
+
+        var network = NetworkUtils.createNetwork();
+        var fromNode = network.getFactory().createNode(Id.createNodeId(id + "_from"), from);
+        var toNode = network.getFactory().createNode(Id.createNodeId(id + "_to"), to);
+        return network.getFactory().createLink(Id.createLinkId(id), fromNode, toNode);
     }
 }

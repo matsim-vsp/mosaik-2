@@ -1,15 +1,63 @@
 package org.matsim.mosaik2.analysis;
 
+import lombok.extern.log4j.Log4j2;
 import org.apache.commons.math.MathException;
 import org.apache.commons.math.special.Erf;
 import org.matsim.api.core.v01.Coord;
+import org.matsim.api.core.v01.network.Link;
+
+import java.util.Map;
 
 /**
  * This class is going to be used to estimate the smoothing radius R for the spatial distribution of emissions explained
  * in https://depositonce.tu-berlin.de/handle/11303/6266 Appendix A. The Methods are named according to the naming in the
  * Thesis. Hence the cryptic names like A, B and so on.
  */
+@Log4j2
 public class SmoothingRadiusEstimate {
+
+    private static final double THRESHOLD =  10E-6;
+
+    static double estimateR(Map<Link, Double> emissions, Coord receiverPoint, final double initialR, double xj) {
+
+        double Rn = initialR;
+        double Rprev;
+
+        int counter = 0;
+
+        do {
+            Rprev = Rn;
+            Rn = Rn(emissions, receiverPoint, Rprev, xj);
+            counter++;
+
+            log.info(Rn);
+        } while(Math.abs(Rn - Rprev) > THRESHOLD);
+
+        log.info("took " + counter + " iterations.");
+        return Rn;
+    }
+
+    static double Rn(Map<Link, Double> emissions, Coord receiverPoint, double Rprev, double xj) {
+        return Rprev - F(emissions, receiverPoint, Rprev, xj) / FDerived(emissions, receiverPoint, Rprev, xj);
+    }
+
+    static double F(Map<Link, Double> emissions, Coord receiverPoint, double R, double xj) {
+
+        var sumWeightedEmissionsAtReceiverPoint = emissions.entrySet().stream()
+                .mapToDouble(e -> f(e.getValue(), e.getKey().getFromNode().getCoord(), e.getKey().getToNode().getCoord(), receiverPoint, R, e.getKey().getLength()))
+                .sum();
+
+        return sumWeightedEmissionsAtReceiverPoint - xj;
+    }
+
+    static double FDerived(Map<Link, Double> emissions, Coord receiverPoint, double R, double xj) {
+
+        var gradient = emissions.entrySet().stream()
+                .mapToDouble(e -> fDerived(e.getValue(), e.getKey().getFromNode().getCoord(), e.getKey().getToNode().getCoord(), receiverPoint, R, e.getKey().getLength()))
+                .sum();
+
+        return gradient - xj;
+    }
 
     static double f(double E, Coord from, Coord to, Coord receiverPoint, double R, double le) {
 

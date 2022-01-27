@@ -11,51 +11,58 @@ import org.matsim.api.core.v01.Coord;
  */
 public class SmoothingRadiusEstimate {
 
-    double F(double E, double xj, Coord from, Coord to, Coord centroid, double R, double le) {
+    static double f(double E, Coord from, Coord to, Coord receiverPoint, double R, double le) {
 
-        var A = calculateA(from, centroid);
-        var B = calculateB(from, to, centroid);
+        var A = calculateA(from, receiverPoint);
+        var B = calculateB(from, to, receiverPoint);
 
-        return g(E, R, le, A, B) * h(R, le, B) - xj;
+        return g(A, B, E, R, le) * h(B, R, le);
     }
 
-    double FDerived(double E, double xj, Coord from, Coord to, Coord centroid, double R, double le) {
+    static double fDerived(double E, Coord from, Coord to, Coord receiverPoint, double R, double le) {
 
-        var A = calculateA(from, centroid);
-        var B = calculateB(from, to, centroid);
+        var A = calculateA(from, receiverPoint);
+        var B = calculateB(from, to, receiverPoint);
 
-        return gDerived(E, A, B, R, le) * h(R, le, B) + g(E, R, le, A, B) * hDerived();
+        return gDerived(A, B, E, R, le) * h(B, R, le) + g(A, B, E, R, le) * hDerived(B, R, le);
     }
 
-    double g(double E, double R, double le, double A, double B) {
+    private static double g(double A, double B, double E, double R, double le) {
 
-        var middlePart = calculateMiddlePart(R, le); // TODO find better variable name
-        var exponent = calculateExponent(A, B, R, le);
+        var C = calculateC(A, B, R, le);
+        var D = calculateD(le);
 
-        return E * Math.exp(exponent) * middlePart;
+        return E * Math.exp(C * -1) * R * D;
     }
 
-    double gDerived(double E, double A, double B, double R, double le) {
+    private static double gDerived(double A, double B, double E, double R, double le) {
 
-        var exponent = calculateExponent(A, B, R, le);
-        var circleStuff = (Math.sqrt(Math.PI)) / 2 / le;
+        var C = calculateC(A, B, R, le);
+        var D = calculateD(le);
 
-        return circleStuff * E * 2 * exponent * Math.exp(exponent * (-1)) + circleStuff * E * Math.exp(exponent * (-1));
+        return E * D * 2 * C * Math.exp(C * -1) + E * D * Math.exp(C * -1);
     }
 
-    double h(double R, double le, double B) {
+    private static double h(double B, double R, double le) {
 
-        var D = calculateD(B, R,le);
-        var E = calculateE(B, R, le);
+        var F = calculateF(B, R, le);
+        var G = calculateG(B, R, le);
 
-        return erf(D) - erf(E);
+        return erf(F) - erf(G);
     }
 
-    double hDerived() {
-        throw new RuntimeException("h' is not yet implemented");
+    private static double hDerived(double B, double R, double le) {
+
+        var G = calculateG(B, R, le);
+        var H = calculateH(B, R, le);
+        var I = calculateI(B, R, le);
+        var J = 2 * B / (Math.sqrt(Math.PI) * le * R*R);
+
+        return -1 * H * Math.exp(I * -1) + J * Math.exp(G*G * -1);
     }
 
-    private double calculateA(Coord from, Coord centroid) {
+
+    private static double calculateA(Coord from, Coord centroid) {
 
         var x0 = centroid.getX();
         var y0 = centroid.getY();
@@ -65,7 +72,7 @@ public class SmoothingRadiusEstimate {
         return (x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0);
     }
 
-    private double calculateB(Coord from, Coord to, Coord centroid) {
+    private static double calculateB(Coord from, Coord to, Coord centroid) {
 
         var x0 = centroid.getX();
         var y0 = centroid.getY();
@@ -77,23 +84,31 @@ public class SmoothingRadiusEstimate {
         return (x2 - x1) * (x1 - x0) + (y2 - y1) * (y1 - y0);
     }
 
-    private double calculateExponent(double A, double B,  double R, double le) {
-        return -1 * (A - B*B / le*le) / R*R;
+    private static double calculateC(double A, double B, double R, double le) {
+        return (A - B*B / (le*le)) / R*R;
     }
 
-    private double calculateE(double B, double R, double le) {
+    private static double calculateD(double le) {
+        return Math.sqrt(Math.PI) / 2 / le;
+    }
+
+    private static double calculateF(double B, double R, double le) {
+        return le / R + B / le * R;
+    }
+
+    private static double calculateG(double B, double R, double le) {
         return B / le / R;
     }
 
-    private double calculateD(double B, double R, double le) {
-        return le / R + B / le / R;
+    private static double calculateH(double B, double R, double le) {
+        return 2 * (B + le*le) / (Math.sqrt(Math.PI) * le * R*R);
     }
 
-    private double calculateMiddlePart(double R, double le) {
-        return R * Math.sqrt(Math.PI) / le / 2; // TODO find better variable name, pre-compute sqrt(PI)? or wil the compiler do it for us?
+    private static double calculateI(double B, double R, double le) {
+        return (B + le*le) * (B + le*le) / (le*le * R*R);
     }
 
-    private double erf(double x) {
+    private static double erf(double x) {
         try {
             return Erf.erf(x);
         } catch (MathException e) {

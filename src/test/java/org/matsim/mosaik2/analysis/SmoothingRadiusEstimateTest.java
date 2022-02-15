@@ -51,7 +51,7 @@ public class SmoothingRadiusEstimateTest {
 
         var result = SmoothingRadiusEstimate.estimateR(emissions, receiverPoint, 20, xj);
 
-        assertEquals(R, result, 0.01);
+        assertEquals(R, result, 0.1);
     }
 
     private static Link getLink(String id, Coord from, Coord to) {

@@ -16,11 +16,11 @@ import java.util.stream.Collectors;
 @Log4j2
 public class PalmChemistryInputReader {
 
-    static TimeBinMap<Map<String, Raster>> read(String filename) {
+    public static TimeBinMap<Map<String, Raster>> read(String filename) {
         return read(filename, 0, Integer.MAX_VALUE);
     }
 
-    static TimeBinMap<Map<String, Raster>> read(String filename, int fromTimeIndex, int toTimeIndex) {
+    public static TimeBinMap<Map<String, Raster>> read(String filename, int fromTimeIndex, int toTimeIndex) {
 
         log.info("Try opening NetcdfFile at: " + filename);
         try (var file = NetcdfFile.open(filename)) {

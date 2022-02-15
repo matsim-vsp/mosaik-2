@@ -16,7 +16,7 @@ import java.util.Map;
 @Log4j2
 public class SmoothingRadiusEstimate {
 
-    private static final double THRESHOLD =  10E-6;
+    private static final double THRESHOLD =  10E-2;
 
     static double estimateR(Map<Link, Double> emissions, Coord receiverPoint, final double initialR, double xj) {
 

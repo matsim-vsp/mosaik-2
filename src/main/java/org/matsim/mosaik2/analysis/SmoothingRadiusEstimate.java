@@ -133,7 +133,7 @@ public class SmoothingRadiusEstimate {
     }
 
     private static double calculateC(double A, double B, double R, double le) {
-        return (A - B*B / (le*le)) / R*R;
+        return (A - B*B / (le*le)) / (R*R);
     }
 
     private static double calculateD(double le) {
@@ -141,7 +141,7 @@ public class SmoothingRadiusEstimate {
     }
 
     private static double calculateF(double B, double R, double le) {
-        return le / R + B / le * R;
+        return le / R + B / le / R;
     }
 
     private static double calculateG(double B, double R, double le) {

@@ -1,7 +1,10 @@
 package org.matsim.mosaik2.analysis;
 
 import lombok.extern.log4j.Log4j2;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.math3.special.Erf;
+import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
@@ -10,7 +13,11 @@ import org.matsim.contrib.analysis.spatial.SpatialInterpolation;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.mosaik2.chemistryDriver.Raster;
+import org.matsim.testcases.MatsimTestUtils;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +25,9 @@ import static org.junit.Assert.*;
 
 @Log4j2
 public class SmoothingRadiusEstimateTest {
+
+    @Rule
+    public MatsimTestUtils testUtils = new MatsimTestUtils();
 
     private final double le = 20;
     private final double E = 10;
@@ -41,15 +51,30 @@ public class SmoothingRadiusEstimateTest {
     public void testWithRaster() {
 
         var bounds = new Raster.Bounds(0,0,110, 110);
-        var raster = new Raster(bounds, 10);
-        var link = getLink("link", new Coord(45, 55), new Coord(65, 55)); // try to put the link into the center of the grid. Spanning 3 cells from centroid to centroid
+        var raster = new Raster(bounds, 2);
+        var link = getLink("link", new Coord(40, 50), new Coord(60, 50)); // try to put the link into the center of the grid. Spanning 3 cells from centroid to centroid
 
-        raster.forEachCoordinate((x, y, value) -> {
-            var receiverPoint =  new Coord(x,y);
-            //var result = SmoothingRadiusEstimate.f(1000, link.getFromNode().getCoord(), link.getToNode().getCoord(), receiverPoint, 10, link.getLength());
-            var result = SpatialInterpolation.calculateWeightFromLine(MGC.coord2Coordinate(link.getFromNode().getCoord()), MGC.coord2Coordinate(link.getToNode().getCoord()), MGC.coord2Coordinate(receiverPoint), 1);
-            log.info(receiverPoint + "\t\t" + result);
-        });
+        raster.setValueForEachCoordinate((x, y) -> SmoothingRadiusEstimate.f(10000., link.getFromNode().getCoord(), link.getToNode().getCoord(), new Coord(x, y), 10, link.getLength()));
+
+        try(var writer = Files.newBufferedWriter(Paths.get(testUtils.getOutputDirectory()).resolve("values.csv")); var printer = CSVFormat.DEFAULT.withHeader("x", "y", "value").print(writer)) {
+
+            raster.forEachCoordinate((x, y, value) -> {
+                try {
+                    log.info(x + " " + y + " " + value + " " + SmoothingRadiusEstimate.f(10000000000., link.getFromNode().getCoord(), link.getToNode().getCoord(), new Coord(x, y), 10, link.getLength()));
+                    printer.printRecord(x, y, value);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        var network = NetworkUtils.createNetwork();
+        network.addNode(link.getFromNode());
+        network.addNode(link.getToNode());
+        network.addLink(link);
+        NetworkUtils.writeNetwork(network, testUtils.getOutputDirectory() + "network.xml");
     }
 
     @Test
@@ -60,7 +85,7 @@ public class SmoothingRadiusEstimateTest {
         for(var coord : receiverPoints) {
             var result = SmoothingRadiusEstimate.f(1E200, from, to, coord, R, 20);
             log.info(coord.toString() + " Weight old: " + SpatialInterpolation.calculateWeightFromLine(MGC.coord2Coordinate(from), MGC.coord2Coordinate(to), MGC.coord2Coordinate(coord), R));
-            //log.info("Distance: " + (coord.getY() - 10) + " Concentration: " + result);
+
         }
     }
 

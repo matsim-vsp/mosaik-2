@@ -19,7 +19,7 @@ public class Raster {
     private final int xLength;
     private final int yLength;
 
-    Raster(Bounds bounds, double cellSize) {
+    public Raster(Bounds bounds, double cellSize) {
 
         this.bounds = bounds;
         this.cellSize = cellSize;
@@ -124,13 +124,21 @@ public class Raster {
      * @param valueSupplier Function which takes an x and a y index and supplies a double value which is written into
      *                      The corresponding pixel of the raster
      */
-    void setValueForEachIndex(IndexToDoubleFunction valueSupplier) {
+    public void setValueForEachIndex(IndexToDoubleFunction valueSupplier) {
 
         IntStream.range(0, xLength).parallel().forEach(xi ->
-                IntStream.range(0, yLength).parallel().forEach(yi -> {
+                IntStream.range(0, yLength).forEach(yi -> {
                     var value = valueSupplier.applyAsDouble(xi, yi);
                     adjustValueForIndex(xi, yi, value);
                 }));
+    }
+
+    public void setValueForEachCoordinate(CoordToDoubleFunction valueSupplier) {
+        setValueForEachIndex((xi, yi) -> {
+            var x = xi * cellSize + bounds.minX;
+            var y = yi * cellSize + bounds.minY;
+            return valueSupplier.applyAsDouble(x, y);
+        });
     }
 
     int getIndex(int xi, int yi) {
@@ -174,6 +182,11 @@ public class Raster {
         double applyAsDouble(int xi, int yi);
     }
 
+    @FunctionalInterface
+    public interface CoordToDoubleFunction {
+        double applyAsDouble(double x, double y);
+    }
+
     @EqualsAndHashCode
     public static class Bounds {
         private double minX = Double.POSITIVE_INFINITY;
@@ -181,7 +194,7 @@ public class Raster {
         private double maxX = Double.NEGATIVE_INFINITY;
         private double maxY = Double.NEGATIVE_INFINITY;
 
-        Bounds(double minX, double minY, double maxX, double maxY) {
+        public Bounds(double minX, double minY, double maxX, double maxY) {
             this.minX = minX;
             this.minY = minY;
             this.maxX = maxX;

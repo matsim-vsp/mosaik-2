@@ -29,9 +29,7 @@ public class SmoothingRadiusEstimate {
             Rprev = Rn;
             Rn = Rn(emissions, receiverPoint, Rprev, xj);
             counter++;
-
-            log.info(Rn);
-        } while(Math.abs(Rn - Rprev) > THRESHOLD);
+        } while(Math.abs(Rn - Rprev) > THRESHOLD && counter < 10000);
 
         log.info("took " + counter + " iterations.");
         return Rn;

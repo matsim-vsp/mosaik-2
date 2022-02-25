@@ -54,7 +54,7 @@ public class SmoothingRadiusEstimateTest {
         var raster = new Raster(bounds, 2);
         var link = getLink("link", new Coord(40, 50), new Coord(60, 50)); // try to put the link into the center of the grid. Spanning 3 cells from centroid to centroid
 
-        raster.setValueForEachCoordinate((x, y) -> SmoothingRadiusEstimate.f(10000., link.getFromNode().getCoord(), link.getToNode().getCoord(), new Coord(x, y), 10, link.getLength()));
+        raster.setValueForEachCoordinate((x, y) -> SmoothingRadiusEstimate.f(10000., link.getFromNode().getCoord(), link.getToNode().getCoord(), new Coord(x, y), 2, link.getLength()));
 
         try(var writer = Files.newBufferedWriter(Paths.get(testUtils.getOutputDirectory()).resolve("values.csv")); var printer = CSVFormat.DEFAULT.withHeader("x", "y", "value").print(writer)) {
 

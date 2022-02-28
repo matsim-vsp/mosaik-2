@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 @Log4j2
 public class NumericSmoothingRadiusEstimate {
 
-    private static final double THRESHOLD =  10E-2;
+    private static final double THRESHOLD =  10E-6;
     private static final double h = 1E-1; // this is the smallest number one could add and still get a difference for R + h
 
     public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR) {
@@ -28,8 +28,43 @@ public class NumericSmoothingRadiusEstimate {
             counter++;
         } while (Math.abs(Rn - Rprev) > THRESHOLD);
 
-        log.info("took " + counter + " iterations.");
+        log.info("Newton-Method took " + counter + " iterations.");
         return Rn;
+    }
+
+    public static double estimateRWithBisect(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj) {
+
+        double lowerBound = 0.1; // set this close to 0. If 0, we miss a few of the zero points
+        double upperBound = 500;
+        double lowerBoundResult = sumF(emissions, receiverPoint, lowerBound, xj);
+        double upperBoundResult = sumF(emissions, receiverPoint, upperBound, xj);
+        double center;
+        double centerResult;
+        int counter = 0;
+
+        if (Math.signum(lowerBoundResult) == Math.signum(upperBoundResult))
+            throw new RuntimeException("This can't be right");
+
+        do {
+            // find center
+            center = (upperBound + lowerBound) / 2;
+
+            // calculate result for center
+            centerResult = sumF(emissions, receiverPoint, center, xj);
+
+            // choose new bounds
+            if (Math.signum(centerResult) == Math.signum(lowerBoundResult)) {
+                lowerBound = center;
+                lowerBoundResult = centerResult;
+            } else {
+                upperBound = center;
+                // not necessary to also copy upper bounds since it is never used again.
+            }
+            counter++;
+        } while (upperBound - lowerBound > THRESHOLD);
+
+       // log.info("Bisect took " + counter + " iterations.");
+        return center;
     }
 
     static double Rn(Object2DoubleMap<Link> emissions, Coord receiverPoint, double Rprev, double xj) {
@@ -37,8 +72,8 @@ public class NumericSmoothingRadiusEstimate {
         var lowerR = Rprev - h;
         var upperR = Rprev + h;
         var sumRprev = sumF(emissions, receiverPoint, Rprev, xj);
-        var sumLowerR = sumF(emissions, receiverPoint, lowerR, xj);
-        var sumUpperR = sumF(emissions, receiverPoint, upperR, xj);
+        var sumLowerR = sumf(emissions, receiverPoint, lowerR, xj);
+        var sumUpperR = sumf(emissions, receiverPoint, upperR, xj);
 
         return Rprev - (sumRprev * 2 * h / (sumUpperR - sumLowerR));
     }
@@ -53,6 +88,18 @@ public class NumericSmoothingRadiusEstimate {
                         R,
                         entry.getDoubleValue(),
                         xj
+                ))
+                .sum();
+    }
+
+    static double sumf(Object2DoubleMap<Link> emissions, Coord receiverPoint, double R, double xj) {
+        return emissions.object2DoubleEntrySet().stream()
+                .mapToDouble(entry -> entry.getDoubleValue() * calculateWeight(
+                        entry.getKey().getFromNode().getCoord(),
+                        entry.getKey().getToNode().getCoord(),
+                        receiverPoint,
+                        entry.getKey().getLength(),
+                        R
                 ))
                 .sum();
     }

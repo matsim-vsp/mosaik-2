@@ -145,13 +145,13 @@ public class Raster {
         return yi * xLength + xi;
     }
 
-    double getValueByIndex(int xi, int yi) {
+    public double getValueByIndex(int xi, int yi) {
 
         var index = getIndex(xi, yi);
         return data[index];
     }
 
-    double getValueByCoord(double x, double y) {
+    public double getValueByCoord(double x, double y) {
         var index = getIndexForCoord(x, y);
         return data[index];
     }

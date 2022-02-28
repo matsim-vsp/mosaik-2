@@ -7,28 +7,23 @@ import org.apache.commons.math.special.Erf;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.network.Link;
 
-import java.util.Collection;
-import java.util.stream.Collectors;
-
 @Log4j2
 public class NumericSmoothingRadiusEstimate {
 
-    private static final double THRESHOLD =  10E-6;
-    private static final double h = 1E-1; // this is the smallest number one could add and still get a difference for R + h
+    private static final double R_THRESHOLD =  10E-9;
+    private static final double BISECT_THRESHOLD = 5;
+    private static final double h = 1E-9; // this is the smallest number one could add and still get a difference for R + h
 
     public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR) {
 
         double Rn = initialR;
         double Rprev;
-        int counter = 0;
 
         do {
             Rprev = Rn;
             Rn = Rn(emissions, receiverPoint, Rprev, xj);
-            counter++;
-        } while (Math.abs(Rn - Rprev) > THRESHOLD);
+        } while (Math.abs(Rn - Rprev) > R_THRESHOLD);
 
-        log.info("Newton-Method took " + counter + " iterations.");
         return Rn;
     }
 
@@ -40,10 +35,9 @@ public class NumericSmoothingRadiusEstimate {
         double upperBoundResult = sumF(emissions, receiverPoint, upperBound, xj);
         double center;
         double centerResult;
-        int counter = 0;
 
         if (Math.signum(lowerBoundResult) == Math.signum(upperBoundResult))
-            throw new RuntimeException("This can't be right");
+            throw new RuntimeException("There is no zero point in the intervall between [0.1, 500]. Consider changing the interval or check whether the input is plausible.");
 
         do {
             // find center
@@ -60,11 +54,12 @@ public class NumericSmoothingRadiusEstimate {
                 upperBound = center;
                 // not necessary to also copy upper bounds since it is never used again.
             }
-            counter++;
-        } while (upperBound - lowerBound > THRESHOLD);
+        } while (upperBound - lowerBound > BISECT_THRESHOLD);
 
-       // log.info("Bisect took " + counter + " iterations.");
-        return center;
+        // newton method converges faster than bisect. After having a plausible interval do the remaining steps with newton
+        // use center because this was the last boundary which was updated and is likely to be on a slope suitable for the
+        // newton method.
+        return estimateR(emissions, receiverPoint, xj, center);
     }
 
     static double Rn(Object2DoubleMap<Link> emissions, Coord receiverPoint, double Rprev, double xj) {

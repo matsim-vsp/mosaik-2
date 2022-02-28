@@ -6,37 +6,72 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.analysis.spatial.SpatialInterpolation;
 import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.utils.geometry.CoordUtils;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.mosaik2.chemistryDriver.Raster;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.*;
 
 @Log4j2
+@RunWith(Parameterized.class)
 public class NumericSmoothingRadiusEstimateTest {
 
-    private final double le = 20;
-    private final double E = 10;
-    private final double R = 23;
-    private final Coord from = new Coord(40, 50);
-    private final Coord to = new Coord(60, 50);
-    private final Coord receiverPoint = new Coord(60,20);
+    private final double le;
+    private final double E;
+    private final double R;
+    private final Coord from;
+    private final Coord to;
+    private final Coord receiverPoint;
+
+    public NumericSmoothingRadiusEstimateTest(double le, double E, double R, Coord from, Coord to, Coord receiverPoint) {
+        this.le = le;
+        this.E = E;
+        this.R = R;
+        this.from = from;
+        this.to = to;
+        this.receiverPoint = receiverPoint;
+    }
+
+    @Parameterized.Parameters
+    public static Collection<Object> primeNumbers() {
+        return Arrays.asList(
+                new Object[][] {
+                        // some chosen number with which we did our hand calculations as well
+                        {20, 10, 10, new Coord(40, 50), new Coord(60, 50), new Coord(50, 60)},
+                        // some arbitrary odd numbers, with different link length than euclidean distance for example
+                        {1000, 10003, 150, new Coord(23, 23), new Coord(54, 110), new Coord(74, 98)},
+                        // R = 1 is an edge case as well
+                        {20, 10, 1, new Coord(40, 50), new Coord(60, 50), new Coord(50, 60)},
+                        // having 0 Emissions is an edge case we should handle as well
+                        {20, 0, 59, new Coord(40, 50), new Coord(60, 50), new Coord(50, 60)}
+                }
+        );
+    }
 
     @Test
     public void testWeight() {
 
-        // The old code calculates a weight for each receiver point before applying the emissions. Since we need the emissions
-        // in our derived function, we pass it directly
-        var result = NumericSmoothingRadiusEstimate.calculateWeight(from, to, receiverPoint, le, R);
+        // compare the weight function to the old implementation. The old implementation uses different interfaces, which I want to avoid here. Hence, the slightly
+        // varying implementation.
+
+        // Use eucledian distance here, since the old implementation does this as well. (Which is not correct)
+        var length = CoordUtils.calcEuclideanDistance(from, to);
+        var result = NumericSmoothingRadiusEstimate.calculateWeight(from, to, receiverPoint, length, R);
         var oldResult = SpatialInterpolation.calculateWeightFromLine(MGC.coord2Coordinate(from), MGC.coord2Coordinate(to), MGC.coord2Coordinate(receiverPoint), R);
 
         assertEquals(oldResult, result, 10E-10);
@@ -75,35 +110,36 @@ public class NumericSmoothingRadiusEstimateTest {
     @Test
     public void testEstimateR() {
 
-        final var emissions = new Object2DoubleOpenHashMap<>(Map.of(getLink("link", from, to), E));
+        final var emissions = new Object2DoubleOpenHashMap<>(Map.of(getLink("link", from, to, le), E));
 
         // first calculate xj with f - this is the forward equation
         var xj = NumericSmoothingRadiusEstimate.calculateWeight(from, to, receiverPoint, le, R) * E;
 
         // now, use xj in estimate R. This should yield the same R which we have used for the forward pass
-        var estimatedR = NumericSmoothingRadiusEstimate.estimateR(emissions, receiverPoint, xj, 10);
+        var estimatedR = NumericSmoothingRadiusEstimate.estimateR(emissions, receiverPoint, xj, R + 5);
 
-        assertEquals(R, estimatedR, 10E-3);
+        // This code doesn't work for zero emissions. This will be filtered elsewhere.
+        if (xj == 0)
+            assertEquals(Double.NaN, estimatedR, 0.001);
+        else
+            assertEquals(R, estimatedR, 10E-5);
     }
 
     @Test
     public void testEstimateRWithBisect() {
 
-        final var emissions = new Object2DoubleOpenHashMap<>(Map.of(getLink("link", from, to), E));
+        final var emissions = new Object2DoubleOpenHashMap<>(Map.of(getLink("link", from, to, le), E));
 
         // first calculate xj with f - this is the forward equation
         var xj = NumericSmoothingRadiusEstimate.calculateWeight(from, to, receiverPoint, le, R) * E;
 
-        var estimatedR = NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, xj);
-
-        assertEquals(R, estimatedR, 10E-3);
-
-        // test other values
-        var coordX2 = new Coord(23, 54);
-        var x2 = NumericSmoothingRadiusEstimate.calculateWeight(from, to, coordX2, le, R) * E;
-        var estimatedR2 = NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, coordX2, x2);
-
-        assertEquals(R, estimatedR2, 10E-3);
+        try {
+            var estimatedR = NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, xj);
+            assertEquals(R, estimatedR, 10E-5);
+        } catch (Exception e) {
+            if (xj != 0) throw new RuntimeException(e);
+            // otherwise, this exception is expected
+        }
     }
 
     /**
@@ -115,8 +151,8 @@ public class NumericSmoothingRadiusEstimateTest {
         // first calcuate xj with f - this is the forward equation
         var xj = NumericSmoothingRadiusEstimate.calculateWeight(from, to, receiverPoint, le, R) * E;
 
-        try (var writer = Files.newBufferedWriter(Paths.get("C:\\Users\\Janekdererste\\Desktop\\smoothing-estimates\\F-results.csv")); var printer =CSVFormat.DEFAULT.withHeader("R", "value").print(writer)) {
-            for(int i = -100; i < 100; i++) {
+        try (var writer = Files.newBufferedWriter(Paths.get("C:\\Users\\Janekdererste\\Desktop\\smoothing-estimates\\F-results-" + R + ".csv")); var printer =CSVFormat.DEFAULT.withHeader("R", "value").print(writer)) {
+            for(int i = -1000; i < 1000; i++) {
                 var result = NumericSmoothingRadiusEstimate.F(from, to, receiverPoint, le, i, E, xj);
                 printer.printRecord(i, result);
             }
@@ -125,11 +161,13 @@ public class NumericSmoothingRadiusEstimateTest {
         }
     }
 
-    private static Link getLink(String id, Coord from, Coord to) {
+    private static Link getLink(String id, Coord from, Coord to, double length) {
 
         var network = NetworkUtils.createNetwork();
         var fromNode = network.getFactory().createNode(Id.createNodeId(id + "_from"), from);
         var toNode = network.getFactory().createNode(Id.createNodeId(id + "_to"), to);
-        return network.getFactory().createLink(Id.createLinkId(id), fromNode, toNode);
+        var link =  network.getFactory().createLink(Id.createLinkId(id), fromNode, toNode);
+        link.setLength(length);
+        return link;
     }
 }

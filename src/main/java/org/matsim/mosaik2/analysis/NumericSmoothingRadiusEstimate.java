@@ -14,7 +14,7 @@ import java.util.stream.Collectors;
 public class NumericSmoothingRadiusEstimate {
 
     private static final double THRESHOLD =  10E-2;
-    private static final double h = Math.pow(Double.MIN_VALUE, 1.0/3);
+    private static final double h = 1E-1; // this is the smallest number one could add and still get a difference for R + h
 
     public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR) {
 

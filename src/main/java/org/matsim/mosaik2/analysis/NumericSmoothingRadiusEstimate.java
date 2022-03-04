@@ -2,8 +2,7 @@ package org.matsim.mosaik2.analysis;
 
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import lombok.extern.log4j.Log4j2;
-import org.apache.commons.math.MathException;
-import org.apache.commons.math.special.Erf;
+import org.apache.commons.math3.special.Erf;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.network.Link;
 
@@ -36,8 +35,11 @@ public class NumericSmoothingRadiusEstimate {
         double center;
         double centerResult;
 
-        if (Math.signum(lowerBoundResult) == Math.signum(upperBoundResult))
-            throw new RuntimeException("There is no zero point in the intervall between [0.1, 500]. Consider changing the interval or check whether the input is plausible.");
+        if (Math.signum(lowerBoundResult) == Math.signum(upperBoundResult)) {
+            log.warn("There is no zero point in the intervall between [0.1, 500]. Consider changing the interval or check whether the input is plausible.");
+            log.warn("ReceiverPoint: " + receiverPoint.toString() + " , xj: " + xj);
+            return 0.0;
+        }
 
         do {
             // find center
@@ -111,8 +113,8 @@ public class NumericSmoothingRadiusEstimate {
 
         double upperLimit = le + B / le;
         double lowerLimit = B / le;
-        double integrationUpperLimit = erf(upperLimit / R);
-        double integrationLowerLimit = erf(lowerLimit / R);
+        double integrationUpperLimit = Erf.erf(upperLimit / R);
+        double integrationLowerLimit = Erf.erf(lowerLimit / R);
         double exponent = -(A - (B*B) / (le*le)) / (R*R);
 
         return Math.exp(exponent) * R * C * (integrationUpperLimit - integrationLowerLimit);
@@ -142,13 +144,5 @@ public class NumericSmoothingRadiusEstimate {
 
     private static double calculateC(double le) {
         return Math.sqrt(Math.PI) / le / 2;
-    }
-
-    private static double erf(double x) {
-        try {
-            return Erf.erf(x);
-        } catch (MathException e) {
-            throw new RuntimeException(e);
-        }
     }
 }

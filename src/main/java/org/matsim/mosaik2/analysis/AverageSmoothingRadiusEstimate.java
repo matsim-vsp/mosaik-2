@@ -18,11 +18,13 @@ public class AverageSmoothingRadiusEstimate {
 
         var result = new Raster(raster.getBounds(), raster.getCellSize());
 
+        log.info("Starting to calculate Rs. This will be " + (raster.getYLength() * raster.getXLength() * emissions.size()) + " operations.");
         result.setValueForEachCoordinate((x, y) -> {
             var receiverPoint = new Coord(x,y);
             var value = raster.getValueByCoord(x, y);
-            return NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value);
+            return value <= 0 ? 0.0 : NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value);
         });
+        log.info("Finished R calculation");
 
         return result;
     }

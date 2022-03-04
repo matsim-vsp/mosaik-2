@@ -65,10 +65,9 @@
         <version>5.6.0</version>
             <exclusions>
                 <exclusion>
-                    <groupId>org.matsim</groupId>
-                    <artifactId>matsim</artifactId>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
                 </exclusion>
-
             </exclusions>
         </dependency>
 

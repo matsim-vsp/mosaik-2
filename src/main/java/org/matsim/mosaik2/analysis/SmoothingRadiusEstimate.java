@@ -1,8 +1,7 @@
 package org.matsim.mosaik2.analysis;
 
 import lombok.extern.log4j.Log4j2;
-import org.apache.commons.math.MathException;
-import org.apache.commons.math.special.Erf;
+import org.apache.commons.math3.special.Erf;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.network.Link;
 
@@ -94,7 +93,7 @@ public class SmoothingRadiusEstimate {
         var F = calculateF(B, R, le);
         var G = calculateG(B, R, le);
 
-        return erf(F) - erf(G);
+        return Erf.erf(F) - Erf.erf(G);
     }
 
     private static double hDerived(double B, double R, double le) {
@@ -153,13 +152,4 @@ public class SmoothingRadiusEstimate {
     private static double calculateI(double B, double R, double le) {
         return (B + le*le) * (B + le*le) / (le*le * R*R);
     }
-
-    private static double erf(double x) {
-        try {
-            return Erf.erf(x);
-        } catch (MathException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
 }

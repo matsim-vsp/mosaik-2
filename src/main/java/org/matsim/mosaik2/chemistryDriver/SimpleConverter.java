@@ -65,7 +65,7 @@ public class SimpleConverter {
 
         // convert pollutants to palm names
         var converter = new PollutantToPalmNameConverter(pollutants);
-        var palmEmissions = converter.convert(emissions);
+        var palmEmissions = converter.convertWithDoubleMap(emissions);
 
         // put emissions onto a raster
         var bounds = props.bounds == null ? getBounds(network) : props.bounds;

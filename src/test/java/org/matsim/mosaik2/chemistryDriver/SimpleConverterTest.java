@@ -12,7 +12,6 @@ import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.testcases.MatsimTestUtils;
-import scala.Int;
 
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;

@@ -162,7 +162,7 @@ public class Raster {
         return data[index] += value;
     }
 
-    double adjustValueForIndex(int xi, int yi, double value) {
+    public double adjustValueForIndex(int xi, int yi, double value) {
         var index = getIndex(xi, yi);
         return data[index] += value;
     }

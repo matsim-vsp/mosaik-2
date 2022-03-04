@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import lombok.RequiredArgsConstructor;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
@@ -46,6 +47,14 @@ public class PollutantToPalmNameConverter {
                 .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond, this::merge));
     }
 
+    Map<String, Map<Id<Link>, Double>> convertWithDoubleMap(Map<Pollutant, Object2DoubleMap<Id<Link>>> map) {
+
+        return map.entrySet().stream()
+                .filter(entry -> pollutantToName.containsKey(entry.getKey()))
+                .map(entry -> Tuple.of(pollutantToName.get(entry.getKey()), entry.getValue()))
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond, this::merge));
+    }
+
     Map<Id<Link>, Double> merge(Map<Id<Link>, Double> map1, Map<Id<Link>, Double> map2) {
         return Stream.concat(map1.entrySet().stream(), map2.entrySet().stream())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, Double::sum));
@@ -58,6 +67,18 @@ public class PollutantToPalmNameConverter {
         for (var bin: timeBinMap.getTimeBins()) {
 
             var convertedMap = convert(bin.getValue());
+            result.getTimeBin(bin.getStartTime()).setValue(convertedMap);
+        }
+        return result;
+    }
+
+    TimeBinMap<Map<String, Map<Id<Link>, Double>>> convertWithDoubleMap(TimeBinMap<Map<Pollutant, Object2DoubleMap<Id<Link>>>> timeBinMap) {
+
+        TimeBinMap<Map<String, Map<Id<Link>, Double>>> result = new TimeBinMap<>(timeBinMap.getBinSize(), timeBinMap.getStartTime());
+
+        for (var bin: timeBinMap.getTimeBins()) {
+
+            var convertedMap = convertWithDoubleMap(bin.getValue());
             result.getTimeBin(bin.getStartTime()).setValue(convertedMap);
         }
         return result;

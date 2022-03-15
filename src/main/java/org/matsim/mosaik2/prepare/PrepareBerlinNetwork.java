@@ -42,6 +42,7 @@ import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -53,9 +54,9 @@ public class PrepareBerlinNetwork {
     private static final String stateShapeFile = "projects\\mosaik-2\\raw-data\\shapes\\bundeslaender\\VG250_LAN.shp";
     private static final String gtfsFile = "matsim\\scenarios\\countries\\de\\berlin\\berlin-v5.5-10pct\\original-data\\GTFS-VBB-20181214\\GTFS-VBB-20181214.zip";
 
-    public static final String networkOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-network-with-geometries.xml.gz";
-    public static final String scheduleOutputFile = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-schedule-with-geometries.xml.gz";
-    public static final String vehiclesOutputFile ="projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-transit-vehicles-with-geometries.xml.gz";
+    public static final String networkOutputFileTemplate = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-network-with-%s.xml.gz";
+    public static final String scheduleOutputFileTemplate = "projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-schedule-with-%s.xml.gz";
+    public static final String vehiclesOutputFileTemplate ="projects\\mosaik-2\\matsim-input-files\\berlin\\berlin-5.5.2-transit-vehicles-with-%s.xml.gz";
 
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation(TransformationFactory.WGS84,"EPSG:25833");
     private static final Set<String> networkModes = Set.of(TransportMode.car, TransportMode.ride, "freight");
@@ -75,9 +76,11 @@ public class PrepareBerlinNetwork {
 
         createVehicles(scenario, network);
 
-        new NetworkWriter(network).write(Paths.get(svnArg.sharedSvn).resolve(networkOutputFile).toString());
-        new TransitScheduleWriter(scenario.getTransitSchedule()).writeFile(Paths.get(svnArg.sharedSvn).resolve(scheduleOutputFile).toString());
-        new MatsimVehicleWriter(scenario.getTransitVehicles()).writeFile(Paths.get(svnArg.sharedSvn).resolve(vehiclesOutputFile).toString());
+        var fileAppendix = svnArg.useOriginalGeometries ? "geometries" : "geometryAttributes";
+
+        new NetworkWriter(network).write(Paths.get(svnArg.sharedSvn).resolve(String.format(networkOutputFileTemplate, fileAppendix)).toString());
+        new TransitScheduleWriter(scenario.getTransitSchedule()).writeFile(Paths.get(svnArg.sharedSvn).resolve(String.format(scheduleOutputFileTemplate, fileAppendix)).toString());
+        new MatsimVehicleWriter(scenario.getTransitVehicles()).writeFile(Paths.get(svnArg.sharedSvn).resolve(String.format(vehiclesOutputFileTemplate, fileAppendix)).toString());
     }
 
     private static Network createNetwork(Input svnArg){
@@ -104,7 +107,12 @@ public class PrepareBerlinNetwork {
 
         new NetworkCleaner().run(network);
 
-        useOriginalGeometryWithinGeometry(network, createStudyArea());
+        // For the calculation with the raster approach we want to store the original geometry as attribute and figure out
+        // the geometries later. For the agent emissions we want the original geometries right when the simulation takes
+        // place, since we are calculating positions from within the qsim.
+        if (svnArg.useOriginalGeometries)
+            useOriginalGeometryWithinGeometry(network, createStudyArea());
+
         network.getAttributes().putAttribute("coordinateReferenceSystem", "EPSG:25833");
         return network;
     }
@@ -209,7 +217,6 @@ public class PrepareBerlinNetwork {
     private static void createSchedule(Scenario scenario, Input svnArgs) {
         LocalDate date = LocalDate.parse("2018-12-20");
 
-        var schedulePath = Paths.get(svnArgs.publicSvn).resolve(scheduleOutputFile);
         RunGTFS2MATSim.convertGTFSandAddToScenario(scenario, Paths.get(svnArgs.publicSvn).resolve(gtfsFile).toString(), date, transformation, false);
         //RunGTFS2MATSim.convertGtfs(Paths.get(svnArgs.publicSvn).resolve(gtfsFile).toString(), schedulePath.toString(), date, transformation, false);
         //new TransitScheduleReader(scenario).readFile(schedulePath.toString());
@@ -296,7 +303,7 @@ public class PrepareBerlinNetwork {
             // identify veh type / mode using gtfs route type (3-digit code, also found at the end of the line id (gtfs: route_id))
             int gtfsTransitType;
             try {
-                gtfsTransitType = Integer.parseInt( (String) line.getAttributes().getAttribute("gtfs_route_type"));
+                gtfsTransitType = Integer.parseInt( (String) Objects.requireNonNull(line.getAttributes().getAttribute("gtfs_route_type")));
             } catch (NumberFormatException e) {
                 log.error("unknown transit mode! Line id was " + line.getId().toString() +
                         "; gtfs route type was " + line.getAttributes().getAttribute("gtfs_route_type"));
@@ -430,5 +437,8 @@ public class PrepareBerlinNetwork {
 
         @Parameter(required = true, names = "-sharedSvn")
         private String sharedSvn;
+
+        @Parameter(names = "-useOriginalGeometries")
+        private boolean useOriginalGeometries;
     }
 }

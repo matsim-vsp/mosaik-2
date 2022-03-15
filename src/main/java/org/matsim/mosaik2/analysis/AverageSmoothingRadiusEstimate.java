@@ -10,6 +10,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.mosaik2.chemistryDriver.Raster;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Log4j2
 public class AverageSmoothingRadiusEstimate {
@@ -17,12 +18,18 @@ public class AverageSmoothingRadiusEstimate {
     public static Raster collectR(Raster raster, Object2DoubleMap<Link> emissions) {
 
         var result = new Raster(raster.getBounds(), raster.getCellSize());
+        var counter = new AtomicInteger();
 
         log.info("Starting to calculate Rs. This will be " + (raster.getYLength() * raster.getXLength() * emissions.size()) + " operations.");
         result.setValueForEachCoordinate((x, y) -> {
             var receiverPoint = new Coord(x,y);
             var value = raster.getValueByCoord(x, y);
-            return value <= 0 ? 0.0 : NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value);
+            var r = value <= 0 ? 0.0 : NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value);
+            var currentCount = counter.incrementAndGet();
+            if (currentCount % 100 == 0) {
+                log.info("Calculated " + currentCount + " R-Values. Last value was: " + r);
+            }
+            return r;
         });
         log.info("Finished R calculation");
 

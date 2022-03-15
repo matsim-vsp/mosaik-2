@@ -10,18 +10,22 @@ import org.matsim.api.core.v01.network.Link;
 public class NumericSmoothingRadiusEstimate {
 
     private static final double R_THRESHOLD =  10E-10;
-    private static final double BISECT_THRESHOLD = 5;
+    private static final double BISECT_THRESHOLD = 10; // I think we are fine with such coarse values for now.
     private static final double h = 1E-10; // this is the smallest number one could add and still get a difference for R + h
 
     public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR) {
 
         double Rn = initialR;
         double Rprev;
+        int counter = 0;
 
         do {
+            counter++;
             Rprev = Rn;
             Rn = Rn(emissions, receiverPoint, Rprev, xj);
         } while (Math.abs(Rn - Rprev) > R_THRESHOLD);
+
+        log.info("Took " + counter + " iterations with newton procedure. R is: " + Rn);
 
         return Rn;
     }
@@ -29,20 +33,22 @@ public class NumericSmoothingRadiusEstimate {
     public static double estimateRWithBisect(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj) {
 
         double lowerBound = 0.1; // set this close to 0. If 0, we miss a few of the zero points
-        double upperBound = 1000;
+        double upperBound = 10000000;
         double lowerBoundResult = sumf(emissions, receiverPoint, lowerBound) - xj;
         double upperBoundResult = sumf(emissions, receiverPoint, upperBound) - xj;
         double center;
         double centerResult;
+        int counter = 0;
 
         if (Math.signum(lowerBoundResult) == Math.signum(upperBoundResult)) {
             log.warn("There is no zero point in the intervall between [0.1, 10000]. Consider changing the interval or check whether the input is plausible.");
             log.warn("ReceiverPoint: " + receiverPoint.toString() + " , xj: " + xj);
             //return 0.0;
-            throw new RuntimeException("No zero point between [0.1, 10000]");
+            throw new RuntimeException("No zero point between [0.1, 10.000.000]");
         }
 
         do {
+            counter++;
             // find center
             center = (upperBound + lowerBound) / 2;
 
@@ -59,10 +65,13 @@ public class NumericSmoothingRadiusEstimate {
             }
         } while (upperBound - lowerBound > BISECT_THRESHOLD);
 
+        //log.info("Took " + counter + " iterations with bisect. Switching to Newton");
+
         // newton method converges faster than bisect. After having a plausible interval do the remaining steps with newton
         // use center because this was the last boundary which was updated and is likely to be on a slope suitable for the
         // newton method.
-        return estimateR(emissions, receiverPoint, xj, center);
+        //return estimateR(emissions, receiverPoint, xj, center);
+        return center;
     }
 
     static double Rn(Object2DoubleMap<Link> emissions, Coord receiverPoint, double Rprev, double xj) {

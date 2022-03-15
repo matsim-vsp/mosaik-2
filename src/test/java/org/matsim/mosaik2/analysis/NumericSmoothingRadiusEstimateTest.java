@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import lombok.extern.java.Log;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
+import org.checkerframework.checker.units.qual.C;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -96,18 +97,6 @@ public class NumericSmoothingRadiusEstimateTest {
     }
 
     @Test
-    public void testF() {
-
-        // first calcuate xj with f - this is the forward equation
-        var xj = NumericSmoothingRadiusEstimate.calculateWeight(from, to, receiverPoint, le, R) * E;
-
-        // now, use xj with F, which should yield 0
-        var result = NumericSmoothingRadiusEstimate.F(from, to, receiverPoint, le, R, E, xj);
-
-        assertEquals(0, result, 10E-10);
-    }
-
-    @Test
     public void testEstimateR() {
 
         final var emissions = new Object2DoubleOpenHashMap<>(Map.of(getLink("link", from, to, le), E));
@@ -128,10 +117,39 @@ public class NumericSmoothingRadiusEstimateTest {
     @Test
     public void testEstimateRWithBisect() {
 
-        final var emissions = new Object2DoubleOpenHashMap<>(Map.of(getLink("link", from, to, le), E));
+        final var emissions = new Object2DoubleOpenHashMap<>(Map.of(
+                getLink("link-1", from, to, le), E
+        ));
 
         // first calculate xj with f - this is the forward equation
         var xj = NumericSmoothingRadiusEstimate.calculateWeight(from, to, receiverPoint, le, R) * E;
+
+        try {
+            var estimatedR = NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, xj);
+            assertEquals(R, estimatedR, 10E-5);
+        } catch (Exception e) {
+            if (xj != 0) throw new RuntimeException(e);
+            // otherwise, this exception is expected
+        }
+    }
+
+    @Test
+    public void testEstimateRWithBisect2Links() {
+
+        final var emissions = new Object2DoubleOpenHashMap<>(Map.of(
+                getLink("link-1", new Coord(10, 10), new Coord(90, 10), 80), E,
+                getLink("link-2", new Coord(10, 50), new Coord(90, 50), 80), E
+        ));
+        final var receiverPoint = new Coord(50, 30);
+
+        var xj = emissions.object2DoubleEntrySet().stream()
+                .mapToDouble(entry -> NumericSmoothingRadiusEstimate.calculateWeight(
+                        entry.getKey().getFromNode().getCoord(),
+                        entry.getKey().getToNode().getCoord(),
+                        receiverPoint,
+                        entry.getKey().getLength(),
+                        R) * entry.getDoubleValue())
+                .sum();
 
         try {
             var estimatedR = NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, xj);
@@ -153,7 +171,7 @@ public class NumericSmoothingRadiusEstimateTest {
 
         try (var writer = Files.newBufferedWriter(Paths.get("C:\\Users\\Janekdererste\\Desktop\\smoothing-estimates\\F-results-" + R + ".csv")); var printer =CSVFormat.DEFAULT.withHeader("R", "value").print(writer)) {
             for(int i = -1000; i < 1000; i++) {
-                var result = NumericSmoothingRadiusEstimate.F(from, to, receiverPoint, le, i, E, xj);
+                var result = E * NumericSmoothingRadiusEstimate.calculateWeight(from, to, receiverPoint, le, i) - xj;
                 printer.printRecord(i, result);
             }
         } catch (IOException e) {

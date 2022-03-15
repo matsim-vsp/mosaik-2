@@ -9,9 +9,9 @@ import org.matsim.api.core.v01.network.Link;
 @Log4j2
 public class NumericSmoothingRadiusEstimate {
 
-    private static final double R_THRESHOLD =  10E-9;
+    private static final double R_THRESHOLD =  10E-10;
     private static final double BISECT_THRESHOLD = 5;
-    private static final double h = 1E-9; // this is the smallest number one could add and still get a difference for R + h
+    private static final double h = 1E-10; // this is the smallest number one could add and still get a difference for R + h
 
     public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR) {
 
@@ -29,16 +29,17 @@ public class NumericSmoothingRadiusEstimate {
     public static double estimateRWithBisect(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj) {
 
         double lowerBound = 0.1; // set this close to 0. If 0, we miss a few of the zero points
-        double upperBound = 500;
-        double lowerBoundResult = sumF(emissions, receiverPoint, lowerBound, xj);
-        double upperBoundResult = sumF(emissions, receiverPoint, upperBound, xj);
+        double upperBound = 1000;
+        double lowerBoundResult = sumf(emissions, receiverPoint, lowerBound) - xj;
+        double upperBoundResult = sumf(emissions, receiverPoint, upperBound) - xj;
         double center;
         double centerResult;
 
         if (Math.signum(lowerBoundResult) == Math.signum(upperBoundResult)) {
-            log.warn("There is no zero point in the intervall between [0.1, 500]. Consider changing the interval or check whether the input is plausible.");
+            log.warn("There is no zero point in the intervall between [0.1, 10000]. Consider changing the interval or check whether the input is plausible.");
             log.warn("ReceiverPoint: " + receiverPoint.toString() + " , xj: " + xj);
-            return 0.0;
+            //return 0.0;
+            throw new RuntimeException("No zero point between [0.1, 10000]");
         }
 
         do {
@@ -46,7 +47,7 @@ public class NumericSmoothingRadiusEstimate {
             center = (upperBound + lowerBound) / 2;
 
             // calculate result for center
-            centerResult = sumF(emissions, receiverPoint, center, xj);
+            centerResult = sumf(emissions, receiverPoint, center) - xj;
 
             // choose new bounds
             if (Math.signum(centerResult) == Math.signum(lowerBoundResult)) {
@@ -68,41 +69,27 @@ public class NumericSmoothingRadiusEstimate {
 
         var lowerR = Rprev - h;
         var upperR = Rprev + h;
-        var sumRprev = sumF(emissions, receiverPoint, Rprev, xj);
-        var sumLowerR = sumf(emissions, receiverPoint, lowerR, xj);
-        var sumUpperR = sumf(emissions, receiverPoint, upperR, xj);
+        var sumRprev = sumf(emissions, receiverPoint, Rprev) - xj;
+        var sumLowerR = sumf(emissions, receiverPoint, lowerR);
+        var sumUpperR = sumf(emissions, receiverPoint, upperR);
 
         return Rprev - (sumRprev * 2 * h / (sumUpperR - sumLowerR));
     }
 
-    static double sumF(Object2DoubleMap<Link> emissions, Coord receiverPoint, double R, double xj) {
+    static double sumf(Object2DoubleMap<Link> emissions, Coord receiverPoint, double R) {
         return emissions.object2DoubleEntrySet().stream()
-                .mapToDouble(entry -> F(
-                        entry.getKey().getFromNode().getCoord(),
-                        entry.getKey().getToNode().getCoord(),
-                        receiverPoint,
-                        entry.getKey().getLength(),
-                        R,
-                        entry.getDoubleValue(),
-                        xj
-                ))
+                .mapToDouble(entry -> {
+                    var weight = calculateWeight(
+                            entry.getKey().getFromNode().getCoord(),
+                            entry.getKey().getToNode().getCoord(),
+                            receiverPoint,
+                            entry.getKey().getLength(),
+                            R
+                    );
+                    var emission = entry.getDoubleValue();
+                    return emission * weight;
+                })
                 .sum();
-    }
-
-    static double sumf(Object2DoubleMap<Link> emissions, Coord receiverPoint, double R, double xj) {
-        return emissions.object2DoubleEntrySet().stream()
-                .mapToDouble(entry -> entry.getDoubleValue() * calculateWeight(
-                        entry.getKey().getFromNode().getCoord(),
-                        entry.getKey().getToNode().getCoord(),
-                        receiverPoint,
-                        entry.getKey().getLength(),
-                        R
-                ))
-                .sum();
-    }
-
-    static double F(final Coord from, final Coord to, final Coord receiverPoint, final double le, final double R, final double E, final double xj) {
-        return E * calculateWeight(from, to, receiverPoint, le, R) - xj;
     }
 
     static double calculateWeight(final Coord from, final Coord to, final Coord receiverPoint, final double le, final double R) {

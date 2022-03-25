@@ -104,16 +104,18 @@ public class AverageSmoothingRadiusEstimate {
     public static Raster collectR(Raster raster, Object2DoubleMap<Link> emissions) {
 
         var result = new Raster(raster.getBounds(), raster.getCellSize());
+        var size = raster.getYLength() * raster.getXLength();
         var counter = new AtomicInteger();
 
-        log.info("Starting to calculate Rs. This will be " + (raster.getYLength() * raster.getXLength() * emissions.size()) + " operations.");
+        log.info("Starting to calculate R for each cell. We have " + size + " cells.");
+
         result.setValueForEachCoordinate((x, y) -> {
             var receiverPoint = new Coord(x,y);
             var value = raster.getValueByCoord(x, y);
             var r = value <= 0 ? 0.0 : NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value);
             var currentCount = counter.incrementAndGet();
             if (currentCount % 100 == 0) {
-                log.info("Calculated " + currentCount + " R-Values. Last value was: " + r);
+                log.info("Calculated " + currentCount + "/" + size + " R-Values. Last value was: " + r);
             }
             return r;
         });

@@ -71,9 +71,6 @@ public class FullFeaturedConverter {
         log.info("Converting segment map to network");
         var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
 
-        log.info("writing network!");
-        new NetworkWriter(segmentNetwork).write("C:\\Users\\Janekdererste\\Desktop\\segment-network.xml.gz");
-
         // read the emission events
         var manager = EventsUtils.createEventsManager();
         var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
@@ -154,6 +151,5 @@ public class FullFeaturedConverter {
                 timeBin.getValue().remove("NOx");
             }
         }
-
     }
 }

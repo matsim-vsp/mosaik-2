@@ -20,6 +20,10 @@ import java.util.Objects;
 @Log4j2
 public class PalmOutputReader {
 
+    public static TimeBinMap<Map<String,Raster>> read(String filename) {
+        return read(filename, 0, Integer.MAX_VALUE);
+    }
+
     public static TimeBinMap<Map<String, Raster>> read(String filename, int fromTimeIndex, int toTimeIndex) {
 
         log.info("Try opening Netcdf file at: " + filename);

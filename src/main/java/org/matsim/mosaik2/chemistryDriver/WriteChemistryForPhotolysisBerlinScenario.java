@@ -39,12 +39,10 @@ public class WriteChemistryForPhotolysisBerlinScenario {
 
     private void write() {
 
-        var nameConverter = new PollutantToPalmNameConverter();
         //everything should be in UTM-33
-        var transformation = new IdentityTransformation();
         var cellSize = 10;
-        var originX = 5816919.0;
-        var originY = 382756.5;
+        var originX = 382756.5;
+        var originY = 5816919.0;
         var numberOfCells = 671;
         var bounds = new Raster.Bounds(originX, originY, originX + numberOfCells * cellSize, originY + numberOfCells * cellSize);
 
@@ -52,9 +50,7 @@ public class WriteChemistryForPhotolysisBerlinScenario {
                 .networkFile(networkFile)
                 .emissionEventsFile(emissionEventsFile)
                 .outputFile(outputFile)
-                .pollutantConverter(nameConverter)
                 .bounds(bounds)
-                .transformation(transformation)
                 .cellSize(cellSize)
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)

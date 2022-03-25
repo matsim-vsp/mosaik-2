@@ -11,6 +11,7 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
+import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -51,8 +52,8 @@ public class FullFeaturedConverter {
         this.timeBinSize = timeBinSize;
         this.scaleFactor = scaleFactor;
         this.bounds = bounds;
-        this.transformation = transformation;
-        this.pollutantConverter = pollutantConverter;
+        this.transformation = transformation == null ? new IdentityTransformation() : transformation;
+        this.pollutantConverter = pollutantConverter == null ? new PollutantToPalmNameConverter() : pollutantConverter;
         this.date = date == null ? LocalDateTime.of(2017, 7, 31, 0, 0) : date;
         this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
         this.offset = offset;
@@ -60,8 +61,10 @@ public class FullFeaturedConverter {
 
     public void write() {
 
+        var rawNetwork = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation);
+
         // read network, transform to destination crs and filter only links that are within bounds
-        var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
+        var network = rawNetwork.getLinks().values().stream()
                 .filter(link -> isCoveredBy(link, bounds))
                 .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
 

@@ -9,8 +9,8 @@ import org.matsim.api.core.v01.network.Link;
 @Log4j2
 public class NumericSmoothingRadiusEstimate {
 
-    private static final double R_THRESHOLD =  10E-10;
-    private static final double BISECT_THRESHOLD = 10; // I think we are fine with such coarse values for now.
+    private static final double R_THRESHOLD =  1E-9;
+    private static final double BISECT_THRESHOLD = 1E-3; // I think we are fine with such coarse values for now.
     private static final double h = 1E-10; // this is the smallest number one could add and still get a difference for R + h
 
     public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR) {
@@ -32,8 +32,8 @@ public class NumericSmoothingRadiusEstimate {
 
     public static double estimateRWithBisect(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj) {
 
-        double lowerBound = 0.1; // set this close to 0. If 0, we miss a few of the zero points
-        double upperBound = 10000000;
+        double lowerBound = 0.0001; // chose a value close to 0. With 0.0 the whole thing didn't work out anymore.
+        double upperBound = 50;
         double lowerBoundResult = sumf(emissions, receiverPoint, lowerBound) - xj;
         double upperBoundResult = sumf(emissions, receiverPoint, upperBound) - xj;
         double center;
@@ -41,10 +41,10 @@ public class NumericSmoothingRadiusEstimate {
         int counter = 0;
 
         if (Math.signum(lowerBoundResult) == Math.signum(upperBoundResult)) {
-            log.warn("There is no zero point in the intervall between [0.1, 10000]. Consider changing the interval or check whether the input is plausible.");
-            log.warn("ReceiverPoint: " + receiverPoint.toString() + " , xj: " + xj);
-            //return 0.0;
-            throw new RuntimeException("No zero point between [0.1, 10.000.000]");
+            log.warn("There is no zero point in the intervall between [" + lowerBound + "," +  upperBound + "]. Consider changing the interval or check whether the input is plausible.");
+            log.warn("ReceiverPoint: " + receiverPoint.toString() + " , xj: " + xj + ", lowerBoundResult: " + lowerBoundResult + " , upperBoundResult: " + upperBoundResult);
+            log.warn("Returning -1.0 as R-Value.");
+            return -1.0;
         }
 
         do {

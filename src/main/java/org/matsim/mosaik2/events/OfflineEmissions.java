@@ -9,6 +9,7 @@ import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.emissions.EmissionModule;
 import org.matsim.contrib.emissions.HbefaVehicleCategory;
+import org.matsim.contrib.emissions.VspHbefaRoadTypeMapping;
 import org.matsim.contrib.emissions.events.ColdEmissionEvent;
 import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.contrib.emissions.utils.EmissionsConfigGroup;
@@ -35,8 +36,8 @@ import java.util.function.Predicate;
 
 public class OfflineEmissions {
 
-    private static final String hbefaAverageWarm = "projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_HOT_Vehcat_2020_Average.csv";
-    private static final String hbefaAverageCold = "projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_ColdStart_Vehcat_2020_Average.csv";
+    private static final String hbefaAverageWarm = "projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv";
+    private static final String hbefaAverageCold = "projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_withHGVetc.csv";
 
     private static class OutputArgs {
 
@@ -69,85 +70,27 @@ public class OfflineEmissions {
         var emissionConfigGroup = new EmissionsConfigGroup();
         config.addModule(emissionConfigGroup);
 
+        // we want to use average values for the emission calculations since we have no special information about the
+        // constitution of the fleet. Also, deactivate checking level, since the calculation crashes because of missing
+        // values in the HBEFA-Tables. I don't know why kmt put this in without working tables.
         emissionConfigGroup.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
-        emissionConfigGroup.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
         emissionConfigGroup.setAverageColdEmissionFactorsFile(sharedSvn.resolve(hbefaAverageCold).toString());
         emissionConfigGroup.setAverageWarmEmissionFactorsFile(sharedSvn.resolve(hbefaAverageWarm).toString());
         emissionConfigGroup.setNonScenarioVehicles(EmissionsConfigGroup.NonScenarioVehicles.ignore);
+        emissionConfigGroup.setHbefaTableConsistencyCheckingLevel(EmissionsConfigGroup.HbefaTableConsistencyCheckingLevel.none);
 
-        // we need the generated vehicles of the matsim run
-
+        // Load vehicles, as well as transit vehicles of the scenario. Also the network is important of course
         config.vehicles().setVehiclesFile(getOutputFile(outputDir, runId, "vehicles"));
         config.network().setInputFile(getOutputFile(outputDir, runId, "network"));
-        config.network().setInputCRS("EPSG:25832");
-        config.global().setCoordinateSystem("EPSG:25832");
-        config.plans().setInputFile(getOutputFile(outputDir, runId, "plans"));
-        config.facilities().setInputFile(getOutputFile(outputDir, runId, "facilities"));
         config.transit().setTransitScheduleFile(getOutputFile(outputDir, runId, "transitSchedule"));
         config.transit().setVehiclesFile(getOutputFile(outputDir, runId, "transitVehicles"));
 
+        // add hbefa road types to the network
         var scenario = ScenarioUtils.loadScenario(config);
+        new VspHbefaRoadTypeMapping().addHbefaMappings(scenario.getNetwork());
 
-
-        for (Link link : scenario.getNetwork().getLinks().values()) {
-
-            double freespeed;
-
-            if (link.getFreespeed() <= 13.888889) {
-                freespeed = link.getFreespeed() * 2;
-                // for non motorway roads, the free speed level was reduced
-            } else {
-                freespeed = link.getFreespeed();
-                // for motorways, the original speed levels seems ok.
-            }
-
-            if(freespeed <= 8.333333333){ //30kmh
-                link.getAttributes().putAttribute("hbefa_road_type", "URB/Access/30");
-            } else if(freespeed <= 11.111111111){ //40kmh
-                link.getAttributes().putAttribute("hbefa_road_type", "URB/Access/40");
-            } else if(freespeed <= 13.888888889){ //50kmh
-                double lanes = link.getNumberOfLanes();
-                if(lanes <= 1.0){
-                    link.getAttributes().putAttribute("hbefa_road_type", "URB/Local/50");
-                } else if(lanes <= 2.0){
-                    link.getAttributes().putAttribute("hbefa_road_type", "URB/Distr/50");
-                } else if(lanes > 2.0){
-                    link.getAttributes().putAttribute("hbefa_road_type", "URB/Trunk-City/50");
-                } else{
-                    throw new RuntimeException("NoOfLanes not properly defined");
-                }
-            } else if(freespeed <= 16.666666667){ //60kmh
-                double lanes = link.getNumberOfLanes();
-                if(lanes <= 1.0){
-                    link.getAttributes().putAttribute("hbefa_road_type", "URB/Local/60");
-                } else if(lanes <= 2.0){
-                    link.getAttributes().putAttribute("hbefa_road_type", "URB/Trunk-City/60");
-                } else if(lanes > 2.0){
-                    link.getAttributes().putAttribute("hbefa_road_type", "URB/MW-City/60");
-                } else{
-                    throw new RuntimeException("NoOfLanes not properly defined");
-                }
-            } else if(freespeed <= 19.444444444){ //70kmh
-                link.getAttributes().putAttribute("hbefa_road_type", "URB/MW-City/70");
-            } else if(freespeed <= 22.222222222){ //80kmh
-                link.getAttributes().putAttribute("hbefa_road_type", "URB/MW-Nat./80");
-            } else if(freespeed > 22.222222222){ //faster
-                link.getAttributes().putAttribute("hbefa_road_type", "RUR/MW/>130");
-            } else{
-                throw new RuntimeException("Link not considered...");
-            }
-        }
-
-
-
-       /* var carVehicleType = VehicleUtils.createVehicleType(carVehicleTypeId);
-        carVehicleType.setMaximumVelocity(100/3.6);
-        carVehicleType.setNetworkMode(TransportMode.car);
-        carVehicleType.setLength(7.5);
-        carVehicleType.setPcuEquivalents(1.0);
-
-
-        */
+        // add hebefa vehicle information for the available vehicle types in the scenario. Ignore the Transit vehicles
+        // for now.
         Id<VehicleType> carVehicleTypeId = Id.create("car", VehicleType.class);
         var carVehicleType = scenario.getVehicles().getVehicleTypes().get(carVehicleTypeId);
         Id<VehicleType> freightVehicleTypeId = Id.create("freight", VehicleType.class);
@@ -203,6 +146,8 @@ public class OfflineEmissions {
 
         EmissionModule emissionModule = injector.getInstance(EmissionModule.class);
 
+        // We generate files which only contain emissions. Also we generate downsampled versions, with only 10 and 1% of the
+        // generated events. These can be used to test downstream implementations with shorter run times
         var onlyEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(1.0), getOutputFile(outputDir, runId, "only_emission_events"));
         var sample10pctEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(0.1), getOutputFile(outputDir, runId,"only_01_emission_events"));
         var sample1pctEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(0.01), getOutputFile(outputDir, runId,"only_001_emission_events"));

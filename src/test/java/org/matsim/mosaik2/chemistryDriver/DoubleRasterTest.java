@@ -1,18 +1,18 @@
 package org.matsim.mosaik2.chemistryDriver;
 
 import org.junit.Test;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class RasterTest {
+public class DoubleRasterTest {
 
     @Test
     public void test() {
 
-        var bounds = new Raster.Bounds(10, 10, 100, 100);
-        var raster = new Raster(bounds, 10);
+        var bounds = new DoubleRaster.Bounds(10, 10, 100, 100);
+        var raster = new DoubleRaster(bounds, 10);
 
         double adjustedValue = raster.adjustValueForCoord(10, 10, 1);
         double retreivedValue = raster.getValueByCoord(10, 10);
@@ -42,8 +42,8 @@ public class RasterTest {
     @Test
     public void testInsertion() {
 
-        var bounds = new Raster.Bounds(4, 5, 123, 244);
-        var raster = new Raster(bounds, 10);
+        var bounds = new DoubleRaster.Bounds(4, 5, 123, 244);
+        var raster = new DoubleRaster(bounds, 10);
 
         // put 10 into each pixel
         raster.setValueForEachIndex((xi, yi) -> 10);
@@ -54,8 +54,8 @@ public class RasterTest {
     @Test
     public void testIterationByIndex() {
 
-        var bounds = new Raster.Bounds(4, 5, 123, 244);
-        var raster = new Raster(bounds, 10);
+        var bounds = new DoubleRaster.Bounds(4, 5, 123, 244);
+        var raster = new DoubleRaster(bounds, 10);
 
         // put 10 into each pixel
         raster.setValueForEachIndex((xi, yi) -> 10);
@@ -72,8 +72,8 @@ public class RasterTest {
     @Test
     public void testIterationByCoord() {
 
-        var bounds = new Raster.Bounds(4, 5, 123, 244);
-        var raster = new Raster(bounds, 10);
+        var bounds = new DoubleRaster.Bounds(4, 5, 123, 244);
+        var raster = new DoubleRaster(bounds, 10);
 
         // put 10 into each pixel
         raster.setValueForEachIndex((xi, yi) -> 10);

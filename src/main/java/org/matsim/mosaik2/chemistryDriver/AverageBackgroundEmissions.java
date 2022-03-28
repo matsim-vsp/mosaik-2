@@ -6,7 +6,7 @@ import com.google.common.util.concurrent.AtomicDouble;
 import lombok.extern.log4j.Log4j2;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.core.utils.collections.Tuple;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -52,7 +52,7 @@ public class AverageBackgroundEmissions {
 
         var rawBackgroundEmissions = PalmChemistryInputReader.read(this.input, fromTimeIndex, toTimeIndex);
         var backgroundEmissions = setTimesRelativeToDay(rawBackgroundEmissions);
-        TimeBinMap<Map<String, Raster>> result = new TimeBinMap<>(rawBackgroundEmissions.getBinSize(), 0);
+        TimeBinMap<Map<String, DoubleRaster>> result = new TimeBinMap<>(rawBackgroundEmissions.getBinSize(), 0);
 
         for (var timeBin : backgroundEmissions.getTimeBins()) {
             log.info("blurring values for: " + timeBin.getStartTime());
@@ -71,7 +71,7 @@ public class AverageBackgroundEmissions {
         PalmChemistryInput2.writeNetCdfFile(output, result, dateOfStudy);
     }
 
-    Raster average(Raster raster) {
+    DoubleRaster average(DoubleRaster raster) {
 
         // sum up all values
         AtomicDouble sum = new AtomicDouble();
@@ -79,7 +79,7 @@ public class AverageBackgroundEmissions {
         int numberOfEntries = raster.getXLength() * raster.getYLength();
         double average = sum.doubleValue() / numberOfEntries;
 
-        var result = new Raster(raster.getBounds(), raster.getCellSize());
+        var result = new DoubleRaster(raster.getBounds(), raster.getCellSize());
         result.setValueForEachIndex((xi, yi) -> average);
         return result;
     }
@@ -92,8 +92,8 @@ public class AverageBackgroundEmissions {
         return duration.getSeconds();
     }
 
-    static TimeBinMap<Map<String, Raster>> setTimesRelativeToDay(TimeBinMap<Map<String, Raster>> source) {
-        TimeBinMap<Map<String, Raster>> result = new TimeBinMap<>(source.getBinSize(), 0); // we start at 0
+    static TimeBinMap<Map<String, DoubleRaster>> setTimesRelativeToDay(TimeBinMap<Map<String, DoubleRaster>> source) {
+        TimeBinMap<Map<String, DoubleRaster>> result = new TimeBinMap<>(source.getBinSize(), 0); // we start at 0
 
         for (var sourceBin : source.getTimeBins()) {
 

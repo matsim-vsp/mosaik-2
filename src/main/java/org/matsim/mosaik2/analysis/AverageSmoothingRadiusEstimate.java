@@ -15,7 +15,7 @@ import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.mosaik2.palm.PalmOutputReader;
 
 import java.io.IOException;
@@ -101,9 +101,9 @@ public class AverageSmoothingRadiusEstimate {
         }
     }
 
-    public static Raster collectR(Raster raster, Object2DoubleMap<Link> emissions) {
+    public static DoubleRaster collectR(DoubleRaster raster, Object2DoubleMap<Link> emissions) {
 
-        var result = new Raster(raster.getBounds(), raster.getCellSize());
+        var result = new DoubleRaster(raster.getBounds(), raster.getCellSize());
         var size = raster.getYLength() * raster.getXLength();
         var counter = new AtomicInteger();
 

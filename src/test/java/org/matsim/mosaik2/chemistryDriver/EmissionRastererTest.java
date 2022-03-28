@@ -6,7 +6,7 @@ import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.mosaik2.utils.TestUtils;
 
 import java.util.Map;
@@ -26,7 +26,7 @@ public class EmissionRastererTest {
     public void raster() {
 
         var network = TestUtils.createSingleLinkNetwork();
-        var bounds = new Raster.Bounds(-10, -10, 110, 10);
+        var bounds = new DoubleRaster.Bounds(-10, -10, 110, 10);
         var cellSize = 10;
         var linkEmission = Map.of(Id.createLinkId("link"), 1000.0);
         var linkEmissionByPollutant = Map.of(Pollutant.NO2, linkEmission);

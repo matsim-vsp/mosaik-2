@@ -10,7 +10,7 @@ import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -32,7 +32,7 @@ public class SimpleConverter {
         @Parameter(names = "-cs") // by default this is 10
         private double cellSize = 10;
 
-        private Raster.Bounds bounds;
+        private DoubleRaster.Bounds bounds;
     }
 
     private static final double timeBinSize = 3600;
@@ -75,9 +75,9 @@ public class SimpleConverter {
         PalmChemistryInput2.writeNetCdfFile(props.outputFile, rasteredEmissions);
     }
 
-    private static Raster.Bounds getBounds(Network network) {
+    private static DoubleRaster.Bounds getBounds(Network network) {
 
         var coords = network.getNodes().values().stream().map(BasicLocation::getCoord).collect(Collectors.toSet());
-        return new Raster.Bounds(coords);
+        return new DoubleRaster.Bounds(coords);
     }
 }

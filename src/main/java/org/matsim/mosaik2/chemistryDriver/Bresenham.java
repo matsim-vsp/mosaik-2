@@ -8,7 +8,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.geotools.MGC;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,9 +24,9 @@ public abstract class Bresenham {
      * an emission value of 100g and the cellSize is 10m and the link covers 2 cells the resulting value per cell is
      * 100g / 2 / (10m * 10m) = 0.5g/m2
      */
-    static Raster rasterizeNetwork(final Network network, final Raster.Bounds bounds, final TObjectDoubleMap<Id<Link>> emissions, final double cellSize) {
+    static DoubleRaster rasterizeNetwork(final Network network, final DoubleRaster.Bounds bounds, final TObjectDoubleMap<Id<Link>> emissions, final double cellSize) {
 
-        var raster = new Raster(bounds, cellSize);
+        var raster = new DoubleRaster(bounds, cellSize);
         final var area = cellSize * cellSize;
 
         emissions.forEachEntry((linkId, value) -> {
@@ -56,9 +56,9 @@ public abstract class Bresenham {
      *
      * Duplicate this to use with normal Map<Id<Link>, Double> backed by a fast utils Object2DoubleMap
      */
-    static Raster rasterizeNetwork(final Network network, final Raster.Bounds bounds, final Map<Id<Link>, Double> emissions, final double cellSize) {
+    static DoubleRaster rasterizeNetwork(final Network network, final DoubleRaster.Bounds bounds, final Map<Id<Link>, Double> emissions, final double cellSize) {
 
-        var raster = new Raster(bounds, cellSize);
+        var raster = new DoubleRaster(bounds, cellSize);
         final var area = cellSize * cellSize;
 
 

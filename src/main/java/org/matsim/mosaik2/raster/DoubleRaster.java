@@ -6,11 +6,11 @@ import java.util.stream.IntStream;
  * Raster holding (x,y, value) values
  * The data is stored within a double[]. The class only offers convenient methods to access this data by (x,y)-coordinates
  */
-public class Raster extends AbstractRaster {
+public class DoubleRaster extends AbstractRaster {
 
     private final double[] data;
 
-    public Raster(Bounds bounds, double cellSize) {
+    public DoubleRaster(Bounds bounds, double cellSize) {
         super(bounds, cellSize);
         this.data = new double[getXLength() * getYLength()];
     }

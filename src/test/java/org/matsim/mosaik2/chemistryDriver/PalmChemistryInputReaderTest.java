@@ -3,7 +3,7 @@ package org.matsim.mosaik2.chemistryDriver;
 import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.contrib.analysis.time.TimeBinMap;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.testcases.MatsimTestUtils;
 
 import java.util.Map;
@@ -26,10 +26,10 @@ public class PalmChemistryInputReaderTest {
         var filename = testUtils.getOutputDirectory() + "test.nc";
         var species = "some-name";
 
-        TimeBinMap<Map<String, Raster>> timeBinMap = new TimeBinMap<>(10, 10);
-        var bounds = new Raster.Bounds(-10, -10, 10, 10);
+        TimeBinMap<Map<String, DoubleRaster>> timeBinMap = new TimeBinMap<>(10, 10);
+        var bounds = new DoubleRaster.Bounds(-10, -10, 10, 10);
 
-        var raster = new Raster(bounds, 10);
+        var raster = new DoubleRaster(bounds, 10);
         raster.adjustValueForCoord(0, 0, 100);
         var map = Map.of(species, raster);
 

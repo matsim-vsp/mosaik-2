@@ -4,7 +4,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.testcases.MatsimTestUtils;
 
 import java.util.Map;
@@ -29,7 +29,7 @@ public class FullFeaturedConverterTest {
                 .scaleFactor(1.0)
                 .timeBinSize(3600)
                 .transformation(new IdentityTransformation())
-                .bounds(new Raster.Bounds(-5, -5, 24, 24))
+                .bounds(new DoubleRaster.Bounds(-5, -5, 24, 24))
                 .build()
                 .write();
 

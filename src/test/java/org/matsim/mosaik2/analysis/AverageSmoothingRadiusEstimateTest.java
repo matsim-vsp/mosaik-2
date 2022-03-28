@@ -14,7 +14,7 @@ import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.mosaik2.palm.PalmOutputReader;
 
 import java.io.IOException;
@@ -37,7 +37,7 @@ public class AverageSmoothingRadiusEstimateTest {
         double E = 10;
         double R = 23;
         final var emissions = new Object2DoubleOpenHashMap<>(Map.of(getLink("link", from, to), E));
-        var raster = new Raster(new Raster.Bounds(0,0,110,110), 10);
+        var raster = new DoubleRaster(new DoubleRaster.Bounds(0,0,110,110), 10);
 
         raster.setValueForEachCoordinate((x, y) -> E * NumericSmoothingRadiusEstimate.calculateWeight(from, to, new Coord(x, y), 20, R));
 
@@ -56,8 +56,8 @@ public class AverageSmoothingRadiusEstimateTest {
         var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM");
 
         // cut 100x100 m in the center of the area.
-        var smallBounds = new Raster.Bounds(pm10Raster.getBounds().getMinX() + 950, pm10Raster.getBounds().getMinY() + 950, pm10Raster.getBounds().getMaxX() - 950, pm10Raster.getBounds().getMaxY() - 950);
-        var smallPm10Raster = new Raster(smallBounds, pm10Raster.getCellSize());
+        var smallBounds = new DoubleRaster.Bounds(pm10Raster.getBounds().getMinX() + 950, pm10Raster.getBounds().getMinY() + 950, pm10Raster.getBounds().getMaxX() - 950, pm10Raster.getBounds().getMaxY() - 950);
+        var smallPm10Raster = new DoubleRaster(smallBounds, pm10Raster.getCellSize());
         smallPm10Raster.setValueForEachIndex(pm10Raster::getValueByIndex);
 
         log.info("Finished loading palm data");

@@ -3,7 +3,7 @@ package org.matsim.mosaik2.palm;
 import lombok.extern.log4j.Log4j2;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 import ucar.ma2.ArrayFloat;
 import ucar.ma2.InvalidRangeException;
 import ucar.nc2.NetcdfFiles;
@@ -16,11 +16,11 @@ import java.util.Objects;
 @Log4j2
 public class PalmOutputReader {
 
-    public static TimeBinMap<Map<String,Raster>> read(String filename) {
+    public static TimeBinMap<Map<String, DoubleRaster>> read(String filename) {
         return read(filename, 0, Integer.MAX_VALUE);
     }
 
-    public static TimeBinMap<Map<String, Raster>> read(String filename, int fromTimeIndex, int toTimeIndex) {
+    public static TimeBinMap<Map<String, DoubleRaster>> read(String filename, int fromTimeIndex, int toTimeIndex) {
 
         log.info("Try opening Netcdf file at: " + filename);
 
@@ -51,7 +51,7 @@ public class PalmOutputReader {
                 log.info("Parsing timestep " + timestep);
 
                 var timeBin = emissions.getTimeBin(timestep);
-                var raster = new Raster(bounds, cellSize);
+                var raster = new DoubleRaster(bounds, cellSize);
                 ArrayFloat.D4 emissionData = (ArrayFloat.D4) kcPm10Var.read(new int[] { ti, 0, 0, 0 }, shapeForReadOperation);
 
                 if (!timeBin.hasValue()) {

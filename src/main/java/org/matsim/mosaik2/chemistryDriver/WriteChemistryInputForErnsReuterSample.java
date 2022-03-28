@@ -25,7 +25,7 @@ import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.mosaik2.events.RawEmissionEventsReader;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -215,7 +215,7 @@ public class WriteChemistryInputForErnsReuterSample {
         // unsimplified network is already adjusted to origin
 
         // transform emissions by link into emissions on a raster
-        TimeBinMap<Map<String, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
+        TimeBinMap<Map<String, DoubleRaster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
         for (var bin : timeBinMap.getTimeBins()) {
 
             logger.info("Writing emissions to raster for timestep: " + bin.getStartTime());
@@ -226,7 +226,7 @@ public class WriteChemistryInputForErnsReuterSample {
                         var emissions = entry.getValue();
                         //var raster = Bresenham.rasterizeNetwork(unsimplifiedNetwork, new Raster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
                         // do it unsimplified
-                        var raster = Bresenham.rasterizeNetwork(filteredNetwork, new Raster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
+                        var raster = Bresenham.rasterizeNetwork(filteredNetwork, new DoubleRaster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
                         var palmPollutantKey = pollutants.get(entry.getKey());
                         return Tuple.of(palmPollutantKey, raster);
                     })
@@ -235,11 +235,11 @@ public class WriteChemistryInputForErnsReuterSample {
         }
 
         // calculate no
-        for (TimeBinMap.TimeBin<Map<String, Raster>> timeBin : rasterTimeBinMap.getTimeBins()) {
+        for (TimeBinMap.TimeBin<Map<String, DoubleRaster>> timeBin : rasterTimeBinMap.getTimeBins()) {
 
             var no2 = timeBin.getValue().get(pollutants.get(Pollutant.NO2));
             var nox = timeBin.getValue().get(pollutants.get(Pollutant.NOx));
-            var no = new Raster(no2.getBounds(), no2.getCellSize());
+            var no = new DoubleRaster(no2.getBounds(), no2.getCellSize());
 
             nox.forEachCoordinate((x, y, noxValue) -> {
                 var no2Value = no2.getValueByCoord(x, y);
@@ -257,14 +257,14 @@ public class WriteChemistryInputForErnsReuterSample {
         writeCSV(Paths.get("C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv"), rasterTimeBinMap);
     }
 
-    public void writeCSV(Path file, TimeBinMap<Map<String, Raster>> map) {
+    public void writeCSV(Path file, TimeBinMap<Map<String, DoubleRaster>> map) {
 
         try (var writer = Files.newBufferedWriter(file); var printer = new CSVPrinter(writer, CSVFormat.DEFAULT)) {
 
             // print header
             printer.printRecord("time", "x", "y", "NO2");
 
-            for (TimeBinMap.TimeBin<Map<String, Raster>> timeBin : map.getTimeBins()) {
+            for (TimeBinMap.TimeBin<Map<String, DoubleRaster>> timeBin : map.getTimeBins()) {
 
                 var time = timeBin.getStartTime();
                 var raster = timeBin.getValue().get("NO2");

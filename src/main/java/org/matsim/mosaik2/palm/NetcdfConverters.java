@@ -1,7 +1,7 @@
 package org.matsim.mosaik2.palm;
 
 import org.matsim.contrib.analysis.time.TimeBinMap;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 import ucar.ma2.ArrayChar;
 import ucar.ma2.DataType;
 import ucar.nc2.Variable;
@@ -57,7 +57,7 @@ public class NetcdfConverters {
         return result;
     }
 
-    public static TimeBinMap<Map<String, Raster>> createTimeBinMap(double[] fromTimes, int fromTimeIndex) {
+    public static TimeBinMap<Map<String, DoubleRaster>> createTimeBinMap(double[] fromTimes, int fromTimeIndex) {
 
         double interval = -1;
         double startTime = fromTimes[fromTimeIndex]; // assuming the list is populated
@@ -95,14 +95,14 @@ public class NetcdfConverters {
         return interval;
     }
 
-    public static Raster.Bounds createBounds(double[] xValues, double[] yValues) {
+    public static DoubleRaster.Bounds createBounds(double[] xValues, double[] yValues) {
 
         if (!isConstantInterval(xValues))
             throw new RuntimeException("found varying intervals on the x-Axis. This code currently assumes a constant grid");
         if (!isConstantInterval(yValues))
             throw new RuntimeException("found varying intervals on the y-Axis. This code currently assumes a constant grid");
 
-        return new Raster.Bounds(xValues[0], yValues[0], xValues[xValues.length - 1], yValues[yValues.length - 1]);
+        return new DoubleRaster.Bounds(xValues[0], yValues[0], xValues[xValues.length - 1], yValues[yValues.length - 1]);
     }
 
     private static boolean isConstantInterval(double[] numbers) {

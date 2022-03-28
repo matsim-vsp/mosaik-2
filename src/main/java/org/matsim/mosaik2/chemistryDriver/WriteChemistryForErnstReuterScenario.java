@@ -4,7 +4,7 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
-import org.matsim.mosaik2.raster.Raster;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -42,7 +42,7 @@ public class WriteChemistryForErnstReuterScenario {
     void write() {
 
         var nameConverter = new PollutantToPalmNameConverter(pollutants);
-        var bounds = new Raster.Bounds(385030.5, 5818413.0, 387076.5, 5820459);
+        var bounds = new DoubleRaster.Bounds(385030.5, 5818413.0, 387076.5, 5820459);
         var transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
 
 

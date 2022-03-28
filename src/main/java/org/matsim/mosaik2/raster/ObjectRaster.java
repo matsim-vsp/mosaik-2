@@ -6,9 +6,9 @@ import java.util.stream.IntStream;
 
 public class ObjectRaster<T> extends AbstractRaster {
 
-    private List<T> data;
+    private final List<T> data;
 
-    protected ObjectRaster(Bounds bounds, double cellSize) {
+    public ObjectRaster(Bounds bounds, double cellSize) {
         super(bounds, cellSize);
         this.data = new ArrayList<>(getXLength() * getYLength());
     }

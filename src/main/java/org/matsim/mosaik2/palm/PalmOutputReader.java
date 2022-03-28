@@ -66,7 +66,7 @@ public class PalmOutputReader {
                     }
                 }
 
-                timeBin.getValue().put(Pollutant.PM.toString(), raster);
+                timeBin.getValue().put("PM10", raster);
             }
             log.info("Finished reading NetcdfFile");
             log.info("");

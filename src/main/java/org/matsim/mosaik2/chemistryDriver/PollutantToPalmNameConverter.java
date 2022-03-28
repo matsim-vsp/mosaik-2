@@ -22,14 +22,14 @@ public class PollutantToPalmNameConverter {
         return pollutantToName.keySet();
     }
 
-    String getPalmName(Pollutant matsimPollutant) {
+    public String getPalmName(Pollutant matsimPollutant) {
         return pollutantToName.get(matsimPollutant);
     }
 
     /**
      * Sets default values for emission names
      */
-    PollutantToPalmNameConverter() {
+    public PollutantToPalmNameConverter() {
         pollutantToName = Map.of(
                 Pollutant.NO2, "NO2",
                 Pollutant.CO2_TOTAL, "CO2",

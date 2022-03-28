@@ -55,7 +55,7 @@ public class AverageSmoothingRadiusEstimate {
         // load the 8 o clock time slice
         var palmOutput = PalmOutputReader.read(input.palmOutputFile, 8 * 4, 8 * 4);
         // take the pm10 raster
-        var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM");
+        var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM10");
 
         // cut 100x100 m in the center of the area.
        // var smallBounds = new Raster.Bounds(pm10Raster.getBounds().getMinX() + 950, pm10Raster.getBounds().getMinY() + 950, pm10Raster.getBounds().getMaxX() - 950, pm10Raster.getBounds().getMaxY() - 950);

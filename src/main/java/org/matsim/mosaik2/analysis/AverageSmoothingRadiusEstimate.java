@@ -15,7 +15,7 @@ import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
-import org.matsim.mosaik2.chemistryDriver.Raster;
+import org.matsim.mosaik2.raster.Raster;
 import org.matsim.mosaik2.palm.PalmOutputReader;
 
 import java.io.IOException;

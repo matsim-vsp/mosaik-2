@@ -6,6 +6,7 @@ import com.google.common.util.concurrent.AtomicDouble;
 import lombok.extern.log4j.Log4j2;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.core.utils.collections.Tuple;
+import org.matsim.mosaik2.raster.Raster;
 
 import java.time.Duration;
 import java.time.LocalDateTime;

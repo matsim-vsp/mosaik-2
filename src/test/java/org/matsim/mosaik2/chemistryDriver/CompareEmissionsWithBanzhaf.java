@@ -6,10 +6,9 @@ import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 import org.junit.Test;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.mosaik2.raster.Raster;
 
-import java.util.Comparator;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Log4j2
 public class CompareEmissionsWithBanzhaf {

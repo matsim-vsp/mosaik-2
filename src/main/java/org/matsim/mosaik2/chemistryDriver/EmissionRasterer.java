@@ -7,6 +7,7 @@ import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.collections.Tuple;
+import org.matsim.mosaik2.raster.Raster;
 
 import java.util.Map;
 import java.util.stream.Collectors;

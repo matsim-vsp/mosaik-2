@@ -11,10 +11,10 @@ import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.handler.BasicEventHandler;
+import org.matsim.mosaik2.raster.Raster;
 import org.matsim.testcases.MatsimTestUtils;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
 

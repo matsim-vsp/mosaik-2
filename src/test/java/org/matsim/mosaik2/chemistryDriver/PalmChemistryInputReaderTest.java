@@ -3,6 +3,7 @@ package org.matsim.mosaik2.chemistryDriver;
 import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.mosaik2.raster.Raster;
 import org.matsim.testcases.MatsimTestUtils;
 
 import java.util.Map;

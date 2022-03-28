@@ -2,15 +2,14 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import org.apache.log4j.Logger;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.mosaik2.raster.Raster;
 import ucar.ma2.*;
 import ucar.nc2.Attribute;
 import ucar.nc2.NetcdfFileWriter;
 
 import java.io.IOException;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.temporal.Temporal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;

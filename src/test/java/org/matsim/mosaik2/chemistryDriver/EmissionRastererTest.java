@@ -2,13 +2,11 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import lombok.extern.log4j.Log4j2;
 import org.junit.Test;
-import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
-import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
-import org.matsim.core.network.NetworkUtils;
+import org.matsim.mosaik2.raster.Raster;
 import org.matsim.mosaik2.utils.TestUtils;
 
 import java.util.Map;

@@ -11,6 +11,7 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
+import org.matsim.mosaik2.raster.Raster;
 
 import java.time.LocalDateTime;
 import java.util.Map;

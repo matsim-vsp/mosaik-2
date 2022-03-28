@@ -4,6 +4,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
+import org.matsim.mosaik2.raster.Raster;
 import org.matsim.testcases.MatsimTestUtils;
 
 import java.util.Map;

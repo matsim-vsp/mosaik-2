@@ -2,8 +2,6 @@ package org.matsim.mosaik2.analysis;
 
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVPrinter;
-import org.apache.commons.math3.special.Erf;
 import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.api.core.v01.Coord;
@@ -12,7 +10,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.analysis.spatial.SpatialInterpolation;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.geotools.MGC;
-import org.matsim.mosaik2.chemistryDriver.Raster;
+import org.matsim.mosaik2.raster.Raster;
 import org.matsim.testcases.MatsimTestUtils;
 
 import java.io.IOException;

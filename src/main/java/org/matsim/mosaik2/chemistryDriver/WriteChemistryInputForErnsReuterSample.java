@@ -25,6 +25,7 @@ import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.mosaik2.events.RawEmissionEventsReader;
+import org.matsim.mosaik2.raster.Raster;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;

@@ -8,6 +8,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.geotools.MGC;
+import org.matsim.mosaik2.raster.Raster;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,6 +1,7 @@
 package org.matsim.mosaik2.chemistryDriver;
 
 import org.junit.Test;
+import org.matsim.mosaik2.raster.Raster;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;

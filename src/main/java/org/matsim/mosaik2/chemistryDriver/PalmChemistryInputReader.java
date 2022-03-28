@@ -2,6 +2,7 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import lombok.extern.log4j.Log4j2;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.mosaik2.raster.Raster;
 import ucar.ma2.*;
 import ucar.nc2.Dimension;
 import ucar.nc2.NetcdfFile;

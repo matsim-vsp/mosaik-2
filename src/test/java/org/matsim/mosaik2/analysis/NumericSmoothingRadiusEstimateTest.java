@@ -1,10 +1,8 @@
 package org.matsim.mosaik2.analysis;
 
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
-import lombok.extern.java.Log;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
-import org.checkerframework.checker.units.qual.C;
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -16,14 +14,12 @@ import org.matsim.contrib.analysis.spatial.SpatialInterpolation;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordUtils;
 import org.matsim.core.utils.geometry.geotools.MGC;
-import org.matsim.mosaik2.chemistryDriver.Raster;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 
 import static org.junit.Assert.*;

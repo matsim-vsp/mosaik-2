@@ -1,7 +1,6 @@
 package org.matsim.mosaik2.analysis;
 
 import it.unimi.dsi.fastutil.objects.AbstractObject2DoubleMap;
-import it.unimi.dsi.fastutil.objects.Object2DoubleArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
@@ -14,17 +13,13 @@ import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
-import org.matsim.core.utils.collections.Tuple;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
-import org.matsim.mosaik2.chemistryDriver.PalmChemistryInputReader;
-import org.matsim.mosaik2.chemistryDriver.Raster;
+import org.matsim.mosaik2.raster.Raster;
 import org.matsim.mosaik2.palm.PalmOutputReader;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.AbstractMap;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;

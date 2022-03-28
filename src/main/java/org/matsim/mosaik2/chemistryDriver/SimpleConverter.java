@@ -10,6 +10,7 @@ import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
+import org.matsim.mosaik2.raster.Raster;
 
 import java.util.Map;
 import java.util.stream.Collectors;

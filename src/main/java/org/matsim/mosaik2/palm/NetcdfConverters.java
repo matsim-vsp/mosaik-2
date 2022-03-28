@@ -1,8 +1,7 @@
 package org.matsim.mosaik2.palm;
 
-import it.unimi.dsi.fastutil.doubles.DoubleList;
 import org.matsim.contrib.analysis.time.TimeBinMap;
-import org.matsim.mosaik2.chemistryDriver.Raster;
+import org.matsim.mosaik2.raster.Raster;
 import ucar.ma2.ArrayChar;
 import ucar.ma2.DataType;
 import ucar.nc2.Variable;

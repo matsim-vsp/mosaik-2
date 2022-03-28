@@ -4,6 +4,7 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
+import org.matsim.mosaik2.raster.Raster;
 
 import java.time.LocalDateTime;
 import java.util.Map;

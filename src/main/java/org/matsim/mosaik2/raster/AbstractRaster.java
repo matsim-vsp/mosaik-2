@@ -68,7 +68,7 @@ class AbstractRaster {
             this.maxY = maxY;
         }
 
-        Bounds(Set<Coord> coords) {
+        public Bounds(Set<Coord> coords) {
             for (Coord coord : coords) {
                 if (coord.getX() < minX) minX = coord.getX();
                 if (coord.getY() < minY) minY = coord.getY();
@@ -77,7 +77,7 @@ class AbstractRaster {
             }
         }
 
-        Bounds(Geometry geometry) {
+        public Bounds(Geometry geometry) {
             this.minX = geometry.getEnvelopeInternal().getMinX();
             this.minY = geometry.getEnvelopeInternal().getMinY();
             this.maxX = geometry.getEnvelopeInternal().getMaxX();

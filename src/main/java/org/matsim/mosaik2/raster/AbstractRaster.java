@@ -2,7 +2,9 @@ package org.matsim.mosaik2.raster;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.matsim.api.core.v01.Coord;
 
 import java.util.Set;
@@ -106,6 +108,16 @@ class AbstractRaster {
 
         public boolean covers(double x, double y) {
             return minX <= x && x <= maxX && minY <= y && y <= maxY;
+        }
+
+        public Geometry toGeometry() {
+            var factory = new GeometryFactory();
+            var coordinates = new Coordinate[]{
+                    new Coordinate(minX, minY), new Coordinate(maxX, minY),
+                    new Coordinate(maxX, maxY), new Coordinate(minX, maxY),
+                    new Coordinate(minX, minY)
+            };
+            return factory.createPolygon(coordinates);
         }
     }
 }

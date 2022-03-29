@@ -10,7 +10,22 @@ public class ObjectRaster<T> extends AbstractRaster {
 
     public ObjectRaster(Bounds bounds, double cellSize) {
         super(bounds, cellSize);
-        this.data = new ArrayList<>(getXLength() * getYLength());
+        this.data = this.initializeArrayWithGarbage();
+    }
+
+    /**
+     * We are using an ArrayList as data store. Since we want to store data with List.set(index, value) in random order
+     * we need to initialize the entire list with null-values. This is because the ArrayList ensures that values are only
+     * added consecutively.
+     *
+     * @return List initialzed with null-values for the entire length of the raster.
+     */
+    private List<T> initializeArrayWithGarbage() {
+        List<T> list = new ArrayList<>(getXLength() * getYLength());
+        for (int i = 0; i < getXLength() * getYLength(); i++) {
+            list.add(null);
+        }
+        return list;
     }
 
     /**

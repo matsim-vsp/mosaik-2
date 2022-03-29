@@ -6,12 +6,15 @@ import org.apache.commons.math3.special.Erf;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.network.Link;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 @Log4j2
 public class NumericSmoothingRadiusEstimate {
 
     private static final double R_THRESHOLD =  1E-9;
     private static final double BISECT_THRESHOLD = 1E-3; // I think we are fine with such coarse values for now.
     private static final double h = 1E-10; // this is the smallest number one could add and still get a difference for R + h
+    private static final AtomicInteger logCounter = new AtomicInteger();
 
     public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR) {
 
@@ -41,10 +44,14 @@ public class NumericSmoothingRadiusEstimate {
         int counter = 0;
 
         if (Math.signum(lowerBoundResult) == Math.signum(upperBoundResult)) {
-            log.warn("There is no zero point in the intervall between [" + lowerBound + "," +  upperBound + "]. Consider changing the interval or check whether the input is plausible.");
-            log.warn("ReceiverPoint: " + receiverPoint.toString() + " , xj: " + xj + ", lowerBoundResult: " + lowerBoundResult + " , upperBoundResult: " + upperBoundResult);
-            log.warn("Returning -1.0 as R-Value.");
-            return -1.0;
+
+            var currentLogCount = logCounter.incrementAndGet();
+            if (currentLogCount < 50 || currentLogCount % 1000000 == 0) {
+                log.warn("There is no zero point in the intervall between [" + lowerBound + "," + upperBound + "]. Consider changing the interval or check whether the input is plausible.");
+                log.warn("ReceiverPoint: " + receiverPoint.toString() + " , xj: " + xj + ", lowerBoundResult: " + lowerBoundResult + " , upperBoundResult: " + upperBoundResult);
+                log.warn("Returning -2.0 as R-Value. After the first 50 logs this will only show every 1.000.000th case.");
+            }
+            return -2.0;
         }
 
         do {

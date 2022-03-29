@@ -15,8 +15,8 @@ import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
-import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.mosaik2.palm.PalmOutputReader;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -28,22 +28,28 @@ import java.util.stream.Collectors;
 @Log4j2
 public class AverageSmoothingRadiusEstimate {
 
-    private static class InputArgs {
+    public static DoubleRaster collectR(DoubleRaster raster, Object2DoubleMap<Link> emissions) {
 
-        @Parameter(names = "-e", required = true)
-        private String emissionEventsFile;
+        var result = new DoubleRaster(raster.getBounds(), raster.getCellSize());
+        var size = raster.getYLength() * raster.getXLength();
+        var counter = new AtomicInteger();
 
-        @Parameter(names = "-n", required = true)
-        private String networkFile;
+        log.info("Starting to calculate R for each cell. We have " + size + " cells.");
 
-        @Parameter(names = "-p", required = true)
-        private String palmOutputFile;
+        result.setValueForEachCoordinate((x, y) -> {
+            var receiverPoint = new Coord(x, y);
+            var value = raster.getValueByCoord(x, y);
+            // assuming that receiver points with 0 emissions are palm-buildings
+            var r = value <= -1 ? 0.0 : NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value);
+            var currentCount = counter.incrementAndGet();
+            if (currentCount % 100000 == 0) {
+                log.info("Calculated " + currentCount + "/" + size + " R-Values. Last value was: " + r);
+            }
+            return r;
+        });
+        log.info("Finished R calculation");
 
-        @Parameter(names = "-o", required = true)
-        private String outputFile;
-
-        @Parameter(names = "-s")
-        private int scaleFactor = 10;
+        return result;
     }
 
     public static void main(String[] args) {
@@ -101,26 +107,21 @@ public class AverageSmoothingRadiusEstimate {
         }
     }
 
-    public static DoubleRaster collectR(DoubleRaster raster, Object2DoubleMap<Link> emissions) {
+    private static class InputArgs {
 
-        var result = new DoubleRaster(raster.getBounds(), raster.getCellSize());
-        var size = raster.getYLength() * raster.getXLength();
-        var counter = new AtomicInteger();
+        @Parameter(names = "-e", required = true)
+        private String emissionEventsFile;
 
-        log.info("Starting to calculate R for each cell. We have " + size + " cells.");
+        @Parameter(names = "-n", required = true)
+        private String networkFile;
 
-        result.setValueForEachCoordinate((x, y) -> {
-            var receiverPoint = new Coord(x,y);
-            var value = raster.getValueByCoord(x, y);
-            var r = value <= 0 ? 0.0 : NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value);
-            var currentCount = counter.incrementAndGet();
-            if (currentCount % 100 == 0) {
-                log.info("Calculated " + currentCount + "/" + size + " R-Values. Last value was: " + r);
-            }
-            return r;
-        });
-        log.info("Finished R calculation");
+        @Parameter(names = "-p", required = true)
+        private String palmOutputFile;
 
-        return result;
+        @Parameter(names = "-o", required = true)
+        private String outputFile;
+
+        @Parameter(names = "-s")
+        private final int scaleFactor = 10;
     }
 }

@@ -36,48 +36,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 
+@SuppressWarnings("ALL")
 @Log4j2
 public class SmoothingRadiusEstimate {
-
-    private TimeBinMap<Map<String, Object2DoubleMap<Link>>> parseEmissions() {
-
-        var handler = new AggregateEmissionsByTimeHandler(network, Set.of(Pollutant.PM), 900, input.scaleFactor);
-        var manager = EventsUtils.createEventsManager();
-        manager.addHandler(handler);
-
-        log.info("Start parsing emission events");
-        new EmissionEventsReader(manager).readFile(input.emissionEventsFile);
-
-        log.info("Start converting collected emissions.");
-        TimeBinMap<Map<String, Object2DoubleMap<Link>>> result = new TimeBinMap<>(900);
-        var handlerMap = handler.getTimeBinMap();
-        var nameConverter = new PollutantToPalmNameConverter();
-
-        for (var bin : handlerMap.getTimeBins()) {
-
-            TimeBinMap.TimeBin<Map<String, Object2DoubleMap<Link>>> resultBin = result.getTimeBin(bin.getStartTime());
-            if (!resultBin.hasValue()) {
-                resultBin.setValue(new HashMap<>());
-            }
-            Map<String, Object2DoubleMap<Link>> pollutantMap = resultBin.getValue();
-
-            for (var pollutantEntry : bin.getValue().entrySet()) {
-
-                var palmKey = nameConverter.getPalmName(pollutantEntry.getKey());
-
-                var emissionResultMap = pollutantMap.computeIfAbsent(palmKey, key -> new Object2DoubleOpenHashMap<>());
-                var emissionMap = pollutantEntry.getValue();
-                for (Object2DoubleMap.Entry<Id<Link>> idEntry : emissionMap.object2DoubleEntrySet()) {
-                    var link = network.getLinks().get(idEntry.getKey());
-
-                    // we must use merge here, since pm and pm_non_exhaust map to pm10 in palm
-                    emissionResultMap.mergeDouble(link, idEntry.getDoubleValue(), Double::sum);
-                }
-                pollutantMap.put(palmKey, emissionResultMap);
-            }
-        }
-        return result;
-    }
 
     public static void main(String[] args) {
 
@@ -169,6 +130,46 @@ public class SmoothingRadiusEstimate {
         return new ObjectRaster<>(raster.getBounds(), raster.getCellSize());
     }
 
+    private TimeBinMap<Map<String, Object2DoubleMap<Link>>> parseEmissions() {
+
+        var handler = new AggregateEmissionsByTimeHandler(network, Set.of(Pollutant.PM), 900, input.scaleFactor);
+        var manager = EventsUtils.createEventsManager();
+        manager.addHandler(handler);
+
+        log.info("Start parsing emission events");
+        new EmissionEventsReader(manager).readFile(input.emissionEventsFile);
+
+        log.info("Start converting collected emissions.");
+        TimeBinMap<Map<String, Object2DoubleMap<Link>>> result = new TimeBinMap<>(900);
+        var handlerMap = handler.getTimeBinMap();
+        var nameConverter = new PollutantToPalmNameConverter();
+
+        for (var bin : handlerMap.getTimeBins()) {
+
+            TimeBinMap.TimeBin<Map<String, Object2DoubleMap<Link>>> resultBin = result.getTimeBin(bin.getStartTime());
+            if (!resultBin.hasValue()) {
+                resultBin.setValue(new HashMap<>());
+            }
+            Map<String, Object2DoubleMap<Link>> pollutantMap = resultBin.getValue();
+
+            for (var pollutantEntry : bin.getValue().entrySet()) {
+
+                var palmKey = nameConverter.getPalmName(pollutantEntry.getKey());
+
+                var emissionResultMap = pollutantMap.computeIfAbsent(palmKey, key -> new Object2DoubleOpenHashMap<>());
+                var emissionMap = pollutantEntry.getValue();
+                for (Object2DoubleMap.Entry<Id<Link>> idEntry : emissionMap.object2DoubleEntrySet()) {
+                    var link = network.getLinks().get(idEntry.getKey());
+
+                    // we must use merge here, since pm and pm_non_exhaust map to pm10 in palm
+                    emissionResultMap.mergeDouble(link, idEntry.getDoubleValue(), Double::sum);
+                }
+                pollutantMap.put(palmKey, emissionResultMap);
+            }
+        }
+        return result;
+    }
+
     private void collectRForEachTimeslice() {
 
         // set the index manually for now. Maybe this is sufficient already
@@ -221,7 +222,7 @@ public class SmoothingRadiusEstimate {
         private String outputFile;
 
         @Parameter(names = "-s")
-        private final int scaleFactor = 10;
+        private int scaleFactor = 10;
     }
 
     private static void printValue(double x, double y, double value, CSVPrinter printer) {

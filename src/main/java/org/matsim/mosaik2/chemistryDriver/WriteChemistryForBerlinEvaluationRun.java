@@ -11,26 +11,28 @@ import java.time.LocalDateTime;
  * the emissions of has UTM-33 (EPSG:25833) as CRS. Hence, no transformation is necessary. The matsim input (network and
  * events file can be found at: runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/output
  * The output is written to: shared-svn/projects/mosaik-2/data/valm02_v04
- * <p>
+ *
  * The matsim scenario is a 10% sample. The default scale factor of 10 was used.
  */
 public class WriteChemistryForBerlinEvaluationRun {
 
     @Parameter(names = "-n", required = true)
-    private final String networkFile = "";
+    private String networkFile = "";
 
     @Parameter(names = "-e", required = true)
-    private final String emissionEventsFile = "";
+    private String emissionEventsFile = "";
 
     @Parameter(names = {"-o2", "-outputNest3"}, required = true)
-    private final String nest2OutputFile = "";
+    private String nest2OutputFile = "";
 
     @Parameter(names = {"-o3", "-outputNest2"}, required = true)
-    private final String nest3OutputFile = "";
-    @Parameter(names = "-s")
-    private final double scaleFactor = 10;
+    private String nest3OutputFile = "";
+
     @Parameter(names = {"-op", "-outputNest1"}, required = true)
     private String parentOutputFile;
+
+    @Parameter(names = "-s")
+    private double scaleFactor = 10;
 
     public static void main(String[] args) {
         var writer = new WriteChemistryForBerlinEvaluationRun();

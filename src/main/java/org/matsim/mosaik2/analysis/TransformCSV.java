@@ -74,7 +74,7 @@ public class TransformCSV {
                     printer.println();
                     counter++;
 
-                    if (counter % 10000 == 0) {
+                    if (counter % 100000 == 0) {
                         log.info("Parsed #" + counter);
                     }
                 }

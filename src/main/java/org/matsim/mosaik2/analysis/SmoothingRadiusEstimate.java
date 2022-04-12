@@ -142,7 +142,14 @@ public class SmoothingRadiusEstimate {
         log.info("Start converting collected emissions.");
         TimeBinMap<Map<String, Object2DoubleMap<Link>>> result = new TimeBinMap<>(900);
         var handlerMap = handler.getTimeBinMap();
-        var nameConverter = new PollutantToPalmNameConverter();
+        var nameConverter = new PollutantToPalmNameConverter(Map.of(
+                Pollutant.NO2, "NO2",
+                Pollutant.CO2_TOTAL, "CO2",
+                Pollutant.PM, "PM10",
+                Pollutant.PM_non_exhaust, "PM10_non_exhaust",
+                Pollutant.CO, "CO",
+                Pollutant.NOx, "NOx"
+        ));
 
         for (var bin : handlerMap.getTimeBins()) {
 
@@ -173,10 +180,10 @@ public class SmoothingRadiusEstimate {
     private void collectRForEachTimeslice() {
 
         // set the index manually for now. Maybe this is sufficient already
-        int startIndex = 0;
-        int endIndex = 24 * 4;
+        int startIndex = input.startIndex;
+        int endIndex = input.endIndex;
 
-        for (int i = startIndex; i < endIndex; i++) {
+        for (int i = startIndex; i <= endIndex; i++) {
             log.info("calculate r for time index: " + i);
             // read a single time slice at a time
             var palmOutput = PalmOutputReader.read(input.palmOutputFile, i, i);
@@ -223,6 +230,12 @@ public class SmoothingRadiusEstimate {
 
         @Parameter(names = "-s")
         private int scaleFactor = 10;
+
+        @Parameter(names = "-si")
+        private int startIndex = 0;
+
+        @Parameter(names = "-ei")
+        private int endIndex = Integer.MAX_VALUE;
     }
 
     private static void printValue(double x, double y, double value, CSVPrinter printer) {

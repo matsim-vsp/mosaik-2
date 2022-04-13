@@ -2,8 +2,10 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import org.matsim.contrib.emissions.Pollutant;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * This class writes emission data for the berlin evaluation run. The palm run has three domains: 1 Parent domain with
@@ -78,16 +80,24 @@ public class WriteChemistryForBerlinEvaluationRun {
 
     private void write(double cellSize, Raster.Bounds bounds, String outputFileName) {
 
+        var names = new PollutantToPalmNameConverter(Map.of(
+                Pollutant.NO2, "NO2",
+                Pollutant.PM, "PM10",
+                Pollutant.PM_non_exhaust, "PM10",
+                Pollutant.NOx, "NOx"
+        ));
+
         var converter = FullFeaturedConverter.builder()
                 .networkFile(networkFile)
                 .emissionEventsFile(emissionEventsFile)
+                .pollutantConverter(names)
                 .outputFile(outputFileName)
                 .bounds(bounds)
                 .cellSize(cellSize)
                 .scaleFactor(scaleFactor)
                 .timeBinSize(3600)
                 .date(LocalDateTime.of(2018, 7, 16, 0, 0, 0))
-                .numberOfDays(2)
+                .numberOfDays(3)
                 .offset(2)
                 .build();
 

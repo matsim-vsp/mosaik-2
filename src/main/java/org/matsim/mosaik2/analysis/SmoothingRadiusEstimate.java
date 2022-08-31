@@ -127,12 +127,13 @@ public class SmoothingRadiusEstimate {
         log.info("Peek into palm file to populate the link cash raster");
         var palmOutput = PalmOutputReader.read(input.palmOutputFile, 0, 0);
         var raster = palmOutput.getTimeBins().iterator().next().getValue().values().iterator().next();
+
         return new ObjectRaster<>(raster.getBounds(), raster.getCellSize());
     }
 
     private TimeBinMap<Map<String, Object2DoubleMap<Link>>> parseEmissions() {
 
-        var handler = new AggregateEmissionsByTimeHandler(network, Set.of(Pollutant.PM), 900, input.scaleFactor);
+        var handler = new AggregateEmissionsByTimeHandler(network, Set.of(Pollutant.PM), input.timeBinSize, input.scaleFactor);
         var manager = EventsUtils.createEventsManager();
         manager.addHandler(handler);
 
@@ -140,7 +141,7 @@ public class SmoothingRadiusEstimate {
         new EmissionEventsReader(manager).readFile(input.emissionEventsFile);
 
         log.info("Start converting collected emissions.");
-        TimeBinMap<Map<String, Object2DoubleMap<Link>>> result = new TimeBinMap<>(900);
+        TimeBinMap<Map<String, Object2DoubleMap<Link>>> result = new TimeBinMap<>(input.timeBinSize);
         var handlerMap = handler.getTimeBinMap();
         var nameConverter = new PollutantToPalmNameConverter(Map.of(
                 Pollutant.NO2, "NO2",
@@ -190,8 +191,14 @@ public class SmoothingRadiusEstimate {
             // lets start with pm 10 only.
             var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM10");
 
+            // cut in the center of the area
+            //var smallBounds = new DoubleRaster.Bounds(3000, 2000, 4000,3000);
+            //var smallPm10Raster = new DoubleRaster(smallBounds, pm10Raster.getCellSize());
+           //smallPm10Raster.setValueForEachIndex(pm10Raster::getValueByIndex);
+            //pm10Raster = smallPm10Raster;
+
             // get the corresponding time slice from the emissions
-            var emissionBin = emissions.getTimeBin(i * 900 + 1);
+            var emissionBin = emissions.getTimeBin((i + input.indexOffset) * input.timeBinSize + 1);
 
             // if we have a small sample, there might be no emissions at all.
             if (emissionBin == null || !emissionBin.hasValue()) {
@@ -205,7 +212,7 @@ public class SmoothingRadiusEstimate {
 
             log.info("after collectR");
             log.info("writing csv to: " + input.outputFile);
-            try (var writer = Files.newBufferedWriter(Paths.get(input.outputFile + "_" + i + "_.csv")); var printer = CSVFormat.DEFAULT.withDelimiter(',').withHeader("x", "y", "R").print(writer)) {
+            try (var writer = Files.newBufferedWriter(Paths.get(input.outputFile + "_" + i + ".csv")); var printer = CSVFormat.DEFAULT.withDelimiter(',').withHeader("x", "y", "R").print(writer)) {
                 rasterOfRs.forEachCoordinate((x, y, value) -> printValue(x, y, value, printer));
             } catch (IOException e) {
                 e.printStackTrace();
@@ -236,6 +243,12 @@ public class SmoothingRadiusEstimate {
 
         @Parameter(names = "-ei")
         private int endIndex = Integer.MAX_VALUE;
+
+        @Parameter(names = "-io")
+        private int indexOffset = 0;
+
+        @Parameter(names = "-ts")
+        private int timeBinSize = 3600;
     }
 
     private static void printValue(double x, double y, double value, CSVPrinter printer) {

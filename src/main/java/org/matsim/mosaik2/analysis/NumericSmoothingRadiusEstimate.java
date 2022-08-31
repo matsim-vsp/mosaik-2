@@ -35,7 +35,7 @@ public class NumericSmoothingRadiusEstimate {
 
     public static double estimateRWithBisect(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj) {
 
-        double lowerBound = 0.0001; // chose a value close to 0. With 0.0 the whole thing didn't work out anymore.
+        double lowerBound = 0.1; // chose a value close to 0. With 0.0 the whole thing didn't work out anymore.
         double upperBound = 50;
         double lowerBoundResult = sumf(emissions, receiverPoint, lowerBound) - xj;
         double upperBoundResult = sumf(emissions, receiverPoint, upperBound) - xj;

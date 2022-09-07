@@ -7,31 +7,37 @@ import org.matsim.mosaik2.raster.ConvertToCSV;
 
 public class ConvertPalmToCSV {
 
-    @Parameter(names = "-p", required = true)
-    private String palmFile;
+	@Parameter(names = "-p", required = true)
+	private String palmFile;
 
-    @Parameter(names = "-o" , required = true)
-    private String outputTemplate;
+	@Parameter(names = "-o", required = true)
+	private String outputTemplate;
 
-    public static void main(String[] args) {
+	@Parameter(names = "-index")
+	private int index;
 
-        var converter = new ConvertPalmToCSV();
-        JCommander.newBuilder().addObject(converter).build().parse(args);
-        converter.run();
-    }
+	@Parameter(names = "-species", required = true)
+	private String species;
 
-    private void run() {
+	public static void main(String[] args) {
 
-        // get data at 8am
-        var palmOutput = PalmOutputReader.read(palmFile, 85, 85);
-        //get pm 10
-        var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM10");
+		var converter = new ConvertPalmToCSV();
+		JCommander.newBuilder().addObject(converter).build().parse(args);
+		converter.run();
+	}
 
-        var outputfile = outputTemplate + "_915pm.csv";
-        ConvertToCSV.convert(pm10Raster, outputfile);
+	private void run() {
 
-        // transform this for kepler.gl
-        var transformArgs = new String[] { "-sCRS", "EPSG:25833", "-tCRS", "EPSG:4326", "-i", outputfile, "-o", outputTemplate + "8am-4326.csv"};
-        TransformCSV.main(transformArgs);
-    }
+		// get data at 8am
+		var palmOutput = PalmOutputReader.read(palmFile, index, index, species);
+		//get pm 10
+		var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM10");
+
+		var outputfile = outputTemplate + "_" + index + ".csv";
+		ConvertToCSV.convert(pm10Raster, outputfile);
+
+		// transform this for kepler.gl
+		var transformArgs = new String[]{"-sCRS", "EPSG:25833", "-tCRS", "EPSG:4326", "-i", outputfile, "-o", outputTemplate + "_" + index + "-4326.csv"};
+		TransformCSV.main(transformArgs);
+	}
 }

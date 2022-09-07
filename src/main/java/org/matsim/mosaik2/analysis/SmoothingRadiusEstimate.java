@@ -138,7 +138,7 @@ public class SmoothingRadiusEstimate {
 	private ObjectRaster<Set<Id<Link>>> setUpLinkCash() {
 
 		log.info("Peek into palm file to populate the link cash raster");
-		var palmOutput = PalmOutputReader.read(input.palmOutputFile, 0, 0);
+		var palmOutput = PalmOutputReader.read(input.palmOutputFile, 0, 0, "PM10");
 		var raster = palmOutput.getTimeBins().iterator().next().getValue().values().iterator().next();
 
 		return new ObjectRaster<>(raster.getBounds(), raster.getCellSize());
@@ -146,7 +146,7 @@ public class SmoothingRadiusEstimate {
 
 	private TimeBinMap<Map<String, Object2DoubleMap<Link>>> parseEmissions() {
 
-		var handler = new AggregateEmissionsByTimeHandler(network, Set.of(Pollutant.PM), input.timeBinSize, input.scaleFactor);
+		var handler = new AggregateEmissionsByTimeHandler(network, Set.of(Pollutant.PM, Pollutant.PM_non_exhaust), input.timeBinSize, input.scaleFactor);
 		var manager = EventsUtils.createEventsManager();
 		manager.addHandler(handler);
 
@@ -160,7 +160,7 @@ public class SmoothingRadiusEstimate {
 				Pollutant.NO2, "NO2",
 				Pollutant.CO2_TOTAL, "CO2",
 				Pollutant.PM, "PM10",
-				Pollutant.PM_non_exhaust, "PM10_non_exhaust",
+				Pollutant.PM_non_exhaust, "PM10",
 				Pollutant.CO, "CO",
 				Pollutant.NOx, "NOx"
 		));
@@ -212,7 +212,7 @@ public class SmoothingRadiusEstimate {
 		for (int i = startIndex; i <= endIndex; i++) {
 			log.info("calculate r for time index: " + i);
 			// read a single time slice at a time
-			var palmOutput = PalmOutputReader.read(input.palmOutputFile, i, i);
+			var palmOutput = PalmOutputReader.read(input.palmOutputFile, i, i, "PM10");
 			// lets start with pm 10 only.
 			var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM10");
 

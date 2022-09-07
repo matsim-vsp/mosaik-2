@@ -12,68 +12,76 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * This class reads a masked averaged output file of PALM.
+ */
 @Log4j2
 public class PalmOutputReader {
 
-    public static TimeBinMap<Map<String, DoubleRaster>> read(String filename) {
-        return read(filename, 0, Integer.MAX_VALUE, "PM10");
-    }
+	public static TimeBinMap<Map<String, DoubleRaster>> read(String filename) {
+		return read(filename, 0, Integer.MAX_VALUE, "PM10");
+	}
 
-    public static TimeBinMap<Map<String, DoubleRaster>> read(String filename, int fromTimeIndex, int toTimeIndex, String species) {
+	public static TimeBinMap<Map<String, DoubleRaster>> readAll(String filename, String species) {
+		return read(filename, 0, Integer.MAX_VALUE, species);
+	}
 
-        log.info("Try opening Netcdf file at: " + filename);
+	public static TimeBinMap<Map<String, DoubleRaster>> read(String filename, int fromTimeIndex, int toTimeIndex, String species) {
+
+		log.info("Try opening Netcdf file at: " + filename);
 
 
-        try (var file = NetcdfFiles.open(filename)) {
+		try (var file = NetcdfFiles.open(filename)) {
 
-            var timeVar = file.findVariable("time");
+			var timeVar = file.findVariable("time");
 
-            // x and y are supposed to be in the correct coordinate system. For Berlin those should be in UTM-33
-            var xVar = file.findVariable("E_UTM");
-            var yVar = file.findVariable("N_UTM");
-            var kcPm10Var = Objects.requireNonNull(file.findVariable("kc_" + species));
+			// x and y are supposed to be in the correct coordinate system. For Berlin those should be in UTM-33
+			var xVar = file.findVariable("E_UTM");
+			var yVar = file.findVariable("N_UTM");
+			var kcPm10Var = Objects.requireNonNull(file.findVariable("kc_" + species));
 
-            var times = NetcdfConverters.toDoubleArray(Objects.requireNonNull(timeVar));
-            var x = NetcdfConverters.toDoubleArray(Objects.requireNonNull(xVar));
-            var y = NetcdfConverters.toDoubleArray(Objects.requireNonNull(yVar));
+			var times = NetcdfConverters.toDoubleArray(Objects.requireNonNull(timeVar));
+			var x = NetcdfConverters.toDoubleArray(Objects.requireNonNull(xVar));
+			var y = NetcdfConverters.toDoubleArray(Objects.requireNonNull(yVar));
 
-            //  Dimension kuAbove = new Dimension(" ku_above_surf", 1);
-            //  kcPm10Var.reduce(List.of(kuAbove)); // remove ku_above_surf, since we are looking at the first layer above surface. This reduces the dimension of the values array
+			//  Dimension kuAbove = new Dimension(" ku_above_surf", 1);
+			//  kcPm10Var.reduce(List.of(kuAbove)); // remove ku_above_surf, since we are looking at the first layer above surface. This reduces the dimension of the values array
 
-            var emissions = NetcdfConverters.createTimeBinMap(times, fromTimeIndex);
-            var bounds = NetcdfConverters.createBounds(x, y);
-            var cellSize = NetcdfConverters.getCellSize(x, y);
-            var shapeForReadOperation = new int[]{1, 1, y.length, x.length};
+			var emissions = NetcdfConverters.createTimeBinMap(times, fromTimeIndex);
+			var bounds = NetcdfConverters.createBounds(x, y);
+			var cellSize = NetcdfConverters.getCellSize(x, y);
+			var shapeForReadOperation = new int[]{1, 1, y.length, x.length};
 
-            for (int ti = fromTimeIndex; ti < times.length && ti <= toTimeIndex; ti++) {
+			for (int ti = fromTimeIndex; ti < times.length && ti <= toTimeIndex; ti++) {
 
-                var timestep = times[ti];
-                log.info("Parsing timestep " + timestep);
+				var timestep = times[ti];
+				var startTime = timestep - emissions.getBinSize();
+				log.info("Parsing timestep [" + startTime + ", " + timestep + "]");
 
-                var timeBin = emissions.getTimeBin(timestep);
-                var raster = new DoubleRaster(bounds, cellSize);
-                ArrayFloat.D4 emissionData = (ArrayFloat.D4) kcPm10Var.read(new int[]{ti, 0, 0, 0}, shapeForReadOperation);
+				var timeBin = emissions.getTimeBin(startTime);
+				var raster = new DoubleRaster(bounds, cellSize);
+				ArrayFloat.D4 emissionData = (ArrayFloat.D4) kcPm10Var.read(new int[]{ti, 0, 0, 0}, shapeForReadOperation);
 
-                if (!timeBin.hasValue()) {
-                    timeBin.setValue(new HashMap<>());
-                }
+				if (!timeBin.hasValue()) {
+					timeBin.setValue(new HashMap<>());
+				}
 
-                for (int xi = 0; xi < x.length; xi++) {
-                    for (int yi = 0; yi < y.length; yi++) {
+				for (int xi = 0; xi < x.length; xi++) {
+					for (int yi = 0; yi < y.length; yi++) {
 
-                        float value = emissionData.get(0, 0, yi, xi);
-                        raster.adjustValueForIndex(xi, yi, value);
-                    }
-                }
+						float value = emissionData.get(0, 0, yi, xi);
+						raster.adjustValueForIndex(xi, yi, value);
+					}
+				}
 
-                timeBin.getValue().put(species, raster);
-            }
-            log.info("Finished reading NetcdfFile");
-            log.info("");
-            return emissions;
+				timeBin.getValue().put(species, raster);
+			}
+			log.info("Finished reading NetcdfFile");
+			log.info("");
+			return emissions;
 
-        } catch (IOException | InvalidRangeException e) {
-            throw new RuntimeException(e);
-        }
-    }
+		} catch (IOException | InvalidRangeException e) {
+			throw new RuntimeException(e);
+		}
+	}
 }

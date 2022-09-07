@@ -5,7 +5,7 @@ import com.beust.jcommander.Parameter;
 import org.matsim.mosaik2.palm.PalmOutputReader;
 import org.matsim.mosaik2.raster.ConvertToCSV;
 
-public class ConvertPalmToCSV {
+public class ConvertPalmTimestepToCSV {
 
 	@Parameter(names = "-p", required = true)
 	private String palmFile;
@@ -13,15 +13,17 @@ public class ConvertPalmToCSV {
 	@Parameter(names = "-o", required = true)
 	private String outputTemplate;
 
+	@SuppressWarnings("FieldMayBeFinal")
 	@Parameter(names = "-index")
-	private int index;
+	private int index = 0;
 
 	@Parameter(names = "-species", required = true)
 	private String species;
 
+
 	public static void main(String[] args) {
 
-		var converter = new ConvertPalmToCSV();
+		var converter = new ConvertPalmTimestepToCSV();
 		JCommander.newBuilder().addObject(converter).build().parse(args);
 		converter.run();
 	}
@@ -31,7 +33,7 @@ public class ConvertPalmToCSV {
 		// get data at 8am
 		var palmOutput = PalmOutputReader.read(palmFile, index, index, species);
 		//get pm 10
-		var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM10");
+		var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get(species);
 
 		var outputfile = outputTemplate + "_" + index + ".csv";
 		ConvertToCSV.convert(pm10Raster, outputfile);

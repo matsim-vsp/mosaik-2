@@ -13,7 +13,7 @@ import java.util.Collection;
 
 @SuppressWarnings("FieldMayBeFinal")
 @Log4j2
-public class CutOutTimeSlices {
+public class ConvertPalmCsvOutputToSparse {
 
 	@Parameter(names = "-xCol")
 	private String xColumnName = "x";
@@ -23,6 +23,9 @@ public class CutOutTimeSlices {
 
 	@Parameter(names = "-timeCol")
 	private String timeColumnName = "time";
+
+	@Parameter(names = "-valueCol")
+	private String valueColumnName = "value";
 
 	@Parameter(names = "-i", required = true)
 	private String inputFile;
@@ -36,10 +39,13 @@ public class CutOutTimeSlices {
 	@Parameter(names = "-endTime")
 	private double endTime = Double.MAX_VALUE;
 
+	@Parameter(names = "-minValue")
+	private double minValue = 0.0;
+
 
 	public static void main(String[] args) {
 
-		var transformer = new CutOutTimeSlices();
+		var transformer = new ConvertPalmCsvOutputToSparse();
 		JCommander.newBuilder().addObject(transformer).build().parse(args);
 		transformer.run();
 	}
@@ -58,16 +64,22 @@ public class CutOutTimeSlices {
 
 			checkForHeaders(parser.getHeaderNames(), xColumnName);
 			checkForHeaders(parser.getHeaderNames(), yColumnName);
+			checkForHeaders(parser.getHeaderNames(), valueColumnName);
 			var headers = parser.getHeaderNames().toArray(new String[0]);
 
 			try (var writer = Files.newBufferedWriter(outputPath); var printer = CSVFormat.DEFAULT.withHeader(headers).print(writer)) {
 				for (var record : parser) {
 
 					var values = record.toMap();
+
+					// adjust time according to offset
 					var time = Double.parseDouble(values.get(timeColumnName));
 					values.put(timeColumnName, Double.toString(time - startTime));
 
-					if (time >= startTime && time <= endTime) {
+					// parse value
+					var value = Double.parseDouble(values.get(valueColumnName));
+
+					if (value >= minValue && time >= startTime && time <= endTime) {
 						for (var column : headers) {
 							printer.print(values.get(column));
 						}

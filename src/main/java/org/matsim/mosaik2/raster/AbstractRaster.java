@@ -2,6 +2,7 @@ package org.matsim.mosaik2.raster;
 
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -57,6 +58,7 @@ class AbstractRaster {
     }
 
     @EqualsAndHashCode
+    @ToString
     public static class Bounds {
         private double minX = Double.POSITIVE_INFINITY;
         private double minY = Double.POSITIVE_INFINITY;

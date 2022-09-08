@@ -2,8 +2,8 @@ package org.matsim.mosaik2.prepare;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import lombok.extern.log4j.Log4j2;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.log4j.Logger;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.counts.Counts;
@@ -14,9 +14,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+@Log4j2
 public class CreateCounts {
-
-	private static final Logger logger = Logger.getLogger(CreateCounts.class);
 
 	private static final Path longTermCountsRootFederalRoad = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-federal-road.txt");
 	private static final Path longTermCountsRootHighway = Paths.get("projects/mosaik-2/raw-data/calibration-data/long-term-counts-highway.txt");
@@ -26,7 +25,7 @@ public class CreateCounts {
 
 	public static void main(String[] args) throws IOException {
 
-		logger.info("Program starts!");
+		log.info("Program starts!");
 
 		var input = new InputArguments();
 		JCommander.newBuilder().addObject(input).build().parse(args);
@@ -38,7 +37,7 @@ public class CreateCounts {
 		var matching = new NodeMatcher();
 		var matchingResult = matching.parseNodeMatching(input.sharedSvn + longTermCountsIdMapping);
 
-		logger.info("Finished with matching nodes.");
+		log.info("Finished with matching nodes.");
 
 		var longTerm = new GetCountData();
 		var longTermResult = longTerm.countData(input.sharedSvn + longTermCountsRootFederalRoad, input.sharedSvn + longTermCountsRootHighway, matchingResult);
@@ -59,7 +58,7 @@ public class CreateCounts {
 				count.createVolume(Integer.parseInt(StringUtils.stripStart(hour, "0")), data.getValue().getResult().get(hour));
 
 			}
-			logger.info("Create new count object! Station ID: " + value.getStationId() + "  Link ID: " + value.getLinkId() + "  Counts: " + value.getResult());
+			log.info("Create new count object! Station ID: " + value.getStationId() + "  Link ID: " + value.getLinkId() + "  Counts: " + value.getResult());
 		}
 
 		new CountsWriter(counts).write(input.sharedSvn + outputCounts);

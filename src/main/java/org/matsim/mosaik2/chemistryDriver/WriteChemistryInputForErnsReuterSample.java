@@ -5,9 +5,9 @@ import com.beust.jcommander.Parameter;
 import de.topobyte.osm4j.core.access.OsmInputException;
 import gnu.trove.map.TObjectDoubleMap;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
+import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-import org.apache.log4j.Logger;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -55,9 +55,9 @@ import java.util.stream.Collectors;
  * 5818412.0
  */
 @SuppressWarnings("FieldMayBeFinal")
+@Log4j2
 public class WriteChemistryInputForErnsReuterSample {
 
-    private static final Logger logger = Logger.getLogger(WriteChemistryInputForErnsReuterSample.class);
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
     private static final Map<Pollutant, String> pollutants = Map.of(
             Pollutant.NO2, "NO2",
@@ -218,7 +218,7 @@ public class WriteChemistryInputForErnsReuterSample {
         TimeBinMap<Map<String, DoubleRaster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
         for (var bin : timeBinMap.getTimeBins()) {
 
-            logger.info("Writing emissions to raster for timestep: " + bin.getStartTime());
+            log.info("Writing emissions to raster for timestep: " + bin.getStartTime());
 
             var rasterByPollutant = bin.getValue().entrySet().parallelStream()
                     .map(entry -> {
@@ -253,7 +253,7 @@ public class WriteChemistryInputForErnsReuterSample {
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasterTimeBinMap);
 
-        logger.info("Writing csv file to: C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv");
+        log.info("Writing csv file to: C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv");
         writeCSV(Paths.get("C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv"), rasterTimeBinMap);
     }
 

@@ -8,8 +8,6 @@ import ucar.ma2.InvalidRangeException;
 import ucar.nc2.NetcdfFiles;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -18,15 +16,15 @@ import java.util.Objects;
 @Log4j2
 public class PalmOutputReader {
 
-	public static TimeBinMap<Map<String, DoubleRaster>> read(String filename) {
+	public static TimeBinMap<DoubleRaster> read(String filename) {
 		return read(filename, 0, Integer.MAX_VALUE, "PM10");
 	}
 
-	public static TimeBinMap<Map<String, DoubleRaster>> readAll(String filename, String species) {
+	public static TimeBinMap<DoubleRaster> readAll(String filename, String species) {
 		return read(filename, 0, Integer.MAX_VALUE, species);
 	}
 
-	public static TimeBinMap<Map<String, DoubleRaster>> read(String filename, int fromTimeIndex, int toTimeIndex, String species) {
+	public static TimeBinMap<DoubleRaster> read(String filename, int fromTimeIndex, int toTimeIndex, String species) {
 
 		log.info("Try opening Netcdf file at: " + filename);
 
@@ -58,13 +56,8 @@ public class PalmOutputReader {
 				var startTime = timestep - emissions.getBinSize();
 				log.info("Parsing timestep [" + startTime + ", " + timestep + "]");
 
-				var timeBin = emissions.getTimeBin(startTime);
 				var raster = new DoubleRaster(bounds, cellSize);
 				ArrayFloat.D4 emissionData = (ArrayFloat.D4) kcPm10Var.read(new int[]{ti, 0, 0, 0}, shapeForReadOperation);
-
-				if (!timeBin.hasValue()) {
-					timeBin.setValue(new HashMap<>());
-				}
 
 				for (int xi = 0; xi < x.length; xi++) {
 					for (int yi = 0; yi < y.length; yi++) {
@@ -74,7 +67,7 @@ public class PalmOutputReader {
 					}
 				}
 
-				timeBin.getValue().put(species, raster);
+				emissions.getTimeBin(startTime).setValue(raster);
 			}
 			log.info("Finished reading NetcdfFile");
 			log.info("");

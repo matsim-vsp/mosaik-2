@@ -70,7 +70,7 @@ public class AverageSmoothingRadiusEstimateTest {
 		// load the 8 o clock time slice
 		var palmOutput = PalmOutputReader.read("C:/Users/janek/repos/shared-svn/projects/mosaik-2/data/berlin-chemistry-driver-results/run_B2_chem_w3_lod2_masked_M01.merged.nc", 8 * 4, 8 * 4, "PM10");
 		// take the pm10 raster
-		var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM");
+		var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue();
 
 		// cut 100x100 m in the center of the area.
 		var smallBounds = new DoubleRaster.Bounds(pm10Raster.getBounds().getMinX() + 950, pm10Raster.getBounds().getMinY() + 950, pm10Raster.getBounds().getMaxX() - 950, pm10Raster.getBounds().getMaxY() - 950);

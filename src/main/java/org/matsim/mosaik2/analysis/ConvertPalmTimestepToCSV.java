@@ -33,7 +33,7 @@ public class ConvertPalmTimestepToCSV {
 		// get data at 8am
 		var palmOutput = PalmOutputReader.read(palmFile, index, index, species);
 		//get pm 10
-		var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get(species);
+		var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue();
 
 		var outputfile = outputTemplate + "_" + index + ".csv";
 		ConvertToCSV.convert(pm10Raster, outputfile);

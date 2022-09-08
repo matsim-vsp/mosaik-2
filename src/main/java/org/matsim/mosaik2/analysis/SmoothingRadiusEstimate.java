@@ -139,7 +139,7 @@ public class SmoothingRadiusEstimate {
 
 		log.info("Peek into palm file to populate the link cash raster");
 		var palmOutput = PalmOutputReader.read(input.palmOutputFile, 0, 0, "PM10");
-		var raster = palmOutput.getTimeBins().iterator().next().getValue().values().iterator().next();
+		var raster = palmOutput.getTimeBins().iterator().next().getValue();
 
 		return new ObjectRaster<>(raster.getBounds(), raster.getCellSize());
 	}
@@ -214,7 +214,7 @@ public class SmoothingRadiusEstimate {
 			// read a single time slice at a time
 			var palmOutput = PalmOutputReader.read(input.palmOutputFile, i, i, "PM10");
 			// lets start with pm 10 only.
-			var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue().get("PM10");
+			var pm10Raster = palmOutput.getTimeBins().iterator().next().getValue();
 
 			// cut in the center of the area
 			//var smallBounds = new DoubleRaster.Bounds(3000, 2000, 4000,3000);

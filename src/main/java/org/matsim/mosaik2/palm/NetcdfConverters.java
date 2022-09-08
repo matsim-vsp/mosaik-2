@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class NetcdfConverters {
@@ -57,18 +56,13 @@ public class NetcdfConverters {
 		return result;
 	}
 
-	public static TimeBinMap<Map<String, DoubleRaster>> createTimeBinMap(double[] fromTimes, int fromTimeIndex) {
+	public static TimeBinMap<DoubleRaster> createTimeBinMap(double[] fromTimes, int fromTimeIndex) {
 
 		double interval = -1;
 		double startTime = fromTimes[fromTimeIndex]; // assuming the list is populated
 
 		for (int i = 1; i < fromTimes.length; i++) {
-
-			var newInterval = fromTimes[i] - fromTimes[i - 1];
-			//  if (interval >= 0 && newInterval != interval) {
-			//       throw new RuntimeException("found varying time intervals in chemistry input. The code currently assumes constant time intervals");
-			//  }
-			interval = newInterval;
+			interval = fromTimes[i] - fromTimes[i - 1];
 		}
 		return new TimeBinMap<>(interval, startTime - interval);
 	}

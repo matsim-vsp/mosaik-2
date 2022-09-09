@@ -4,6 +4,7 @@ import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import lombok.ToString;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -22,14 +23,20 @@ import java.util.stream.Collectors;
 public class PalmCsvOutput {
 
 	public static void write(Path output, TimeBinMap<DoubleRaster> palmData) {
+
+		log.info("Writing t,x,y,value data to: " + output);
+
 		var counter = new AtomicInteger();
-		try (var writer = Files.newBufferedWriter(output); var printer = createFormat().print(writer)) {
+		try (var writer = Files.newBufferedWriter(output); var printer = createWriteFormat().print(writer)) {
 
 			for (var bin : palmData.getTimeBins()) {
 				var time = bin.getStartTime();
 				var raster = bin.getValue();
 
 				raster.forEachCoordinate((x, y, value) -> {
+
+					if (value <= 0) return;
+
 					var count = counter.incrementAndGet();
 					if (count % 100000 == 0) {
 						log.info("Printed " + count);
@@ -40,15 +47,23 @@ public class PalmCsvOutput {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
+
+		log.info("Finished writing to: " + output);
 	}
 
 	public static TimeBinMap<DoubleRaster> read(Path input) {
 
-		var info = figureOutBounds(input);
-		TimeBinMap<DoubleRaster> result = new TimeBinMap<>(info.getTimeInterval());
+		var info = readDataInfo(input);
+		return read(input, info);
+	}
+
+	public static TimeBinMap<DoubleRaster> read(Path input, DataInfo dataInfo) {
+		TimeBinMap<DoubleRaster> result = new TimeBinMap<>(dataInfo.getTimeInterval());
 		var count = 0;
 
-		try (var reader = Files.newBufferedReader(input); var parser = CSVParser.parse(reader, createFormat())) {
+		log.info("Reading palm output csv with data info: " + dataInfo);
+
+		try (var reader = Files.newBufferedReader(input); var parser = CSVParser.parse(reader, createReadFormat())) {
 
 			for (var record : parser) {
 				count++;
@@ -61,7 +76,7 @@ public class PalmCsvOutput {
 				var y = Double.parseDouble(record.get("y"));
 				var value = Double.parseDouble(record.get("value"));
 
-				var bin = getRasterForTime(time, result, info.getRasterInfo());
+				var bin = getRasterForTime(time, result, dataInfo.getRasterInfo());
 				bin.adjustValueForCoord(x, y, value);
 			}
 		} catch (IOException e) {
@@ -71,12 +86,13 @@ public class PalmCsvOutput {
 		return result;
 	}
 
-	private static DataInfo figureOutBounds(Path input) {
+	public static DataInfo readDataInfo(Path input) {
 
 		double currentTimeStep = -1;
 		Coordinates coordinates = new Coordinates();
 
-		try (var reader = Files.newBufferedReader(input); var parser = CSVParser.parse(reader, createFormat())) {
+		log.info("Reading data info of file " + input.toString());
+		try (var reader = Files.newBufferedReader(input); var parser = CSVParser.parse(reader, createReadFormat())) {
 
 			for (var record : parser) {
 
@@ -109,8 +125,18 @@ public class PalmCsvOutput {
 		}
 	}
 
-	private static CSVFormat createFormat() {
-		return CSVFormat.DEFAULT.withHeader("time", "x", "y", "value").withFirstRecordAsHeader();
+	private static CSVFormat createReadFormat() {
+		return CSVFormat.DEFAULT.builder()
+				.setHeader("time", "x", "y", "value")
+				.setSkipHeaderRecord(true)
+				.build();
+	}
+
+	private static CSVFormat createWriteFormat() {
+		return CSVFormat.DEFAULT.builder()
+				.setHeader("time", "x", "y", "value")
+				.setSkipHeaderRecord(false)
+				.build();
 	}
 
 	private static DoubleRaster getRasterForTime(double time, TimeBinMap<DoubleRaster> map, RasterInfo rasterInfo) {
@@ -164,14 +190,16 @@ public class PalmCsvOutput {
 
 	@RequiredArgsConstructor
 	@Getter
-	private static class RasterInfo {
+	@ToString
+	public static class RasterInfo {
 		private final DoubleRaster.Bounds bounds;
 		private final double cellSize;
 	}
 
 	@Getter
 	@RequiredArgsConstructor
-	private static class DataInfo {
+	@ToString
+	public static class DataInfo {
 
 		private final RasterInfo rasterInfo;
 		private final double timeInterval;

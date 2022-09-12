@@ -58,7 +58,6 @@ public class CalculateExposure {
 		var inputPath = Paths.get(palmData);
 		var dataInfo = PalmCsvOutput.readDataInfo(inputPath);
 		var palmData = PalmCsvOutput.read(inputPath, dataInfo);
-		//var population = PopulationUtils.readPopulation(plansData);
 
 		log.info("Create Spacial Index.");
 		// create spacial index for palmdata

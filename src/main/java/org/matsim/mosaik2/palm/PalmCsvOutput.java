@@ -77,7 +77,7 @@ public class PalmCsvOutput {
 				var value = Double.parseDouble(record.get("value"));
 
 				var bin = getRasterForTime(time, result, dataInfo.getRasterInfo());
-				bin.adjustValueForCoord(x, y, value);
+				bin.setValueForCoord(x, y, value);
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -144,7 +144,7 @@ public class PalmCsvOutput {
 		var bin = map.getTimeBin(time);
 
 		if (!bin.hasValue()) {
-			bin.setValue(new DoubleRaster(rasterInfo.getBounds(), rasterInfo.getCellSize()));
+			bin.setValue(new DoubleRaster(rasterInfo.getBounds(), rasterInfo.getCellSize(), -1.));
 		}
 
 		return bin.getValue();

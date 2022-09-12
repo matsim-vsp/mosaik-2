@@ -2,6 +2,7 @@ package org.matsim.mosaik2.analysis;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.population.Activity;
@@ -13,26 +14,25 @@ import org.matsim.mosaik2.palm.PalmCsvOutput;
 import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.mosaik2.raster.ObjectRaster;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 
 @Log4j2
+@AllArgsConstructor
 public class CalculateExposure {
 
-	@Parameter(names = "-palmData", required = true)
-	private String palmData;
-
-	@Parameter(names = "-eventsData", required = true)
-	private String eventsData;
-
-	@Parameter(names = "-output", required = true)
-	private String outputPath;
+	private final Path palmPath;
+	private final Path eventsData;
+	private final Path outputPath;
 
 	public static void main(String[] args) {
 
-		var calculator = new CalculateExposure();
-		JCommander.newBuilder().addObject(calculator).build().parse(args);
-		calculator.run();
+		var inputArgs = new InputArgs();
+		JCommander.newBuilder().addObject(inputArgs).build().parse(args);
+		new CalculateExposure(
+				Paths.get(inputArgs.palmData), Paths.get(inputArgs.eventsData), Paths.get(inputArgs.outputPath)
+		).run();
 	}
 
 	private static double getStartTime(Activity activity) {
@@ -53,11 +53,10 @@ public class CalculateExposure {
 		return Double.POSITIVE_INFINITY;
 	}
 
-	private void run() {
+	void run() {
 
-		var inputPath = Paths.get(palmData);
-		var dataInfo = PalmCsvOutput.readDataInfo(inputPath);
-		var palmData = PalmCsvOutput.read(inputPath, dataInfo);
+		var dataInfo = PalmCsvOutput.readDataInfo(palmPath);
+		var palmData = PalmCsvOutput.read(palmPath, dataInfo);
 
 		log.info("Create Spacial Index.");
 		// create spacial index for palmdata
@@ -93,7 +92,7 @@ public class CalculateExposure {
 		});
 		var manager = EventsUtils.createEventsManager();
 		manager.addHandler(events2Activities);
-		EventsUtils.readEvents(manager, eventsData);
+		EventsUtils.readEvents(manager, eventsData.toString());
 
 		log.info("Start exposure calculation");
 		var resultMap = new TimeBinMap<DoubleRaster>(palmData.getBinSize(), palmData.getStartTime());
@@ -116,7 +115,21 @@ public class CalculateExposure {
 			resultMap.getTimeBin(startTime).setValue(exposureRaster);
 		}
 		log.info("Finished exposure calculation.");
-		PalmCsvOutput.write(Paths.get(outputPath), resultMap);
+		PalmCsvOutput.write(outputPath, resultMap);
+	}
+
+	private static class InputArgs {
+		@Parameter(names = "-palmData", required = true)
+		private String palmData;
+
+		@Parameter(names = "-eventsData", required = true)
+		private String eventsData;
+
+		@Parameter(names = "-output", required = true)
+		private String outputPath;
+
+		private InputArgs() {
+		}
 	}
 
 	private static class Tile {

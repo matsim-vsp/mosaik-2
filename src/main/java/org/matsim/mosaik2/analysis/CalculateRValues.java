@@ -4,6 +4,8 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
@@ -39,11 +41,12 @@ public class CalculateRValues {
 	private final ObjectRaster<Set<Id<Link>>> linkCache;
 	private final TimeBinMap<Object2DoubleMap<Link>> emissions;
 
-	CalculateRValues(InputArgs inputArgs, PalmCsvOutput.DataInfo palmDataInfo) {
-		Network network = loadNetwork(inputArgs.networkFile, palmDataInfo.getRasterInfo().getBounds().toGeometry());
+	CalculateRValues(InputArgs inputArgs) {
+		var info = PalmCsvOutput.readDataInfo(Paths.get(inputArgs.palmFile));
+		Network network = loadNetwork(inputArgs.networkFile, info.getRasterInfo().getBounds().toGeometry());
 		this.input = inputArgs;
-		this.linkCache = createCache(network, palmDataInfo.getRasterInfo().getBounds(), palmDataInfo.getRasterInfo().getCellSize());
-		this.emissions = parseEmissions(network, inputArgs);
+		this.linkCache = createCache(network, info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());
+		this.emissions = parseEmissions(network, inputArgs, info);
 	}
 
 	public static void main(String[] args) {
@@ -51,10 +54,8 @@ public class CalculateRValues {
 		var input = new InputArgs();
 		JCommander.newBuilder().addObject(input).build().parse(args);
 
-		var info = PalmCsvOutput.readDataInfo(Paths.get(input.palmFile));
-
-		var calculation = new CalculateRValues(input, info);
-		calculation.printRValues();
+		var calculation = new CalculateRValues(input);
+		calculation.run();
 	}
 
 	private static ObjectRaster<Set<Id<Link>>> createCache(Network network, ObjectRaster.Bounds bounds, double cellSize) {
@@ -119,10 +120,10 @@ public class CalculateRValues {
 		return geometry.covers(MGC.coord2Point(coord));
 	}
 
-	private static TimeBinMap<Object2DoubleMap<Link>> parseEmissions(Network network, InputArgs inputArgs) {
+	private static TimeBinMap<Object2DoubleMap<Link>> parseEmissions(Network network, InputArgs inputArgs, PalmCsvOutput.DataInfo dataInfo) {
 
 		var converter = PollutantToPalmNameConverter.createForSingleSpecies(inputArgs.species);
-		var handler = new AggregateEmissionsByTimeHandler(network, converter.getPollutants(), inputArgs.timeBinSize, inputArgs.scaleFactor);
+		var handler = new AggregateEmissionsByTimeHandler(network, converter.getPollutants(), dataInfo.getTimeInterval(), inputArgs.scaleFactor);
 		var manager = EventsUtils.createEventsManager();
 		manager.addHandler(handler);
 
@@ -130,7 +131,7 @@ public class CalculateRValues {
 		new EmissionEventsReader(manager).readFile(inputArgs.emissionEventsFile);
 
 		log.info("Start converting collected emissions");
-		TimeBinMap<Object2DoubleMap<Link>> result = new TimeBinMap<>(inputArgs.timeBinSize);
+		TimeBinMap<Object2DoubleMap<Link>> result = new TimeBinMap<>(dataInfo.getTimeInterval());
 		var handlerMap = handler.getTimeBinMap();
 
 		for (var bin : handlerMap.getTimeBins()) {
@@ -151,7 +152,7 @@ public class CalculateRValues {
 		return result;
 	}
 
-	private void printRValues() {
+	void run() {
 
 		var palmData = PalmCsvOutput.read(Paths.get(input.palmFile));
 		var result = new TimeBinMap<DoubleRaster>(palmData.getBinSize(), palmData.getStartTime());
@@ -199,6 +200,8 @@ public class CalculateRValues {
 
 
 	@SuppressWarnings("FieldMayBeFinal")
+	@AllArgsConstructor
+	@NoArgsConstructor
 	static class InputArgs {
 
 		@Parameter(names = "-e", required = true)
@@ -218,8 +221,5 @@ public class CalculateRValues {
 
 		@Parameter(names = "-s")
 		private int scaleFactor = 10;
-
-		@Parameter(names = "-ts")
-		private int timeBinSize = 3600;
 	}
 }

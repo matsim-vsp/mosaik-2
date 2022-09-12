@@ -31,16 +31,12 @@ public class PalmCsvOutput {
 
 			for (var bin : palmData.getTimeBins()) {
 				var time = bin.getStartTime();
+
+				log.info("Writing time slices: [" + time + ", " + (time + palmData.getBinSize()) + "]");
 				var raster = bin.getValue();
 
 				raster.forEachCoordinate((x, y, value) -> {
-
 					if (value <= 0) return;
-
-					var count = counter.incrementAndGet();
-					if (count % 100000 == 0) {
-						log.info("Printed " + count);
-					}
 					printRecord(time, x, y, value, printer);
 				});
 			}
@@ -59,19 +55,21 @@ public class PalmCsvOutput {
 
 	public static TimeBinMap<DoubleRaster> read(Path input, DataInfo dataInfo) {
 		TimeBinMap<DoubleRaster> result = new TimeBinMap<>(dataInfo.getTimeInterval());
-		var count = 0;
+		double lastTime = -1;
 
 		log.info("Reading palm output csv with data info: " + dataInfo);
 
 		try (var reader = Files.newBufferedReader(input); var parser = CSVParser.parse(reader, createReadFormat())) {
 
 			for (var record : parser) {
-				count++;
-				if (count % 100000 == 0) {
-					log.info("Parsed " + count);
-				}
 
 				var time = Double.parseDouble(record.get("time"));
+
+				if (time != lastTime) {
+					lastTime = time;
+					log.info("Parsing Time Slice: [" + time + ", " + (time + dataInfo.timeInterval) + "]");
+				}
+
 				var x = Double.parseDouble(record.get("x"));
 				var y = Double.parseDouble(record.get("y"));
 				var value = Double.parseDouble(record.get("value"));

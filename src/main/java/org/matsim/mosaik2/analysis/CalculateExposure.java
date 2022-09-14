@@ -3,6 +3,7 @@ package org.matsim.mosaik2.analysis;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.population.Activity;
@@ -41,7 +42,7 @@ public class CalculateExposure {
 			return activity.getEndTime().seconds() - activity.getMaximumDuration().seconds();
 
 		// we don't really know the start time. use 0 here, since we assume that most simulations start no earlier than 0 seconds
-		return 0.;
+		return Double.NEGATIVE_INFINITY;
 	}
 
 	private static double getEndTime(Activity activity) {
@@ -135,25 +136,26 @@ public class CalculateExposure {
 		}
 	}
 
-	private static class Tile {
+	// make package private for testing
+	@Getter
+	static class Tile {
 		private static final Comparator<Activity> startTimeComparator = (act1, act2) -> Double.compare(getStartTime(act2), getStartTime(act1));
 
 		private final Queue<Activity> activities = new PriorityQueue<>(startTimeComparator);
 		private final Collection<Activity> currentlyPerforming = new ArrayList<>();
-		private final double exposureValue = 0;
 
 		void add(Activity activity) {
 			activities.add(activity);
 		}
 
-		boolean nextActStartsBefore(double time) {
-			return !activities.isEmpty() && getStartTime(activities.peek()) < time;
+		boolean nextActHasStarted(double time) {
+			return !activities.isEmpty() && getStartTime(activities.peek()) <= time;
 		}
 
 		//b. store those activities as "currently performed" sorted by earliest end time (Priority Queue - inverse ordering)
-		void pushAllActToPerforming(double beforeTime) {
+		void pushAllActToPerforming(double time) {
 
-			while (nextActStartsBefore(beforeTime)) {
+			while (nextActHasStarted(time)) {
 				var act = activities.poll();
 				currentlyPerforming.add(act);
 			}

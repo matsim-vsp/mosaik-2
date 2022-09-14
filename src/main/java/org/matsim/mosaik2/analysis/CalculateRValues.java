@@ -158,11 +158,12 @@ public class CalculateRValues {
 		var result = new TimeBinMap<DoubleRaster>(palmData.getBinSize(), palmData.getStartTime());
 
 		// do it for only the first bin for debugging
-		//var binCount = 0;
+		var binCount = 0;
 
 		for (var bin : palmData.getTimeBins()) {
 
-			//if (binCount > 1) break; // This will go away eventually, we want all time slices.
+			binCount++;
+			if (binCount > 1) break; // This will go away eventually, we want all time slices.
 
 			log.info("Calculating R-Values for time: [" + bin.getStartTime() + ", " + (bin.getStartTime() + palmData.getBinSize()) + "]");
 
@@ -176,7 +177,7 @@ public class CalculateRValues {
 
 			resultRaster.setValueForEachCoordinate((x, y) -> {
 				var value = palmRaster.getValueByCoord(x, y);
-				if (value <= 0.0) return -2; // short circuit right here, if there is no emission value anyway.
+				if (value <= 0.0) return -3; // short circuit right here, if there is no emission value anyway.
 
 				var receiverPoint = new Coord(x, y);
 				var cachedLinks = linkCache.getValueByCoord(x, y);
@@ -184,7 +185,7 @@ public class CalculateRValues {
 						.filter(entry -> cachedLinks.contains(entry.getKey().getId()))
 						.collect(Collectors.toMap(Map.Entry::getKey, Object2DoubleMap.Entry::getDoubleValue, (a, b) -> b, Object2DoubleOpenHashMap::new));
 
-				var r = NumericSmoothingRadiusEstimate.estimateRWithBisect(filteredEmissions, receiverPoint, value);
+				var r = NumericSmoothingRadiusEstimate.estimateRWithBisect(filteredEmissions, receiverPoint, value, palmRaster.getCellSize());
 
 				var currentCount = counter.incrementAndGet();
 				if (currentCount % 100000 == 0) {
@@ -192,10 +193,9 @@ public class CalculateRValues {
 				}
 				return r;
 			});
-			//binCount++;
 		}
 
-		PalmCsvOutput.write(Paths.get(input.outputFile), result);
+		PalmCsvOutput.write(Paths.get(input.outputFile), result, -1);
 	}
 
 

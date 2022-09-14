@@ -16,17 +16,19 @@ import org.matsim.mosaik2.raster.DoubleRaster;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Log4j2
 public class PalmCsvOutput {
 
 	public static void write(Path output, TimeBinMap<DoubleRaster> palmData) {
+		write(output, palmData, 0.0);
+	}
+
+	public static void write(Path output, TimeBinMap<DoubleRaster> palmData, double minValue) {
 
 		log.info("Writing t,x,y,value data to: " + output);
 
-		var counter = new AtomicInteger();
 		try (var writer = Files.newBufferedWriter(output); var printer = createWriteFormat().print(writer)) {
 
 			for (var bin : palmData.getTimeBins()) {
@@ -36,7 +38,7 @@ public class PalmCsvOutput {
 				var raster = bin.getValue();
 
 				raster.forEachCoordinate((x, y, value) -> {
-					if (value <= 0) return;
+					if (value <= minValue) return;
 					printRecord(time, x, y, value, printer);
 				});
 			}

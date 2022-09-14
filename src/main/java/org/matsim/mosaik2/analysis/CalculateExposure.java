@@ -68,7 +68,10 @@ public class CalculateExposure {
 		);
 
 		var firstRaster = palmData.getTimeBins().iterator().next().getValue();
-		firstRaster.forEachCoordinate((x, y, value) -> index.put(x, y, new Coord(x, y)));
+		firstRaster.forEachCoordinate((x, y, value) -> {
+			if (value >= 0.0)
+				index.put(x, y, new Coord(x, y));
+		});
 
 
 		// 2.  a. go through each palm time slice and find activities starting during that slice

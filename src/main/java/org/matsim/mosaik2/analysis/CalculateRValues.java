@@ -137,7 +137,7 @@ public class CalculateRValues {
 		for (var bin : handlerMap.getTimeBins()) {
 
 			var resultBin = result.getTimeBin(bin.getStartTime());
-			var emissionResultMap = resultBin.getValue(Object2DoubleOpenHashMap::new);
+			var emissionResultMap = resultBin.computeIfAbsent(Object2DoubleOpenHashMap::new);
 
 			for (var pollutantEntry : bin.getValue().entrySet()) {
 				var emissionMap = pollutantEntry.getValue();
@@ -169,7 +169,7 @@ public class CalculateRValues {
 			var palmRaster = bin.getValue();
 			var size = palmRaster.getYLength() * palmRaster.getXLength();
 			var resultBin = result.getTimeBin(bin.getStartTime());
-			var resultRaster = resultBin.getValue(() -> new DoubleRaster(palmRaster.getBounds(), palmRaster.getCellSize(), -1));
+			var resultRaster = resultBin.computeIfAbsent(() -> new DoubleRaster(palmRaster.getBounds(), palmRaster.getCellSize(), -1));
 			var emissionsForTimeSlice = emissions.getTimeBin(bin.getStartTime()).getValue();
 
 			var counter = new AtomicInteger();

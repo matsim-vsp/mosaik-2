@@ -58,7 +58,7 @@ public class CalculateRValues {
 		calculation.run();
 	}
 
-	private static ObjectRaster<Set<Id<Link>>> createCache(Network network, ObjectRaster.Bounds bounds, double cellSize) {
+	static ObjectRaster<Set<Id<Link>>> createCache(Network network, ObjectRaster.Bounds bounds, double cellSize) {
 
 		var geomFac = new GeometryFactory();
 		var prepGeomFac = new PreparedGeometryFactory();
@@ -98,7 +98,7 @@ public class CalculateRValues {
 		return raster;
 	}
 
-	private static Network loadNetwork(String networkPath, Geometry bounds) {
+	static Network loadNetwork(String networkPath, Geometry bounds) {
 
 		var preparedGeometryFactory = new PreparedGeometryFactory();
 		var originalNetwork = NetworkUtils.readNetwork(networkPath);

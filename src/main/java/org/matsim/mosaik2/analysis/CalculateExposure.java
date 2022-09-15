@@ -83,7 +83,7 @@ public class CalculateExposure {
 		// 1. map all activities onto a raster cell
 		// create data structure that holds the activity info and populate it
 		var activityRaster = new ObjectRaster<Tile>(dataInfo.getRasterInfo().getBounds(), dataInfo.getRasterInfo().getCellSize());
-		activityRaster.setValueForEachIndex((xi, yi) -> new Tile());
+		//activityRaster.setValueForEachIndex((xi, yi) -> new Tile());
 
 		log.info("Map all activities onto raster tiles for which PALM calculated a concentration value.");
 		var events2Activities = new EventsToActivities();
@@ -91,6 +91,11 @@ public class CalculateExposure {
 			if (activityRaster.getBounds().covers(act.getActivity().getCoord()) && !act.getActivity().getType().contains(" interaction")) {
 				var closestTile = index.getClosest(act.getActivity().getCoord().getX(), act.getActivity().getCoord().getY());
 				var tile = activityRaster.getValueByCoord(closestTile.getX(), closestTile.getY());
+
+				if (tile == null) {
+					tile = new Tile();
+					activityRaster.setValueForCoord(closestTile.getX(), closestTile.getY(), tile);
+				}
 				tile.add(act.getActivity());
 			}
 		});
@@ -110,6 +115,8 @@ public class CalculateExposure {
 			log.info("Calculating Exposure for time slice: [" + startTime + ", " + endTime + "]");
 			exposureRaster.setValueForEachIndex((xi, yi) -> {
 				var tile = activityRaster.getValueByIndex(xi, yi);
+				if (tile == null) return -1;
+
 				tile.pushAllActToPerforming(endTime);
 				var spentTime = tile.calculateSpentTime(startTime, endTime);
 				var concentration = emissions.getValueByIndex(xi, yi);
@@ -139,7 +146,7 @@ public class CalculateExposure {
 	// make package private for testing
 	@Getter
 	static class Tile {
-		private static final Comparator<Activity> startTimeComparator = (act1, act2) -> Double.compare(getStartTime(act2), getStartTime(act1));
+		private static final Comparator<Activity> startTimeComparator = Comparator.comparingDouble(CalculateExposure::getStartTime);
 
 		private final Queue<Activity> activities = new PriorityQueue<>(startTimeComparator);
 		private final Collection<Activity> currentlyPerforming = new ArrayList<>();

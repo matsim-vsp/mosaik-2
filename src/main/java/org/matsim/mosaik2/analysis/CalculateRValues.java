@@ -157,13 +157,8 @@ public class CalculateRValues {
 		var palmData = PalmCsvOutput.read(Paths.get(input.palmFile));
 		var result = new TimeBinMap<DoubleRaster>(palmData.getBinSize(), palmData.getStartTime());
 
-		// do it for only the first bin for debugging
-		var binCount = 0;
-
 		for (var bin : palmData.getTimeBins()) {
 
-			binCount++;
-			if (binCount > 1) break; // This will go away eventually, we want all time slices.
 
 			log.info("Calculating R-Values for time: [" + bin.getStartTime() + ", " + (bin.getStartTime() + palmData.getBinSize()) + "]");
 

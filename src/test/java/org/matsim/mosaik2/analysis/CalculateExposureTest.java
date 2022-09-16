@@ -1,6 +1,7 @@
 package org.matsim.mosaik2.analysis;
 
 import lombok.extern.log4j.Log4j2;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.matsim.api.core.v01.Coord;
@@ -17,54 +18,15 @@ import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.testcases.MatsimTestUtils;
 
 import java.nio.file.Paths;
-import java.util.List;
 
 import static org.junit.Assert.assertEquals;
 
 @Log4j2
 public class CalculateExposureTest {
 
+
 	@Rule
 	public MatsimTestUtils testUtils = new MatsimTestUtils();
-
-	@Test
-	public void tile_pushToPerforming_noStartTime() {
-
-		var activity = PopulationUtils.getFactory().createActivityFromCoord("test", new Coord(10, 10));
-		activity.setEndTime(5000);
-		var tile = new CalculateExposure.Tile();
-		tile.add(activity);
-
-		assertEquals(1, tile.getActivities().size());
-		assertEquals(0, tile.getCurrentlyPerforming().size());
-
-		tile.pushAllActToPerforming(0);
-
-		assertEquals(0, tile.getActivities().size());
-		assertEquals(1, tile.getCurrentlyPerforming().size());
-	}
-
-	@Test
-	public void tile_pushToPerforming_withStartTime() {
-
-		var activity = PopulationUtils.getFactory().createActivityFromCoord("test", new Coord(10, 10));
-		activity.setStartTime(5000);
-		var tile = new CalculateExposure.Tile();
-		tile.add(activity);
-
-		assertEquals(1, tile.getActivities().size());
-		assertEquals(0, tile.getCurrentlyPerforming().size());
-
-		tile.pushAllActToPerforming(4999);
-
-		assertEquals(1, tile.getActivities().size());
-		assertEquals(0, tile.getCurrentlyPerforming().size());
-
-		tile.pushAllActToPerforming(5000);
-
-		assertEquals(0, tile.getActivities().size());
-		assertEquals(1, tile.getCurrentlyPerforming().size());
-	}
 
 	@Test
 	public void tile_calculateSpentTime_cutStartTime() {
@@ -74,11 +36,24 @@ public class CalculateExposureTest {
 		activity.setEndTime(2000);
 		var tile = new CalculateExposure.Tile();
 		tile.add(activity);
-		tile.pushAllActToPerforming(1000);
 
 		var time = tile.calculateSpentTime(500, 1500);
 
 		assertEquals(500, time, 1e-8);
+	}
+
+	@Test
+	public void tile_calculateSpentTime_cutStartTime_undefined() {
+
+		var activity = PopulationUtils.getFactory().createActivityFromCoord("test", new Coord(10, 10));
+		activity.setStartTimeUndefined();
+		activity.setEndTime(2000);
+		var tile = new CalculateExposure.Tile();
+		tile.add(activity);
+
+		var time = tile.calculateSpentTime(500, 1500);
+
+		assertEquals(1000, time, 1e-8);
 	}
 
 	@Test
@@ -89,11 +64,24 @@ public class CalculateExposureTest {
 		activity.setEndTime(2000);
 		var tile = new CalculateExposure.Tile();
 		tile.add(activity);
-		tile.pushAllActToPerforming(1000);
 
 		var time = tile.calculateSpentTime(1600, 2800);
 
 		assertEquals(400, time, 1e-8);
+	}
+
+	@Test
+	public void tile_calculateSpentTime_cutEndTime_undefined() {
+
+		var activity = PopulationUtils.getFactory().createActivityFromCoord("test", new Coord(10, 10));
+		activity.setStartTime(1000);
+		activity.setEndTimeUndefined();
+		var tile = new CalculateExposure.Tile();
+		tile.add(activity);
+
+		var time = tile.calculateSpentTime(1600, 2800);
+
+		assertEquals(1200, time, 1e-8);
 	}
 
 	@Test
@@ -104,7 +92,6 @@ public class CalculateExposureTest {
 		activity.setEndTime(2000);
 		var tile = new CalculateExposure.Tile();
 		tile.add(activity);
-		tile.pushAllActToPerforming(1000);
 
 		var time = tile.calculateSpentTime(800, 2800);
 
@@ -119,36 +106,10 @@ public class CalculateExposureTest {
 		activity.setEndTime(2000);
 		var tile = new CalculateExposure.Tile();
 		tile.add(activity);
-		tile.pushAllActToPerforming(1000);
 
 		var time = tile.calculateSpentTime(1200, 1800);
 
 		assertEquals(600, time, 1e-8);
-	}
-
-	@Test
-	public void tile_priorityByStartTime() {
-
-		var act1 = PopulationUtils.getFactory().createActivityFromCoord("home1", new Coord(10, 10));
-		act1.setEndTime(1000);
-		var act2 = PopulationUtils.getFactory().createActivityFromCoord("other", new Coord(20, 20));
-		act2.setStartTime(1500);
-		act2.setEndTime(2500);
-		var act3 = PopulationUtils.getFactory().createActivityFromCoord("home2", new Coord(10, 10));
-		act3.setStartTime(3000);
-		var tile = new CalculateExposure.Tile();
-		// insert in unexpected order
-		tile.add(act2);
-		tile.add(act1);
-		tile.add(act3);
-		var expectedOrder = List.of(act1, act2, act3);
-
-		var index = 0;
-		for (var actFromTile : tile.getActivities()) {
-			var expectedAct = expectedOrder.get(index);
-			assertEquals(expectedAct, actFromTile);
-			index++;
-		}
 	}
 
 	@Test
@@ -166,7 +127,6 @@ public class CalculateExposureTest {
 		tile.add(act2);
 		tile.add(act1);
 		tile.add(act3);
-		tile.pushAllActToPerforming(1000);
 
 		var spentTime = tile.calculateSpentTime(500, 2500);
 		// we expect act1 -> 1500 + act2 -> 1000 + act3 -> 1500 = 4000
@@ -220,7 +180,9 @@ public class CalculateExposureTest {
 		});
 	}
 
+	// this test was here to debug some things. Don't know how to run this with ci yet.
 	@Test
+	@Ignore
 	public void integration_3_persons_from_berlin() {
 
 		var eventsPath = Paths.get(testUtils.getInputDirectory()).resolve("events-3-agent-sample.xml");

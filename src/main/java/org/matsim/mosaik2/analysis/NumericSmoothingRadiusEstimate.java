@@ -16,7 +16,7 @@ public class NumericSmoothingRadiusEstimate {
 	private static final double h = 1E-10; // this is the smallest number one could add and still get a difference for R + h
 	private static final AtomicInteger logCounter = new AtomicInteger();
 
-	public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR) {
+	public static double estimateR(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, final double initialR, double cellSize) {
 
 		double Rn = initialR;
 		double Rprev;
@@ -25,7 +25,7 @@ public class NumericSmoothingRadiusEstimate {
 		do {
 			counter++;
 			Rprev = Rn;
-			Rn = Rn(emissions, receiverPoint, Rprev, xj);
+			Rn = Rn(emissions, receiverPoint, Rprev, xj, cellSize);
 		} while (Math.abs(Rn - Rprev) > R_THRESHOLD);
 
 		log.info("Took " + counter + " iterations with newton procedure. R is: " + Rn);
@@ -33,12 +33,12 @@ public class NumericSmoothingRadiusEstimate {
 		return Rn;
 	}
 
-	public static double estimateRWithBisect(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj) {
+	public static double estimateRWithBisect(Object2DoubleMap<Link> emissions, Coord receiverPoint, final double xj, double cellSize) {
 
 		double lowerBound = 0.1; // chose a value close to 0. With 0.0 the whole thing didn't work out anymore.
 		double upperBound = 100;
-		double lowerBoundResult = sumf(emissions, receiverPoint, lowerBound) - xj;
-		double upperBoundResult = sumf(emissions, receiverPoint, upperBound) - xj;
+		double lowerBoundResult = sumf(emissions, receiverPoint, lowerBound, cellSize) - xj;
+		double upperBoundResult = sumf(emissions, receiverPoint, upperBound, cellSize) - xj;
 		double center;
 		double centerResult;
 		int counter = 0;
@@ -60,7 +60,7 @@ public class NumericSmoothingRadiusEstimate {
 			center = (upperBound + lowerBound) / 2;
 
 			// calculate result for center
-			centerResult = sumf(emissions, receiverPoint, center) - xj;
+			centerResult = sumf(emissions, receiverPoint, center, cellSize) - xj;
 
 			// choose new bounds
 			if (Math.signum(centerResult) == Math.signum(lowerBoundResult)) {
@@ -81,23 +81,21 @@ public class NumericSmoothingRadiusEstimate {
 		return center;
 	}
 
-	static double Rn(Object2DoubleMap<Link> emissions, Coord receiverPoint, double Rprev, double xj) {
+	static double Rn(Object2DoubleMap<Link> emissions, Coord receiverPoint, double Rprev, double xj, double cellSize) {
 
 		var lowerR = Rprev - h;
 		var upperR = Rprev + h;
-		var sumRprev = sumf(emissions, receiverPoint, Rprev) - xj;
-		var sumLowerR = sumf(emissions, receiverPoint, lowerR);
-		var sumUpperR = sumf(emissions, receiverPoint, upperR);
+		var sumRprev = sumf(emissions, receiverPoint, Rprev, cellSize) - xj;
+		var sumLowerR = sumf(emissions, receiverPoint, lowerR, cellSize);
+		var sumUpperR = sumf(emissions, receiverPoint, upperR, cellSize);
 
 		return Rprev - (sumRprev * 2 * h / (sumUpperR - sumLowerR));
 	}
 
-	static double sumf(Object2DoubleMap<Link> emissions, Coord receiverPoint, double R) {
-		// var builder = new StringBuilder();
-		// builder.append("R-Values for ");
-		// builder.append(receiverPoint.toString());
-		//  builder.append(": ");
-		var sum = emissions.object2DoubleEntrySet().stream()
+	static double sumf(Object2DoubleMap<Link> emissions, Coord receiverPoint, double R, double cellSize) {
+
+		var normalizationFactor = cellSize / (Math.PI * R * R);
+		return emissions.object2DoubleEntrySet().stream()
 				.mapToDouble(entry -> {
 					var weight = calculateWeight(
 							entry.getKey().getFromNode().getCoord(),
@@ -107,13 +105,10 @@ public class NumericSmoothingRadiusEstimate {
 							R
 					);
 					var emission = entry.getDoubleValue();
-					//       builder.append(weight);
-					//        builder.append(", ");
-					return emission * weight;
+					//log.info("R: " + R + ", xj: " + (emission * weight * normalizationFactor));
+					return emission * weight * normalizationFactor;
 				})
 				.sum();
-		// log.info(builder.toString());
-		return sum;
 	}
 
 	static double calculateWeight(final Coord from, final Coord to, final Coord receiverPoint, final double le, final double R) {

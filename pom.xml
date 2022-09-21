@@ -71,10 +71,11 @@
             </exclusions>
         </dependency>
 
+
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.13.2</version>
+            <version>4.13.1</version>
             <scope>test</scope>
         </dependency>
 
@@ -82,18 +83,18 @@
         <dependency>
             <groupId>com.beust</groupId>
             <artifactId>jcommander</artifactId>
-            <version>1.82</version>
+            <version>1.81</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.22</version>
+            <version>1.18.20</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>it.unimi.dsi</groupId>
             <artifactId>fastutil</artifactId>
-            <version>8.5.8</version>
+            <version>8.4.3</version>
         </dependency>
 
         <dependency>

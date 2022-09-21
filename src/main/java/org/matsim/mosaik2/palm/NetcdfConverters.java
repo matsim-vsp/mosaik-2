@@ -58,13 +58,11 @@ public class NetcdfConverters {
 
 	public static TimeBinMap<DoubleRaster> createTimeBinMap(double[] fromTimes, int fromTimeIndex) {
 
-		double interval = -1;
-		double startTime = fromTimes[fromTimeIndex]; // assuming the list is populated
+		double endTimeFirstBin = Math.round(fromTimes[fromTimeIndex]); // assuming the list is populated
+		double interval = fromTimes.length > 1 ? Math.round(fromTimes[1]) - Math.round(fromTimes[0]) : 1;
 
-		for (int i = 1; i < fromTimes.length; i++) {
-			interval = fromTimes[i] - fromTimes[i - 1];
-		}
-		return new TimeBinMap<>(interval, startTime - interval);
+		double startTime = endTimeFirstBin - interval;
+		return new TimeBinMap<>(interval, startTime);
 	}
 
 	public static double getCellSize(double[] x, double[] y) {

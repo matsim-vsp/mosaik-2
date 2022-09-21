@@ -52,8 +52,8 @@ public class PalmOutputReader {
 
 			for (int ti = fromTimeIndex; ti < times.length && ti <= toTimeIndex; ti++) {
 
-				var timestep = times[ti];
-				var startTime = timestep - emissions.getBinSize();
+				double timestep = Math.round(times[ti]);
+				double startTime = timestep - emissions.getBinSize(); // Palm's timestamps contain fractions which causes errors.
 				log.info("Parsing timestep [" + startTime + ", " + timestep + "]");
 
 				var raster = new DoubleRaster(bounds, cellSize);

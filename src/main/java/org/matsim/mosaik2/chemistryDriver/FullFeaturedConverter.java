@@ -11,6 +11,7 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
+import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
 import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.time.LocalDateTime;
@@ -52,8 +53,8 @@ public class FullFeaturedConverter {
         this.timeBinSize = timeBinSize;
         this.scaleFactor = scaleFactor;
         this.bounds = bounds;
-        this.transformation = transformation;
-        this.pollutantConverter = pollutantConverter;
+        this.transformation = transformation == null ? new IdentityTransformation() : transformation;
+        this.pollutantConverter = pollutantConverter == null ? new PollutantToPalmNameConverter() : pollutantConverter;
         this.date = date == null ? LocalDateTime.of(2017, 7, 31, 0, 0) : date;
         this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
         this.offset = offset;
@@ -155,6 +156,5 @@ public class FullFeaturedConverter {
                 timeBin.getValue().remove("NOx");
             }
         }
-
     }
 }

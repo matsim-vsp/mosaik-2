@@ -2,7 +2,7 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
-import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.time.LocalDateTime;
 
@@ -14,8 +14,8 @@ import java.time.LocalDateTime;
  * "runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/output/berlin-with-geometry-attributes.output_only_emission_events.xml.gz"
  * -o
  * "runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/output/berlin-with-geometry-attributes.output_emission_raster.nc"
- *
  */
+@SuppressWarnings("FieldMayBeFinal")
 public class WriteChemistryForPhotolysisBerlinScenario {
 
     @Parameter(names = "-n", required = true)
@@ -44,7 +44,7 @@ public class WriteChemistryForPhotolysisBerlinScenario {
         var originX = 382756.5;
         var originY = 5816919.0;
         var numberOfCells = 671;
-        var bounds = new Raster.Bounds(originX, originY, originX + numberOfCells * cellSize, originY + numberOfCells * cellSize);
+        var bounds = new DoubleRaster.Bounds(originX, originY, originX + numberOfCells * cellSize, originY + numberOfCells * cellSize);
 
         var converter = FullFeaturedConverter.builder()
                 .networkFile(networkFile)

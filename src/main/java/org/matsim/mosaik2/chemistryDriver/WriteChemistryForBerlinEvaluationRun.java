@@ -3,6 +3,7 @@ package org.matsim.mosaik2.chemistryDriver;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import org.matsim.contrib.emissions.Pollutant;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -13,7 +14,7 @@ import java.util.Map;
  * the emissions of has UTM-33 (EPSG:25833) as CRS. Hence, no transformation is necessary. The matsim input (network and
  * events file can be found at: runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/output
  * The output is written to: shared-svn/projects/mosaik-2/data/valm02_v04
- *
+ * <p>
  * The matsim scenario is a 10% sample. The default scale factor of 10 was used.
  */
 public class WriteChemistryForBerlinEvaluationRun {
@@ -51,7 +52,7 @@ public class WriteChemistryForBerlinEvaluationRun {
         var originY = 5798930.0;
         var numberOfCellsX = 2943;
         var numberOfCellsY = 2439;
-        var bounds = new Raster.Bounds(originX, originY, originX + numberOfCellsX * cellSize, originY + numberOfCellsY * cellSize);
+        var bounds = new DoubleRaster.Bounds(originX, originY, originX + numberOfCellsX * cellSize, originY + numberOfCellsY * cellSize);
 
         write(cellSize, bounds, parentOutputFile);
     }
@@ -62,7 +63,7 @@ public class WriteChemistryForBerlinEvaluationRun {
         var originX = 385198.5;
         var originY = 5818429.0;
         var numberOfCells = 1439;
-        var bounds = new Raster.Bounds(originX, originY, originX + numberOfCells * cellSize, originY + numberOfCells * cellSize);
+        var bounds = new DoubleRaster.Bounds(originX, originY, originX + numberOfCells * cellSize, originY + numberOfCells * cellSize);
 
         write(cellSize, bounds, nest2OutputFile);
     }
@@ -73,12 +74,12 @@ public class WriteChemistryForBerlinEvaluationRun {
         var originX = 384686.5;
         var originY = 5812189.0;
         var numberOfCells = 1439;
-        var bounds = new Raster.Bounds(originX, originY, originX + numberOfCells * cellSize, originY + numberOfCells * cellSize);
+        var bounds = new DoubleRaster.Bounds(originX, originY, originX + numberOfCells * cellSize, originY + numberOfCells * cellSize);
 
         write(cellSize, bounds, nest3OutputFile);
     }
 
-    private void write(double cellSize, Raster.Bounds bounds, String outputFileName) {
+    private void write(double cellSize, DoubleRaster.Bounds bounds, String outputFileName) {
 
         var names = new PollutantToPalmNameConverter(Map.of(
                 Pollutant.NO2, "NO2",

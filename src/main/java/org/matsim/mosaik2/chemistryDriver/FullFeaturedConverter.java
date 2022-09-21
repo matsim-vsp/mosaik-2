@@ -12,6 +12,7 @@ import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -31,7 +32,7 @@ public class FullFeaturedConverter {
 
     private final double scaleFactor;
 
-    private final Raster.Bounds bounds;
+    private final DoubleRaster.Bounds bounds;
 
     private final CoordinateTransformation transformation;
 
@@ -44,7 +45,7 @@ public class FullFeaturedConverter {
     private final int offset;
 
     @Builder
-    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, Raster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, LocalDateTime date, int numberOfDays, int offset) {
+    public FullFeaturedConverter(String networkFile, String emissionEventsFile, String outputFile, double cellSize, double timeBinSize, double scaleFactor, DoubleRaster.Bounds bounds, CoordinateTransformation transformation, PollutantToPalmNameConverter pollutantConverter, LocalDateTime date, int numberOfDays, int offset) {
         this.networkFile = networkFile;
         this.emissionEventsFile = emissionEventsFile;
         this.outputFile = outputFile;
@@ -61,10 +62,8 @@ public class FullFeaturedConverter {
 
     public void write() {
 
-        var rawNetwork = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation);
-
         // read network, transform to destination crs and filter only links that are within bounds
-        var network = rawNetwork.getLinks().values().stream()
+        var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
                 .filter(link -> isCoveredBy(link, bounds))
                 .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
 
@@ -73,6 +72,9 @@ public class FullFeaturedConverter {
 
         log.info("Converting segment map to network");
         var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
+
+        log.info("writing network!");
+        new NetworkWriter(segmentNetwork).write("C:\\Users\\Janekdererste\\Desktop\\segment-network.xml.gz");
 
         // read the emission events
         var manager = EventsUtils.createEventsManager();
@@ -96,9 +98,9 @@ public class FullFeaturedConverter {
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
     }
 
-    private static TimeBinMap<Map<String, Raster>> cuttofulldays(TimeBinMap<Map<String, Raster>> rasteredEmissions, int numberOfDays, int offset) {
+    private static TimeBinMap<Map<String, DoubleRaster>> cuttofulldays(TimeBinMap<Map<String, DoubleRaster>> rasteredEmissions, int numberOfDays, int offset) {
 
-        TimeBinMap<Map<String, Raster>> result = new TimeBinMap<>(3600);
+        TimeBinMap<Map<String, DoubleRaster>> result = new TimeBinMap<>(3600);
         for (int day = 0; day < numberOfDays; day++) {
             for (int hour = 0; hour < 24; hour++) {
 
@@ -111,7 +113,7 @@ public class FullFeaturedConverter {
                 // necessary because this became apparent only in the last minute when the evaluation run had to be started.
                 var inputSeconds = getInputSeconds(hour, offset);
                 var bin = rasteredEmissions.getTimeBin(inputSeconds);
-                Map<String, Raster> value = bin.hasValue() ? bin.getValue() : Map.of();
+                Map<String, DoubleRaster> value = bin.hasValue() ? bin.getValue() : Map.of();
                 result.getTimeBin(resultSeconds).setValue(value);
             }
         }
@@ -130,11 +132,11 @@ public class FullFeaturedConverter {
         }
     }
 
-    private static boolean isCoveredBy(Link link, Raster.Bounds bounds) {
+    private static boolean isCoveredBy(Link link, DoubleRaster.Bounds bounds) {
         return bounds.covers(link.getFromNode().getCoord()) && bounds.covers(link.getToNode().getCoord());
     }
 
-    private void addNoIfPossible(TimeBinMap<Map<String, Raster>> timeBinMap) {
+    private void addNoIfPossible(TimeBinMap<Map<String, DoubleRaster>> timeBinMap) {
 
         if (pollutantConverter.getPollutants().contains(Pollutant.NO2) && pollutantConverter.getPollutants().contains(Pollutant.NOx)) {
 
@@ -142,7 +144,7 @@ public class FullFeaturedConverter {
 
                 var no2 = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NO2));
                 var nox = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NOx));
-                var no = new Raster(no2.getBounds(), no2.getCellSize());
+                var no = new DoubleRaster(no2.getBounds(), no2.getCellSize());
 
                 nox.forEachCoordinate((x, y, noxValue) -> {
                     var no2Value = no2.getValueByCoord(x, y);

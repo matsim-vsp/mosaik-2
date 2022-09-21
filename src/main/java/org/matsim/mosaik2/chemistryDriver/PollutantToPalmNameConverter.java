@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import lombok.RequiredArgsConstructor;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
@@ -21,14 +22,14 @@ public class PollutantToPalmNameConverter {
         return pollutantToName.keySet();
     }
 
-    String getPalmName(Pollutant matsimPollutant) {
+    public String getPalmName(Pollutant matsimPollutant) {
         return pollutantToName.get(matsimPollutant);
     }
 
     /**
      * Sets default values for emission names
      */
-    PollutantToPalmNameConverter() {
+    public PollutantToPalmNameConverter() {
         pollutantToName = Map.of(
                 Pollutant.NO2, "NO2",
                 Pollutant.CO2_TOTAL, "CO2",
@@ -40,6 +41,14 @@ public class PollutantToPalmNameConverter {
     }
 
     Map<String, Map<Id<Link>, Double>> convert(Map<Pollutant, Map<Id<Link>, Double>> map) {
+        return map.entrySet().stream()
+                .filter(entry -> pollutantToName.containsKey(entry.getKey()))
+                .map(entry -> Tuple.of(pollutantToName.get(entry.getKey()), entry.getValue()))
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond, this::merge));
+    }
+
+    Map<String, Map<Id<Link>, Double>> convertWithDoubleMap(Map<Pollutant, Object2DoubleMap<Id<Link>>> map) {
+
         return map.entrySet().stream()
                 .filter(entry -> pollutantToName.containsKey(entry.getKey()))
                 .map(entry -> Tuple.of(pollutantToName.get(entry.getKey()), entry.getValue()))
@@ -58,6 +67,18 @@ public class PollutantToPalmNameConverter {
         for (var bin: timeBinMap.getTimeBins()) {
 
             var convertedMap = convert(bin.getValue());
+            result.getTimeBin(bin.getStartTime()).setValue(convertedMap);
+        }
+        return result;
+    }
+
+    TimeBinMap<Map<String, Map<Id<Link>, Double>>> convertWithDoubleMap(TimeBinMap<Map<Pollutant, Object2DoubleMap<Id<Link>>>> timeBinMap) {
+
+        TimeBinMap<Map<String, Map<Id<Link>, Double>>> result = new TimeBinMap<>(timeBinMap.getBinSize(), timeBinMap.getStartTime());
+
+        for (var bin: timeBinMap.getTimeBins()) {
+
+            var convertedMap = convertWithDoubleMap(bin.getValue());
             result.getTimeBin(bin.getStartTime()).setValue(convertedMap);
         }
         return result;

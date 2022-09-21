@@ -36,8 +36,8 @@ import java.util.function.Predicate;
 
 public class OfflineEmissions {
 
-    private static final String hbefaAverageWarm = "projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv";
-    private static final String hbefaAverageCold = "projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_withHGVetc.csv";
+    private static final String hbefaAverageWarm = "projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_HOT_Vehcat_2020_Average.csv";
+    private static final String hbefaAverageCold = "projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_ColdStart_Concept_2020_detailed_perTechAverage_withHGVetc.csv";
 
     private static class OutputArgs {
 
@@ -79,9 +79,14 @@ public class OfflineEmissions {
         emissionConfigGroup.setNonScenarioVehicles(EmissionsConfigGroup.NonScenarioVehicles.ignore);
         emissionConfigGroup.setHbefaTableConsistencyCheckingLevel(EmissionsConfigGroup.HbefaTableConsistencyCheckingLevel.none);
 
-        // Load vehicles, as well as transit vehicles of the scenario. Also the network is important of course
+        // we need the generated vehicles of the matsim run
+
         config.vehicles().setVehiclesFile(getOutputFile(outputDir, runId, "vehicles"));
         config.network().setInputFile(getOutputFile(outputDir, runId, "network"));
+        config.network().setInputCRS("EPSG:25832");
+        config.global().setCoordinateSystem("EPSG:25832");
+        // config.plans().setInputFile(getOutputFile(outputDir, runId, "plans"));
+        // config.facilities().setInputFile(getOutputFile(outputDir, runId, "facilities"));
         config.transit().setTransitScheduleFile(getOutputFile(outputDir, runId, "transitSchedule"));
         config.transit().setVehiclesFile(getOutputFile(outputDir, runId, "transitVehicles"));
 

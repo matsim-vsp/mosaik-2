@@ -5,9 +5,9 @@ import com.beust.jcommander.Parameter;
 import de.topobyte.osm4j.core.access.OsmInputException;
 import gnu.trove.map.TObjectDoubleMap;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
+import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
-import org.apache.log4j.Logger;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -25,6 +25,7 @@ import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 import org.matsim.mosaik2.events.RawEmissionEventsReader;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -54,9 +55,9 @@ import java.util.stream.Collectors;
  * 5818412.0
  */
 @SuppressWarnings("FieldMayBeFinal")
+@Log4j2
 public class WriteChemistryInputForErnsReuterSample {
 
-    private static final Logger logger = Logger.getLogger(WriteChemistryInputForErnsReuterSample.class);
     private static final CoordinateTransformation transformation = TransformationFactory.getCoordinateTransformation("EPSG:31468", "EPSG:25833");
     private static final Map<Pollutant, String> pollutants = Map.of(
             Pollutant.NO2, "NO2",
@@ -214,10 +215,10 @@ public class WriteChemistryInputForErnsReuterSample {
         // unsimplified network is already adjusted to origin
 
         // transform emissions by link into emissions on a raster
-        TimeBinMap<Map<String, Raster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
+        TimeBinMap<Map<String, DoubleRaster>> rasterTimeBinMap = new TimeBinMap<>(timeBinSize);
         for (var bin : timeBinMap.getTimeBins()) {
 
-            logger.info("Writing emissions to raster for timestep: " + bin.getStartTime());
+            log.info("Writing emissions to raster for timestep: " + bin.getStartTime());
 
             var rasterByPollutant = bin.getValue().entrySet().parallelStream()
                     .map(entry -> {
@@ -225,7 +226,7 @@ public class WriteChemistryInputForErnsReuterSample {
                         var emissions = entry.getValue();
                         //var raster = Bresenham.rasterizeNetwork(unsimplifiedNetwork, new Raster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
                         // do it unsimplified
-                        var raster = Bresenham.rasterizeNetwork(filteredNetwork, new Raster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
+                        var raster = Bresenham.rasterizeNetwork(filteredNetwork, new DoubleRaster.Bounds(0, 0, xDimension * cellSize, yDimension * cellSize), emissions, cellSize);
                         var palmPollutantKey = pollutants.get(entry.getKey());
                         return Tuple.of(palmPollutantKey, raster);
                     })
@@ -234,11 +235,11 @@ public class WriteChemistryInputForErnsReuterSample {
         }
 
         // calculate no
-        for (TimeBinMap.TimeBin<Map<String, Raster>> timeBin : rasterTimeBinMap.getTimeBins()) {
+        for (TimeBinMap.TimeBin<Map<String, DoubleRaster>> timeBin : rasterTimeBinMap.getTimeBins()) {
 
             var no2 = timeBin.getValue().get(pollutants.get(Pollutant.NO2));
             var nox = timeBin.getValue().get(pollutants.get(Pollutant.NOx));
-            var no = new Raster(no2.getBounds(), no2.getCellSize());
+            var no = new DoubleRaster(no2.getBounds(), no2.getCellSize());
 
             nox.forEachCoordinate((x, y, noxValue) -> {
                 var no2Value = no2.getValueByCoord(x, y);
@@ -252,18 +253,18 @@ public class WriteChemistryInputForErnsReuterSample {
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasterTimeBinMap);
 
-        logger.info("Writing csv file to: C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv");
+        log.info("Writing csv file to: C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv");
         writeCSV(Paths.get("C:\\Users\\Janekdererste\\Desktop\\ernst_reuter_input.csv"), rasterTimeBinMap);
     }
 
-    public void writeCSV(Path file, TimeBinMap<Map<String, Raster>> map) {
+    public void writeCSV(Path file, TimeBinMap<Map<String, DoubleRaster>> map) {
 
         try (var writer = Files.newBufferedWriter(file); var printer = new CSVPrinter(writer, CSVFormat.DEFAULT)) {
 
             // print header
             printer.printRecord("time", "x", "y", "NO2");
 
-            for (TimeBinMap.TimeBin<Map<String, Raster>> timeBin : map.getTimeBins()) {
+            for (TimeBinMap.TimeBin<Map<String, DoubleRaster>> timeBin : map.getTimeBins()) {
 
                 var time = timeBin.getStartTime();
                 var raster = timeBin.getValue().get("NO2");

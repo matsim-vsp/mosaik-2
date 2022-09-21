@@ -6,10 +6,9 @@ import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import lombok.extern.log4j.Log4j2;
 import org.junit.Test;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
-import java.util.Comparator;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Log4j2
 public class CompareEmissionsWithBanzhaf {
@@ -85,12 +84,12 @@ public class CompareEmissionsWithBanzhaf {
                 .forEach(entry -> log.info(entry.getKey() + ":\t" + entry.getValue() + "\t\t\t" + timeSlicedBanzhaf.get(entry.getKey())));
     }
 
-    private Map<String, Double> aggregateEmissionsIntoTimeSlices(TimeBinMap<Map<String, Raster>> emissionRastersByTime) {
+    private Map<String, Double> aggregateEmissionsIntoTimeSlices(TimeBinMap<Map<String, DoubleRaster>> emissionRastersByTime) {
 
         Object2DoubleMap<String> result = new Object2DoubleOpenHashMap<>();
 
         int i = 0;
-        for (TimeBinMap.TimeBin<Map<String, Raster>> timeBin : emissionRastersByTime.getTimeBins()) {
+        for (TimeBinMap.TimeBin<Map<String, DoubleRaster>> timeBin : emissionRastersByTime.getTimeBins()) {
 
             for(var entry : timeBin.getValue().entrySet()) {
                 var key = getKey(entry.getKey(), i);
@@ -113,7 +112,7 @@ public class CompareEmissionsWithBanzhaf {
         return "late " + pollutant;
     }
 
-    private Map<String, Double> aggregateEmissions(TimeBinMap<Map<String, Raster>> emissionRastersByTime) {
+    private Map<String, Double> aggregateEmissions(TimeBinMap<Map<String, DoubleRaster>> emissionRastersByTime) {
 
         Object2DoubleMap<String> result = new Object2DoubleOpenHashMap<>();
 

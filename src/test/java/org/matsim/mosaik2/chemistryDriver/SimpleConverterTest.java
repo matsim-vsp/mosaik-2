@@ -11,11 +11,10 @@ import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.handler.BasicEventHandler;
+import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.testcases.MatsimTestUtils;
-import scala.Int;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.Assert.*;
 
@@ -33,7 +32,7 @@ public class SimpleConverterTest {
                 testUtils.getClassInputDirectory() + "emissionEvents.xml",
                 testFilePath,
                 10,
-                new Raster.Bounds(0, -10, 100, 10)
+                new DoubleRaster.Bounds(0, -10, 100, 10)
         );
 
         SimpleConverter.write(props);
@@ -67,7 +66,7 @@ public class SimpleConverterTest {
                 emissionEventsFile,
                 testFilePath,
                 10,
-                new Raster.Bounds(0, -10, 100, 10
+                new DoubleRaster.Bounds(0, -10, 100, 10
                 )
         );
 

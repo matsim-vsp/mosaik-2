@@ -4,8 +4,8 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import lombok.extern.log4j.Log4j2;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.mosaik2.raster.DoubleRaster;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -37,10 +37,10 @@ public class MergeBackgroundAndTrafficEmissions {
         var backgroundEmissions = PalmChemistryInputReader.read(this.backgroundFile);
         var trafficEmissions = PalmChemistryInputReader.read(this.trafficFile);
 
-        TimeBinMap<Map<String, Raster>> mergeResult = new TimeBinMap<>(backgroundEmissions.getBinSize(), 0);
+        TimeBinMap<Map<String, DoubleRaster>> mergeResult = new TimeBinMap<>(backgroundEmissions.getBinSize(), 0);
 
         // merge the values
-        for (TimeBinMap.TimeBin<Map<String, Raster>> backgroundEmissionsTimeBin : backgroundEmissions.getTimeBins()) {
+        for (TimeBinMap.TimeBin<Map<String, DoubleRaster>> backgroundEmissionsTimeBin : backgroundEmissions.getTimeBins()) {
             var trafficEmissionsTimeBin = trafficEmissions.getTimeBin(backgroundEmissionsTimeBin.getStartTime());
             var mergedBin = mergeResult.getTimeBin(backgroundEmissionsTimeBin.getStartTime());
             mergedBin.setValue(new HashMap<>());
@@ -52,7 +52,7 @@ public class MergeBackgroundAndTrafficEmissions {
                 else {
                     var backgroundRaster = backgroundEmissionsTimeBin.getValue().get(pollutant.getKey());
                     var trafficRaster = pollutant.getValue();
-                    var mergedRaster = new Raster(backgroundRaster.getBounds(), backgroundRaster.getCellSize());
+                    var mergedRaster = new DoubleRaster(backgroundRaster.getBounds(), backgroundRaster.getCellSize());
 
                     mergedRaster.setValueForEachIndex((xi, yi) -> {
                         var backgroundValue = backgroundRaster.getValueByIndex(xi, yi);

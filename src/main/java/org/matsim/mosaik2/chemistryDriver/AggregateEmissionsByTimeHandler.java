@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import lombok.Getter;
 import org.matsim.api.core.v01.Id;
@@ -19,12 +20,12 @@ import java.util.Set;
 public class AggregateEmissionsByTimeHandler implements BasicEventHandler {
 
     @Getter
-    private final TimeBinMap<Map<Pollutant, Map<Id<Link>, Double>>> timeBinMap;
+    private final TimeBinMap<Map<Pollutant, Object2DoubleMap<Id<Link>>>> timeBinMap;
     private final Network network;
     private final Set<Pollutant> pollutantsOfInterest;
     private final double scaleFactor;
 
-    AggregateEmissionsByTimeHandler(Network network, Set<Pollutant> pollutantsOfInterest, double timeBinSize, double scaleFactor) {
+    public AggregateEmissionsByTimeHandler(Network network, Set<Pollutant> pollutantsOfInterest, double timeBinSize, double scaleFactor) {
         this.network = network;
         this.pollutantsOfInterest = pollutantsOfInterest;
         timeBinMap = new TimeBinMap<>(timeBinSize);
@@ -57,7 +58,7 @@ public class AggregateEmissionsByTimeHandler implements BasicEventHandler {
                     .forEach(entry -> {
                         var linkEmissions = emissionByPollutant.computeIfAbsent(entry.getKey(), p -> new Object2DoubleOpenHashMap<>());
                         var value = entry.getValue() * scaleFactor;
-                        linkEmissions.merge(linkId, value, Double::sum);
+                        linkEmissions.mergeDouble(linkId, value, Double::sum);
                     });
         }
     }

@@ -3,9 +3,9 @@ package org.matsim.mosaik2.prepare;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.ToString;
+import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.log4j.Logger;
 
 import java.io.FileReader;
 import java.io.IOException;
@@ -14,9 +14,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Log4j2
 public class GetCountData {
-
-	private static final Logger logger = Logger.getLogger(CreateCounts.class);
 
 	Map<String, CountingData> countData(String filePath1, String filePath2, Map<String, NodeMatcher.MatchedLinkID> nodeMatcher) throws IOException {
 
@@ -27,12 +26,12 @@ public class GetCountData {
 			result2.put(entry.getKey(), entry.getValue());
 		}
 
-		logger.info("###############################################");
-		logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
-		logger.info("#\t\t\t All Counts were imported! \t\t\t#");
-		logger.info("#\t\t\t  " + result2.keySet().size() + " stations were found!\t\t\t#");
-		logger.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
-		logger.info("###############################################");
+		log.info("###############################################");
+		log.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
+		log.info("#\t\t\t All Counts were imported! \t\t\t#");
+		log.info("#\t\t\t  " + result2.keySet().size() + " stations were found!\t\t\t#");
+		log.info("#\t\t\t\t\t\t\t\t\t\t\t\t#");
+		log.info("###############################################");
 		return result2;
 	}
 

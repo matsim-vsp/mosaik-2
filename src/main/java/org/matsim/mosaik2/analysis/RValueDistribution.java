@@ -33,6 +33,7 @@ public class RValueDistribution {
 
 	}
 
+
 	private static void doSomethingWithRaster(DoubleRaster raster, SmoothingRadiusEstimate estimator) {
 
 		log.info("Do something with raster");

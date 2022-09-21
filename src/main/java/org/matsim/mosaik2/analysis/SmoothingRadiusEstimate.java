@@ -87,7 +87,7 @@ public class SmoothingRadiusEstimate {
 		var geometryFactory = new GeometryFactory();
 		var preparedGeometryFactory = new PreparedGeometryFactory();
 
-		log.info("Put buffer of 30m around each link. Then filter for buffers within bounds of study area. #Links: " + originalNetwork.getLinks().size());
+		log.info("Put buffer of 1000m around each link. Then filter for buffers within bounds of study area. #Links: " + originalNetwork.getLinks().size());
 		var boundsGeometry = preparedGeometryFactory.create(linkCache.getBounds().toGeometry());
 		var buffers = originalNetwork.getLinks().values().parallelStream()
 				// currently pt doesn't have emissions.
@@ -99,7 +99,7 @@ public class SmoothingRadiusEstimate {
 					});
 					// we use a buffer of 30m, because links wich are further away don't really add emissions to a receiver
 					// point.
-					return Tuple.of(link.getId(), lineString.buffer(30));
+					return Tuple.of(link.getId(), lineString.buffer(1000));
 				})
 				// select all the links wich buffer 'touches' the study area.
 				.filter(tuple -> boundsGeometry.intersects(tuple.getSecond()))

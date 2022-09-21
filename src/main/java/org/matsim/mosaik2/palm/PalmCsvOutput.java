@@ -16,31 +16,29 @@ import org.matsim.mosaik2.raster.DoubleRaster;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Log4j2
 public class PalmCsvOutput {
 
 	public static void write(Path output, TimeBinMap<DoubleRaster> palmData) {
+		write(output, palmData, 0.0);
+	}
+
+	public static void write(Path output, TimeBinMap<DoubleRaster> palmData, double minValue) {
 
 		log.info("Writing t,x,y,value data to: " + output);
 
-		var counter = new AtomicInteger();
 		try (var writer = Files.newBufferedWriter(output); var printer = createWriteFormat().print(writer)) {
 
 			for (var bin : palmData.getTimeBins()) {
 				var time = bin.getStartTime();
+
+				log.info("Writing time slices: [" + time + ", " + (time + palmData.getBinSize()) + "]");
 				var raster = bin.getValue();
 
 				raster.forEachCoordinate((x, y, value) -> {
-
-					if (value <= 0) return;
-
-					var count = counter.incrementAndGet();
-					if (count % 100000 == 0) {
-						log.info("Printed " + count);
-					}
+					if (value <= minValue) return;
 					printRecord(time, x, y, value, printer);
 				});
 			}
@@ -59,25 +57,27 @@ public class PalmCsvOutput {
 
 	public static TimeBinMap<DoubleRaster> read(Path input, DataInfo dataInfo) {
 		TimeBinMap<DoubleRaster> result = new TimeBinMap<>(dataInfo.getTimeInterval());
-		var count = 0;
+		double lastTime = -1;
 
 		log.info("Reading palm output csv with data info: " + dataInfo);
 
 		try (var reader = Files.newBufferedReader(input); var parser = CSVParser.parse(reader, createReadFormat())) {
 
 			for (var record : parser) {
-				count++;
-				if (count % 100000 == 0) {
-					log.info("Parsed " + count);
-				}
 
 				var time = Double.parseDouble(record.get("time"));
+
+				if (time != lastTime) {
+					lastTime = time;
+					log.info("Parsing Time Slice: [" + time + ", " + (time + dataInfo.timeInterval) + "]");
+				}
+
 				var x = Double.parseDouble(record.get("x"));
 				var y = Double.parseDouble(record.get("y"));
 				var value = Double.parseDouble(record.get("value"));
 
 				var bin = getRasterForTime(time, result, dataInfo.getRasterInfo());
-				bin.adjustValueForCoord(x, y, value);
+				bin.setValueForCoord(x, y, value);
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e);
@@ -144,7 +144,7 @@ public class PalmCsvOutput {
 		var bin = map.getTimeBin(time);
 
 		if (!bin.hasValue()) {
-			bin.setValue(new DoubleRaster(rasterInfo.getBounds(), rasterInfo.getCellSize()));
+			bin.setValue(new DoubleRaster(rasterInfo.getBounds(), rasterInfo.getCellSize(), -1.));
 		}
 
 		return bin.getValue();

@@ -6,7 +6,6 @@ import it.unimi.dsi.fastutil.objects.AbstractObject2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import lombok.extern.log4j.Log4j2;
-import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.network.Link;
@@ -14,6 +13,7 @@ import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.network.NetworkUtils;
+import org.matsim.mosaik2.Utils;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
 import org.matsim.mosaik2.palm.PalmOutputReader;
 import org.matsim.mosaik2.raster.DoubleRaster;
@@ -40,7 +40,7 @@ public class AverageSmoothingRadiusEstimate {
 			var receiverPoint = new Coord(x, y);
 			var value = raster.getValueByCoord(x, y);
 			// assuming that receiver points with 0 emissions are palm-buildings
-			var r = value <= -1 ? 0.0 : NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value);
+			var r = value <= -1 ? 0.0 : NumericSmoothingRadiusEstimate.estimateRWithBisect(emissions, receiverPoint, value, raster.getCellSize());
 			var currentCount = counter.incrementAndGet();
 			if (currentCount % 100000 == 0) {
 				log.info("Calculated " + currentCount + "/" + size + " R-Values. Last value was: " + r);
@@ -91,7 +91,7 @@ public class AverageSmoothingRadiusEstimate {
 		var rasterOfRs = AverageSmoothingRadiusEstimate.collectR(pm10Raster, emissions);
 		log.info("after collectR");
 		log.info("writing csv to: " + input.outputFile);
-		try (var writer = Files.newBufferedWriter(Paths.get(input.outputFile)); var printer = CSVFormat.DEFAULT.withDelimiter(',').withHeader("x", "y", "R").print(writer)) {
+		try (var writer = Files.newBufferedWriter(Paths.get(input.outputFile)); var printer = new CSVPrinter(writer, Utils.createWriteFormat("x", "y", "R"))) {
 			rasterOfRs.forEachCoordinate((x, y, value) -> printValue(x, y, value, printer));
 		} catch (IOException e) {
 			e.printStackTrace();

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<events version="1.0">
+
+	<event time="21350.0" type="actend" person="254847801" link="234100530005f" x="376666.0137315097" y="5823531.117120545" actType="home_47400.0"  />
+	<event time="21350.0" type="departure" person="254847801" link="234100530005f" legMode="walk"  />
+	<event time="21434.0" type="travelled" person="254847801" distance="89.46148581098734" mode="walk"  />
+	<event time="21434.0" type="arrival" person="254847801" link="234100530005f" legMode="walk"  />
+	<event time="21434.0" type="actstart" person="254847801" link="234100530005f" x="376688.5317708137" y="5823596.145209626" actType="ride interaction"  />
+	<event time="21434.0" type="actend" person="254847801" link="234100530005f" x="376688.5317708137" y="5823596.145209626" actType="ride interaction"  />
+	<event time="21434.0" type="departure" person="254847801" link="234100530005f" legMode="ride"  />
+	<event time="22531.0" type="travelled" person="254847801" distance="11704.697428418978" mode="ride"  />
+	<event time="22531.0" type="arrival" person="254847801" link="334651310002f" legMode="ride"  />
+	<event time="22531.0" type="actstart" person="254847801" link="334651310002f" x="386825.90815368213" y="5820805.417951689" actType="ride interaction"  />
+	<event time="22531.0" type="actend" person="254847801" link="334651310002f" x="386825.90815368213" y="5820805.417951689" actType="ride interaction"  />
+	<event time="22531.0" type="departure" person="254847801" link="334651310002f" legMode="walk"  />
+	<event time="22548.0" type="travelled" person="254847801" distance="18.503409471701953" mode="walk"  />
+	<event time="22548.0" type="arrival" person="254847801" link="334651310002f" legMode="walk"  />
+	<event time="22548.0" type="actstart" person="254847801" link="334651310002f" x="386824.52793638525" y="5820791.25163794" actType="work_43200.0"  />
+	<event time="50340.0" type="actend" person="263629601" link="5084630190000f" x="383815.1105640421" y="5819250.998935819" actType="home_84000.0"  />
+	<event time="50340.0" type="departure" person="263629601" link="5084630190000f" legMode="bicycle"  />
+	<event time="51419.0" type="travelled" person="263629601" distance="3387.1686999307635" mode="bicycle"  />
+	<event time="51419.0" type="arrival" person="263629601" link="2190818310000f" legMode="bicycle"  />
+	<event time="51419.0" type="actstart" person="263629601" link="2190818310000f" x="386125.3503912457" y="5820455.779890583" actType="other_1800.0"  />
+	<event time="53099.0" type="actend" person="263629601" link="2190818310000f" x="386125.3503912457" y="5820455.779890583" actType="other_1800.0"  />
+	<event time="53099.0" type="departure" person="263629601" link="2190818310000f" legMode="bicycle"  />
+	<event time="54178.0" type="travelled" person="263629601" distance="3387.1686999307635" mode="bicycle"  />
+	<event time="54178.0" type="arrival" person="263629601" link="5084630190000f" legMode="bicycle"  />
+	<event time="54178.0" type="actstart" person="263629601" link="5084630190000f" x="383815.1105640421" y="5819250.998935819" actType="home_7800.0"  />
+	<event time="60660.0" type="actend" person="263629601" link="5084630190000f" x="383815.1105640421" y="5819250.998935819" actType="home_7800.0"  />
+	<event time="60660.0" type="departure" person="263629601" link="5084630190000f" legMode="walk"  />
+	<event time="60773.0" type="travelled" person="263629601" distance="120.14770241724908" mode="walk"  />
+	<event time="60773.0" type="arrival" person="263629601" link="3317038810002f" legMode="walk"  />
+	<event time="60773.0" type="actstart" person="263629601" link="3317038810002f" x="383851.71217497636" y="5819335.86365485" actType="other_600.0"  />
+	<event time="61262.0" type="actend" person="254847801" link="334651310002f" x="386824.52793638525" y="5820791.25163794" actType="work_43200.0"  />
+	<event time="61262.0" type="departure" person="254847801" link="334651310002f" legMode="walk"  />
+	<event time="61279.0" type="travelled" person="254847801" distance="18.503409471701953" mode="walk"  />
+	<event time="61279.0" type="arrival" person="254847801" link="334651310002f" legMode="walk"  />
+	<event time="61279.0" type="actstart" person="254847801" link="334651310002f" x="386825.90815368213" y="5820805.417951689" actType="ride interaction"  />
+	<event time="61279.0" type="actend" person="254847801" link="334651310002f" x="386825.90815368213" y="5820805.417951689" actType="ride interaction"  />
+	<event time="61279.0" type="departure" person="254847801" link="334651310002f" legMode="ride"  />
+	<event time="61553.0" type="actend" person="263629601" link="3317038810002f" x="383851.71217497636" y="5819335.86365485" actType="other_600.0"  />
+	<event time="61553.0" type="departure" person="263629601" link="3317038810002f" legMode="walk"  />
+	<event time="61666.0" type="travelled" person="263629601" distance="120.14770241724908" mode="walk"  />
+	<event time="61666.0" type="arrival" person="263629601" link="5084630190000f" legMode="walk"  />
+	<event time="61666.0" type="actstart" person="263629601" link="5084630190000f" x="383815.1105640421" y="5819250.998935819" actType="home_84000.0"  />
+	<event time="62471.0" type="travelled" person="254847801" distance="12138.483312187363" mode="ride"  />
+	<event time="62471.0" type="arrival" person="254847801" link="234100530005f" legMode="ride"  />
+	<event time="62471.0" type="actstart" person="254847801" link="234100530005f" x="376688.5317708137" y="5823596.145209626" actType="ride interaction"  />
+	<event time="62471.0" type="actend" person="254847801" link="234100530005f" x="376688.5317708137" y="5823596.145209626" actType="ride interaction"  />
+	<event time="62471.0" type="departure" person="254847801" link="234100530005f" legMode="walk"  />
+	<event time="62555.0" type="travelled" person="254847801" distance="89.46148581098734" mode="walk"  />
+	<event time="62555.0" type="arrival" person="254847801" link="234100530005f" legMode="walk"  />
+	<event time="62555.0" type="actstart" person="254847801" link="234100530005f" x="376666.0137315097" y="5823531.117120545" actType="home_47400.0"  />
+</events>

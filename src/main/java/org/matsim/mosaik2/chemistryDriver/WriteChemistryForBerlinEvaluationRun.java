@@ -14,7 +14,7 @@ import java.util.Map;
  * the emissions of has UTM-33 (EPSG:25833) as CRS. Hence, no transformation is necessary. The matsim input (network and
  * events file can be found at: runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/output
  * The output is written to: shared-svn/projects/mosaik-2/data/valm02_v04
- * <p>
+ *
  * The matsim scenario is a 10% sample. The default scale factor of 10 was used.
  */
 public class WriteChemistryForBerlinEvaluationRun {

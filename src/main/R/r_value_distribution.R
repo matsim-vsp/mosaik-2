@@ -1,12 +1,12 @@
 library(tidyverse)
 library(dplyr)
 
-csv_data <- read_csv("C:/Users/Janekdererste/Desktop/photoshade_6km10m/r-values-by-type.csv")
+csv_data <- read_csv("C:/Users/Janekdererste/repos/runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-PM10-r-values.csv")
 csv_data
 
-ggplot(csv_data, aes(x = value, color = type, fill = type)) +
-  geom_histogram(binwidth = 1) +
-  facet_grid(rows = vars(type), scales = "free")
+ggplot(csv_data, aes(x = value)) +
+  geom_histogram(binwidth = 1)
+#facet_grid(rows = vars(type), scales = "free")
 
 #csv_data1 = csv_data %>% mutate(intervall = cut(value, breaks = 2))
 #ggplot(csv_data1, aes(intervall)) + geom_bar()

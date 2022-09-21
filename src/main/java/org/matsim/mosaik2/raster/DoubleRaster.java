@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.raster;
 
+import java.util.Arrays;
 import java.util.stream.IntStream;
 
 /**
@@ -11,8 +12,13 @@ public class DoubleRaster extends AbstractRaster {
 	private final double[] data;
 
 	public DoubleRaster(Bounds bounds, double cellSize) {
+		this(bounds, cellSize, 0.0);
+	}
+
+	public DoubleRaster(Bounds bounds, double cellSize, double defaultValue) {
 		super(bounds, cellSize);
 		this.data = new double[getXLength() * getYLength()];
+		Arrays.fill(this.data, defaultValue);
 	}
 
 	/**
@@ -66,7 +72,7 @@ public class DoubleRaster extends AbstractRaster {
 		IntStream.range(0, getXLength()).parallel().forEach(xi ->
 				IntStream.range(0, getYLength()).forEach(yi -> {
 					var value = valueSupplier.applyAsDouble(xi, yi);
-					adjustValueForIndex(xi, yi, value);
+					setValueForIndex(xi, yi, value);
 				}));
 	}
 
@@ -87,6 +93,16 @@ public class DoubleRaster extends AbstractRaster {
 	public double getValueByCoord(double x, double y) {
 		var index = getIndexForCoord(x, y);
 		return data[index];
+	}
+
+	public void setValueForIndex(int xi, int yi, double value) {
+		var index = getIndex(xi, yi);
+		data[index] = value;
+	}
+
+	public void setValueForCoord(double x, double y, double value) {
+		var index = getIndexForCoord(x, y);
+		data[index] = value;
 	}
 
 	public double adjustValueForCoord(double x, double y, double value) {

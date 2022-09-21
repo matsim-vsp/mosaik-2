@@ -74,7 +74,8 @@ public class CalculateLinkExposure {
 			var rValueSlice = rValues.getTimeBin(bin.getStartTime()).getValue();
 			exposureSlice.forEachCoordinate((x, y, value) -> {
 
-				var r = rValueSlice.getValueByCoord(x, y);
+				//var r = rValueSlice.getValueByCoord(x, y);
+				var r = 11;
 				if (value <= 0.0 || r <= 0.0) return; // no need to do anything here.
 
 				var linkIds = linkCache.getValueByCoord(x, y);

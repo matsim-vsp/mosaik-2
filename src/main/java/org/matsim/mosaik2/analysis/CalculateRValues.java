@@ -80,7 +80,7 @@ public class CalculateRValues {
 		var counter = new AtomicInteger();
 		var size = raster.getXLength() * raster.getYLength();
 
-		log.info("Created Buffer geometries. Start creating populating link cache");
+		log.info("Created Buffer geometries. Start populating link cache");
 		raster.setValueForEachCoordinate((x, y) -> {
 			var point = MGC.xy2Point(x, y);
 

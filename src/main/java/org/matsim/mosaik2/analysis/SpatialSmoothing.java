@@ -2,19 +2,23 @@ package org.matsim.mosaik2.analysis;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
-import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
-import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.prep.PreparedGeometry;
+import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
+import org.locationtech.jts.index.hprtree.HPRtree;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
+import org.matsim.application.options.ShpOptions;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
-import org.matsim.core.utils.collections.QuadTree;
+import org.matsim.core.utils.geometry.geotools.MGC;
 import org.matsim.core.utils.gis.ShapeFileReader;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
 import org.matsim.mosaik2.chemistryDriver.PollutantToPalmNameConverter;
@@ -24,8 +28,9 @@ import org.matsim.mosaik2.raster.ObjectRaster;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
 
+import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.HashSet;
+import java.util.*;
 
 @Log4j2
 @RequiredArgsConstructor
@@ -34,7 +39,9 @@ public class SpatialSmoothing {
     private final String species;
     private final Path emissionEvents;
     private final Path networkPath;
-    private final Path shapeFile;
+    private final Path boundsFile;
+
+    private final Path buildingsFile;
     private final Path outputFile;
     private final int r;
     private final int cellSize;
@@ -47,46 +54,36 @@ public class SpatialSmoothing {
         JCommander.newBuilder().addObject(inputArgs).build().parse(args);
 
         new SpatialSmoothing(
-                inputArgs.species, inputArgs.emissionEvents, inputArgs.networkPath, inputArgs.shapeFile,
+                inputArgs.species, inputArgs.emissionEvents, inputArgs.networkPath, inputArgs.boundsFile, inputArgs.buildingsFile,
                 inputArgs.outputFile, inputArgs.r, inputArgs.cellSize, inputArgs.timeBinSize, inputArgs.scaleFactor
         ).run();
     }
 
-    private static QuadTree<Id<Link>> createLinkQuadTree(Network network, Geometry bounds) {
-        var envelope = bounds.getEnvelopeInternal();
-        var q = new QuadTree<Id<Link>>(
-                envelope.getMinX(), envelope.getMinY(),
-                envelope.getMaxX(), envelope.getMaxY()
-        );
-
-        for (Link link : network.getLinks().values()) {
-
-            if (link.getCoord().getX() > q.getMinEasting() &&
-                    link.getCoord().getX() < q.getMaxEasting() &&
-                    link.getCoord().getY() > q.getMinNorthing() &&
-                    link.getCoord().getY() < q.getMaxNorthing()
-            ) {
-                q.put(link.getCoord().getX(), link.getCoord().getY(), link.getId());
-            }
-        }
-        return q;
-    }
-
     void run() throws FactoryException, TransformException {
 
-        var berlinGeometry = ShapeFileReader.getAllFeatures(shapeFile.toString()).stream()
+        var berlinGeometry = ShapeFileReader.getAllFeatures(boundsFile.toString()).stream()
                 .map(simpleFeature -> (Geometry) simpleFeature.getDefaultGeometry())
                 .findAny()
                 .orElseThrow(() -> new RuntimeException("Couldn't find feature for berlin"));
+        var bounds = new ObjectRaster.Bounds(berlinGeometry);
 
         var network = CalculateRValues.loadNetwork(networkPath.toString(), berlinGeometry);
 
-        // create a quad tree which contains link ids. This attaches link ids to the centroids of the
-        // corresponding links. We use this as a quick cache to reduce the number of calculations
-        // necessary when calculating concentration values for the entire grid. This is less precise
-        // than using from and to nodes, but speeds up the computation by 50%.
-        var quadTree = createLinkQuadTree(network, berlinGeometry);
-        var bounds = new ObjectRaster.Bounds(berlinGeometry);
+        log.info("Creating spatial link index");
+        // with a distance of 3*r, 99% of emissions of a link get distributet into the raster.
+        var linkIndex = new Index(network, r * 5, berlinGeometry);
+        var linkIndexRaster = new ObjectRaster<Set<Id<Link>>>(bounds, cellSize);
+
+        log.info("Creating raster cache with link ids.");
+        linkIndexRaster.setValueForEachCoordinate(linkIndex::query);
+
+        log.info("Creating spatial building index");
+        var options = new ShpOptions(buildingsFile, "EPSG:4326", Charset.defaultCharset());
+        var buildingIndex = options.createIndex("EPSG:25833", "");
+
+        log.info("Creating raster with building data.");
+        var rasteredBuildings = new DoubleRaster(bounds, cellSize);
+        rasteredBuildings.setValueForEachCoordinate((x, y) -> buildingIndex.contains(new Coord(x, y)) ? -1 : 0);
 
         var manager = EventsUtils.createEventsManager();
         var converter = PollutantToPalmNameConverter.createForSingleSpecies(species);
@@ -97,14 +94,11 @@ public class SpatialSmoothing {
         new EmissionEventsReader(manager).readFile(emissionEvents.toString());
 
         log.info("Sort collected emissions by link");
-        TimeBinMap<Object2DoubleMap<Link>> emissionByLink = new TimeBinMap<>(timeBinSize);
-
-        // use lambda for each in case we want to run concurrent
+        TimeBinMap<Map<Id<Link>, LinkEmission>> emissionByLink = new TimeBinMap<>(timeBinSize);
         handler.getTimeBinMap().getTimeBins().forEach(bin -> {
 
-            log.info("Converting link emissions for for: [" + bin.getStartTime() + ", " + (bin.getStartTime() + timeBinSize) + "]");
             var resultBin = emissionByLink.getTimeBin(bin.getStartTime());
-            var emissionResultMap = resultBin.computeIfAbsent(Object2DoubleOpenHashMap::new);
+            var emissionResultMap = resultBin.computeIfAbsent(HashMap::new);
 
             var emissionByPollutant = bin.getValue();
             for (var pollutantEntry : emissionByPollutant.entrySet()) {
@@ -112,13 +106,18 @@ public class SpatialSmoothing {
                 for (var idEntry : emissionMap.object2DoubleEntrySet()) {
 
                     var link = network.getLinks().get(idEntry.getKey());
-                    emissionResultMap.mergeDouble(link, idEntry.getDoubleValue(), Double::sum);
+                    emissionResultMap.computeIfAbsent(link.getId(), id -> new LinkEmission(link)).add(idEntry.getDoubleValue());
                 }
             }
         });
 
+        log.info("Start calculating concentrations.");
         TimeBinMap<DoubleRaster> rasterTimeSeries = new TimeBinMap<>(timeBinSize);
+        var counter = 0;
         for (var bin : emissionByLink.getTimeBins()) {
+
+            if (counter > 9) break;
+            counter++;
 
             log.info("Calculating concentrations for: [" + bin.getStartTime() + ", " + (bin.getStartTime() + timeBinSize) + "]");
             var raster = new DoubleRaster(bounds, cellSize);
@@ -126,15 +125,19 @@ public class SpatialSmoothing {
 
             raster.setValueForEachCoordinate((x, y) -> {
 
-                var linkIds = new HashSet<>(quadTree.getDisk(x, y, 1000));
+                // this means this point is covered by a building
+                if (rasteredBuildings.getValueByCoord(x, y) < 0) return -1;
 
                 // instead of calling sumf in the NumericSmoothing class we re-implement the logic here.
                 // this saves us one stream/collect in the inner loop here.
                 var normalizationFactor = cellSize / (Math.PI * r * r);
-                return linkEmissions.object2DoubleEntrySet().stream()
-                        .filter(entry -> linkIds.contains(entry.getKey().getId()))
-                        .mapToDouble(entry -> {
-                            var link = entry.getKey();
+                var linkIds = linkIndexRaster.getValueByCoord(x, y);
+
+                return linkIds.stream()
+                        .map(linkEmissions::get)
+                        .filter(Objects::nonNull)
+                        .mapToDouble(linkEmission -> {
+                            var link = linkEmission.link;
                             var weight = NumericSmoothingRadiusEstimate.calculateWeight(
                                     link.getFromNode().getCoord(),
                                     link.getToNode().getCoord(),
@@ -142,7 +145,7 @@ public class SpatialSmoothing {
                                     link.getLength(),
                                     r
                             );
-                            var emission = entry.getDoubleValue();
+                            var emission = linkEmission.value;
                             return emission * weight * normalizationFactor;
                         })
                         .sum();
@@ -163,8 +166,10 @@ public class SpatialSmoothing {
         private Path emissionEvents;
         @Parameter(names = "-n", required = true)
         private Path networkPath;
-        @Parameter(names = "-shp", required = true)
-        private Path shapeFile;
+        @Parameter(names = "-bounds", required = true)
+        private Path boundsFile;
+        @Parameter(names = "-buildings", required = true)
+        private Path buildingsFile;
         @Parameter(names = "-o", required = true)
         private Path outputFile;
         @Parameter(names = "-r")
@@ -177,6 +182,57 @@ public class SpatialSmoothing {
         private double scaleFactor = 10;
 
         private InputArgs() {
+        }
+    }
+
+    private static class Index {
+        private static final GeometryFactory geomFact = new GeometryFactory();
+
+        private final HPRtree index = new HPRtree();
+
+        Index(Network network, double bufferDist, Geometry bounds) {
+
+            var prepFactory = new PreparedGeometryFactory();
+            var preparedBounds = prepFactory.create(bounds);
+
+            network.getLinks().values().stream()
+                    .map(link -> {
+                        var line = geomFact.createLineString(new Coordinate[]{
+                                MGC.coord2Coordinate(link.getFromNode().getCoord()), MGC.coord2Coordinate(link.getToNode().getCoord())
+                        });
+                        var lineRect = line.buffer(bufferDist);
+                        var preparedRect = prepFactory.create(lineRect);
+                        return new IndexLine(link.getId(), preparedRect);
+                    })
+                    .filter(indexLine -> preparedBounds.covers(indexLine.geometry.getGeometry()))
+                    .forEach(indexLine -> index.insert(indexLine.geometry.getGeometry().getEnvelopeInternal(), indexLine));
+        }
+
+        Set<Id<Link>> query(double x, double y) {
+
+            var point = geomFact.createPoint(new Coordinate(x, y));
+            Set<Id<Link>> result = new HashSet<>();
+            index.query(point.getEnvelopeInternal(), item -> {
+                var indexLine = (IndexLine) item;
+                if (indexLine.geometry.intersects(point))
+                    result.add(indexLine.id);
+            });
+            return result;
+        }
+    }
+
+    record IndexLine(Id<Link> id, PreparedGeometry geometry) {
+    }
+
+    @RequiredArgsConstructor
+    private static class LinkEmission {
+
+        private final Link link;
+        private double value;
+
+
+        void add(double emission) {
+            this.value += emission;
         }
     }
 }

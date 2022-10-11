@@ -1,11 +1,14 @@
 library(tidyverse)
 library(dplyr)
 
-csv_data <- read_csv("C:/Users/Janekdererste/repos/runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-PM10-r-values.csv")
+csv_data <- read_csv("X:/mosaik-2-r-estimation/photoshade_6km10m_lod2_av_masked_M01.day2-NO2-r-values.csv")
 csv_data
 
 ggplot(csv_data, aes(x = value)) +
   geom_histogram(binwidth = 1)
+
+csv_data %>%
+  summarise(across(where(is.numeric), mean))
 #facet_grid(rows = vars(type), scales = "free")
 
 #csv_data1 = csv_data %>% mutate(intervall = cut(value, breaks = 2))

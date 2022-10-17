@@ -40,8 +40,9 @@ public class SpatialSmoothing {
     private final Path emissionEvents;
     private final Path networkPath;
     private final Path boundsFile;
-
     private final Path buildingsFile;
+
+    private final Path palmFile;
     private final Path outputFile;
     private final int r;
     private final int cellSize;
@@ -55,8 +56,31 @@ public class SpatialSmoothing {
 
         new SpatialSmoothing(
                 inputArgs.species, inputArgs.emissionEvents, inputArgs.networkPath, inputArgs.boundsFile, inputArgs.buildingsFile,
-                inputArgs.outputFile, inputArgs.r, inputArgs.cellSize, inputArgs.timeBinSize, inputArgs.scaleFactor
+                inputArgs.palmFile, inputArgs.outputFile, inputArgs.r, inputArgs.cellSize, inputArgs.timeBinSize, inputArgs.scaleFactor
         ).run();
+    }
+
+    /**
+     * This aligns the two rasters, so that all raster tiles are on the same grid. This is necessary, because we want
+     * the smoothed an the palm data on the same grid.
+     *
+     * @param bounds
+     * @param alignTo
+     * @param cellSize
+     * @return
+     */
+    DoubleRaster.Bounds createAlignedBounds(DoubleRaster.Bounds bounds, DoubleRaster.Bounds alignTo, double cellSize) {
+
+        var howManyCellsX = Math.round((bounds.getMinX() - alignTo.getMinX()) / cellSize);
+        var alignedMinX = alignTo.getMinX() + (howManyCellsX * cellSize);
+        var lengthX = bounds.getMaxX() - bounds.getMinX();
+        var alignedMaxX = alignedMinX + lengthX;
+        var howManyCellsY = Math.round((bounds.getMinY() - alignTo.getMinY()) / cellSize);
+        var alignedMinY = alignTo.getMinY() + (howManyCellsY * cellSize);
+        var lengthY = bounds.getMaxY() - bounds.getMinY();
+        var alignedMaxY = alignedMinY + lengthY;
+
+        return new DoubleRaster.Bounds(alignedMinX, alignedMinY, alignedMaxX, alignedMaxY);
     }
 
     void run() throws FactoryException, TransformException {
@@ -65,7 +89,9 @@ public class SpatialSmoothing {
                 .map(simpleFeature -> (Geometry) simpleFeature.getDefaultGeometry())
                 .findAny()
                 .orElseThrow(() -> new RuntimeException("Couldn't find feature for berlin"));
-        var bounds = new ObjectRaster.Bounds(berlinGeometry);
+        var berlinBounds = new ObjectRaster.Bounds(berlinGeometry);
+        var palmInfo = PalmCsvOutput.readDataInfo(palmFile);
+        var bounds = createAlignedBounds(berlinBounds, palmInfo.getRasterInfo().getBounds(), palmInfo.getRasterInfo().getCellSize());
 
         var network = CalculateRValues.loadNetwork(networkPath.toString(), berlinGeometry);
 
@@ -154,7 +180,7 @@ public class SpatialSmoothing {
             rasterTimeSeries.getTimeBin(bin.getStartTime()).setValue(raster);
         }
 
-        PalmCsvOutput.write(outputFile, rasterTimeSeries);
+        PalmCsvOutput.write(outputFile, rasterTimeSeries, -10);
     }
 
     @SuppressWarnings("FieldMayBeFinal")
@@ -170,6 +196,8 @@ public class SpatialSmoothing {
         private Path boundsFile;
         @Parameter(names = "-buildings", required = true)
         private Path buildingsFile;
+        @Parameter(names = "-palm", required = true)
+        private Path palmFile;
         @Parameter(names = "-o", required = true)
         private Path outputFile;
         @Parameter(names = "-r")

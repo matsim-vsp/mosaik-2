@@ -88,33 +88,39 @@ public class PalmCsvOutput {
 
 	public static DataInfo readDataInfo(Path input) {
 
-		double currentTimeStep = -1;
+		double lastTimeStep = -1;
+		double timeStepSize = -1;
+		MaxBounds bounds = new MaxBounds();
 		Coordinates coordinates = new Coordinates();
+		double cellSize = -1;
 
 		log.info("Reading data info of file " + input.toString());
 		try (var reader = Files.newBufferedReader(input); var parser = CSVParser.parse(reader, createReadFormat())) {
 
 			for (var record : parser) {
 
-				var time = Double.parseDouble(record.get("time"));
-
-				// make sure to only parse the first timestep
-				if (currentTimeStep < 0.) {
-					currentTimeStep = time;
-				} else if (!Precision.equals(currentTimeStep, time)) {
-					return new DataInfo(coordinates.createRasterInfo(), time - currentTimeStep);
-				}
-
 				var x = Double.parseDouble(record.get("x"));
 				var y = Double.parseDouble(record.get("y"));
-				coordinates.add(x, y);
+				bounds.adjustTo(x, y);
+				if (cellSize < 0.)
+					coordinates.add(x, y);
+
+				var time = Double.parseDouble(record.get("time"));
+
+
+				if (!Precision.equals(lastTimeStep, time)) {
+					log.info("lasttimestep: " + lastTimeStep + " time: " + time);
+					timeStepSize = time - lastTimeStep;
+					if (lastTimeStep > 0)
+						cellSize = coordinates.getCellSize();
+					lastTimeStep = time;
+				}
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 
-		// if we reach this point, there is only one timestep
-		return new DataInfo(coordinates.createRasterInfo(), 1);
+		return new DataInfo(new RasterInfo(bounds.createBounds(), cellSize), timeStepSize);
 	}
 
 	private static void printRecord(double time, double x, double y, double value, CSVPrinter printer) {
@@ -151,40 +157,44 @@ public class PalmCsvOutput {
 	}
 
 	/**
-	 * This collects x and y values in two arrays. Converts those into a AbstractRaster.Bounds object.
-	 * Before doing so, the values in the arrays are sorted. This only works for CRS, where x and y values
-	 * have the same signum
+	 * This collects x values in an array. Converts it into a cell size
 	 */
 	@Getter
 	private static class Coordinates {
 
 		private final DoubleList xValues = new DoubleArrayList();
-		private final DoubleList yValues = new DoubleArrayList();
 
 		private void add(double x, double y) {
 			xValues.add(x);
-			yValues.add(y);
 		}
 
-		private RasterInfo createRasterInfo() {
+		private double getCellSize() {
 
 			var xDistinct = xValues.stream()
 					.distinct()
 					.sorted()
 					.collect(Collectors.toCollection(DoubleArrayList::new));
 
-			var yDistinct = yValues.stream()
-					.distinct()
-					.sorted()
-					.collect(Collectors.toCollection(DoubleArrayList::new));
+			return xDistinct.getDouble(1) - xDistinct.getDouble(0);
+		}
+	}
 
-			var minX = xDistinct.getDouble(0);
-			var maxX = xDistinct.getDouble(xDistinct.size() - 1);
-			var minY = yDistinct.getDouble(0);
-			var maxY = yDistinct.getDouble(yDistinct.size() - 1);
-			var cellSize = xDistinct.getDouble(1) - xDistinct.getDouble(0);
+	public static class MaxBounds {
 
-			return new RasterInfo(new DoubleRaster.Bounds(minX, minY, maxX, maxY), cellSize);
+		private double minX = Double.MAX_VALUE;
+		private double maxX = Double.MIN_VALUE;
+		private double minY = Double.MAX_VALUE;
+		private double maxY = Double.MIN_VALUE;
+
+		void adjustTo(double x, double y) {
+			this.minX = Math.min(x, minX);
+			this.maxX = Math.max(x, maxX);
+			this.minY = Math.min(y, minY);
+			this.maxY = Math.max(y, maxY);
+		}
+
+		DoubleRaster.Bounds createBounds() {
+			return new DoubleRaster.Bounds(minX, minY, maxX, maxY);
 		}
 	}
 

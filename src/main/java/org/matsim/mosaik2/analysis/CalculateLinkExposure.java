@@ -25,23 +25,29 @@ import java.util.Set;
 public class CalculateLinkExposure {
 
 	private final Path exposureFile;
-	private final Path rValueFile;
 	private final Path outputFile;
 
 	private final Network network;
 	private final ObjectRaster<Set<Id<Link>>> linkCache;
 
+	private final double r;
+
 	public CalculateLinkExposure(InputArgs args) {
-		this(Paths.get(args.exposureFile), Paths.get(args.rValueFile), Paths.get(args.networkFile), Paths.get(args.outputFile));
+		this(Paths.get(args.exposureFile), Paths.get(args.networkFile), Paths.get(args.outputFile), args.r);
 	}
 
-	public CalculateLinkExposure(Path exposureFile, Path rValueFile, Path networkFile, Path outputFile) {
+	public CalculateLinkExposure(Path exposureFile, Path networkFile, Path outputFile, double r) {
 
 		var info = PalmCsvOutput.readDataInfo(exposureFile);
 		network = CalculateRValues.loadNetwork(networkFile.toString(), info.getRasterInfo().getBounds().toGeometry());
-		linkCache = CalculateRValues.createCache(network, info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());
+		//linkCache = CalculateRValues.createCache(network, info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());\
+		log.info("Create spatial index");
+		var linkIndex = new SpatialIndex(network, r * 5, info.getRasterInfo().getBounds().toGeometry());
+		linkCache = new ObjectRaster<>(info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());
+		log.info("Creating raster cache with link ids");
+		linkCache.setValueForEachCoordinate(linkIndex::query);
 		this.exposureFile = exposureFile;
-		this.rValueFile = rValueFile;
+		this.r = r;
 		this.outputFile = outputFile;
 	}
 
@@ -55,7 +61,6 @@ public class CalculateLinkExposure {
 	void run() {
 
 		var exposureData = PalmCsvOutput.read(exposureFile);
-		var rValues = PalmCsvOutput.read(rValueFile);
 		var result = new TimeBinMap<Object2DoubleMap<Id<Link>>>(exposureData.getBinSize());
 
 		log.info("Starting to calculate exposure values for links");
@@ -71,12 +76,9 @@ public class CalculateLinkExposure {
 					.getTimeBin(bin.getStartTime())
 					.getValue();
 			var exposureSlice = bin.getValue();
-			var rValueSlice = rValues.getTimeBin(bin.getStartTime()).getValue();
 			exposureSlice.forEachCoordinate((x, y, value) -> {
 
-				//var r = rValueSlice.getValueByCoord(x, y);
-				var r = 11;
-				if (value <= 0.0 || r <= 0.0) return; // no need to do anything here.
+				if (value <= 0.0) return; // no need to do anything here.
 
 				var linkIds = linkCache.getValueByCoord(x, y);
 				linkIds.stream()
@@ -121,11 +123,11 @@ public class CalculateLinkExposure {
 
 		@Parameter(names = "-e", required = true)
 		public String exposureFile;
-		@Parameter(names = "-r", required = true)
-		public String rValueFile;
 		@Parameter(names = "-n", required = true)
 		public String networkFile;
 		@Parameter(names = "-o", required = true)
 		public String outputFile;
+		@Parameter(names = "-r", required = true)
+		public double r;
 	}
 }

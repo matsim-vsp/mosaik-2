@@ -124,16 +124,16 @@ public class CalculateExposure {
 				dataInfo.getRasterInfo().getBounds().getMaxY()
 		);
 
-		var firstRaster = palmData.getTimeBins().iterator().next().getValue();
-		firstRaster.forEachCoordinate((x, y, value) -> {
+		// use the 9am raster since this is our peak hour. This means the most of the raster points
+		// which will ever receive concentration values will have a value here.
+		// don't use a building filter explicitly, since the palm data has a more coarse resolution of
+		// buildings than what we receive from OSM. This is a bit hacky but will do.
+		var nineAmRaster = palmData.getTimeBin(9 * 3600).getValue();
+		nineAmRaster.forEachCoordinate((x, y, value) -> {
 			if (value >= 0.0)
 				index.put(x, y, new Coord(x, y));
 		});
-
-		// 1. map all activities onto a raster cell
-		// create data structure that holds the activity info and populate it
 		var activityRaster = new ObjectRaster<Tile>(dataInfo.getRasterInfo().getBounds(), dataInfo.getRasterInfo().getCellSize());
-		//activityRaster.setValueForEachIndex((xi, yi) -> new Tile());
 
 		log.info("Map all activities onto raster tiles for which PALM calculated a concentration value.");
 		var fact = new GeometryFactory();

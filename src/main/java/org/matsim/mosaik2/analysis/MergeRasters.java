@@ -15,49 +15,53 @@ import java.util.stream.Collectors;
 @Log4j2
 public class MergeRasters {
 
-    private final List<Path> files;
-    private final Path output;
+	private final List<Path> files;
+	private final Path output;
 
-    public static void main(String[] args) {
+	public static void main(String[] args) {
 
-        var input = new InputArgs();
-        JCommander.newBuilder().addObject(input).build().parse(args);
+		var input = new InputArgs();
+		JCommander.newBuilder().addObject(input).build().parse(args);
 
-        var paths = input.files.stream()
-                .map(Paths::get)
-                .collect(Collectors.toList());
-        new MergeRasters(paths, Paths.get(input.output)).run();
-    }
+		var paths = input.files.stream()
+				.map(Paths::get)
+				.collect(Collectors.toList());
+		new MergeRasters(paths, Paths.get(input.output)).run();
+	}
 
-    private void run() {
+	private void run() {
 
-        var first = this.files.get(0);
-        var firstInfo = PalmCsvOutput.readDataInfo(first);
-        var firstTimeSeries = PalmCsvOutput.read(first, firstInfo);
+		var first = this.files.get(0);
+		var firstInfo = PalmCsvOutput.readDataInfo(first);
+		var firstTimeSeries = PalmCsvOutput.read(first, firstInfo);
 
-        for (int i = 1; i < files.size(); i++) {
+		for (int i = 1; i < files.size(); i++) {
 
-            var path = files.get(i);
-            var data = PalmCsvOutput.read(path);
+			var path = files.get(i);
+			var data = PalmCsvOutput.read(path);
 
-            for (var bin : firstTimeSeries.getTimeBins()) {
+			for (var bin : firstTimeSeries.getTimeBins()) {
+				if (data.getTimeBin(bin.getStartTime()).hasValue()) {
 
-                var rasterToMerge = data.getTimeBin(bin.getStartTime()).getValue();
-                var rasterToMergeInto = bin.getValue();
+					log.info("Merging time bin [" + bin.getStartTime() + ", " + (bin.getStartTime() + data.getBinSize()) + "]");
 
-                rasterToMerge.forEachIndex(rasterToMergeInto::setValueForIndex);
-            }
-        }
+					var rasterToMerge = data.getTimeBin(bin.getStartTime()).getValue();
+					var rasterToMergeInto = bin.getValue();
 
-        PalmCsvOutput.write(output, firstTimeSeries);
-    }
+					rasterToMerge.forEachCoordinate(rasterToMergeInto::setValueForCoord);
+				}
+			}
+		}
 
-    private static class InputArgs {
+		PalmCsvOutput.write(output, firstTimeSeries);
+	}
 
-        @Parameter(names = "-f", required = true)
-        private List<String> files;
+	private static class InputArgs {
 
-        @Parameter(names = "-output", required = true)
-        private String output;
-    }
+		@Parameter(names = "-f", required = true)
+		private List<String> files;
+
+		@Parameter(names = "-output", required = true)
+		private String output;
+	}
 }

@@ -94,7 +94,7 @@ public class NumericSmoothingRadiusEstimate {
 
 	static double sumf(Object2DoubleMap<Link> emissions, Coord receiverPoint, double R, double cellSize) {
 
-		var normalizationFactor = cellSize / (Math.PI * R * R);
+		var normalizationFactor = cellSize * cellSize / (Math.PI * R * R);
 		return emissions.object2DoubleEntrySet().stream()
 				.mapToDouble(entry -> {
 					var weight = calculateWeight(

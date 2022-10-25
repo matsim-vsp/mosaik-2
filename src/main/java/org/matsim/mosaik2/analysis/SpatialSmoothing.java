@@ -59,11 +59,6 @@ public class SpatialSmoothing {
 	/**
 	 * This aligns the two rasters, so that all raster tiles are on the same grid. This is necessary, because we want
 	 * the smoothed an the palm data on the same grid.
-	 *
-	 * @param bounds
-	 * @param alignTo
-	 * @param cellSize
-	 * @return
 	 */
 	DoubleRaster.Bounds createAlignedBounds(DoubleRaster.Bounds bounds, DoubleRaster.Bounds alignTo, double cellSize) {
 
@@ -148,7 +143,10 @@ public class SpatialSmoothing {
 
 				// instead of calling sumf in the NumericSmoothing class we re-implement the logic here.
 				// this saves us one stream/collect in the inner loop here.
-				var normalizationFactor = cellSize / (Math.PI * r * r);
+				//
+				// the normalization factor gives the ratio between cell area and area under the gauss function
+				// cell area = cellSize^2 (obviously), area under function = PI * r^2. This is described in Kickhoefer 2014
+				var normalizationFactor = cellSize * cellSize / (Math.PI * r * r);
 				var linkIds = linkIndexRaster.getValueByCoord(x, y);
 
 				return linkIds.stream()

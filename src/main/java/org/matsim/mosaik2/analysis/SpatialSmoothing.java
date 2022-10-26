@@ -40,7 +40,7 @@ public class SpatialSmoothing {
 
 	private final Path palmFile;
 	private final Path outputFile;
-	private final int r;
+	private final double r;
 	private final int cellSize;
 	private final int timeBinSize;
 	private final double scaleFactor;
@@ -130,11 +130,21 @@ public class SpatialSmoothing {
 
 		log.info("Start calculating concentrations.");
 		TimeBinMap<DoubleRaster> rasterTimeSeries = new TimeBinMap<>(timeBinSize);
+
+		// the normalization factor gives the ratio between cell area and area under the gauss function
+		// cell area = cellSize^2 (obviously), area under function = PI * r^2. This is described in Kickhoefer 2014
+		var normalizationFactor = cellSize * cellSize / (Math.PI * r * r);
+
+		// to get a concentration in g/m3 for a receiver point we divide the calculated value by cell volume after applying
+		// the normalized weight to the link emission.
+		var cellVolume = cellSize * cellSize * cellSize;
+
 		for (var bin : emissionByLink.getTimeBins()) {
 
 			log.info("Calculating concentrations for: [" + bin.getStartTime() + ", " + (bin.getStartTime() + timeBinSize) + "]");
 			var raster = new DoubleRaster(bounds, cellSize);
 			var linkEmissions = bin.getValue();
+
 
 			raster.setValueForEachCoordinate((x, y) -> {
 
@@ -144,9 +154,7 @@ public class SpatialSmoothing {
 				// instead of calling sumf in the NumericSmoothing class we re-implement the logic here.
 				// this saves us one stream/collect in the inner loop here.
 				//
-				// the normalization factor gives the ratio between cell area and area under the gauss function
-				// cell area = cellSize^2 (obviously), area under function = PI * r^2. This is described in Kickhoefer 2014
-				var normalizationFactor = cellSize * cellSize / (Math.PI * r * r);
+
 				var linkIds = linkIndexRaster.getValueByCoord(x, y);
 
 				return linkIds.stream()
@@ -162,7 +170,7 @@ public class SpatialSmoothing {
 									r
 							);
 							var emission = linkEmission.value;
-							return emission * weight * normalizationFactor;
+							return emission * weight * normalizationFactor / cellVolume;
 						})
 						.sum();
 			});
@@ -191,7 +199,7 @@ public class SpatialSmoothing {
 		@Parameter(names = "-o", required = true)
 		private Path outputFile;
 		@Parameter(names = "-r")
-		private int r = 11;
+		private double r = 11;
 		@Parameter(names = "-c")
 		private int cellSize = 10;
 		@Parameter(names = "-t")

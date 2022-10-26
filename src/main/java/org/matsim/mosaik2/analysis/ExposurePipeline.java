@@ -16,7 +16,7 @@ public class ExposurePipeline {
 	private static final String AV_MASKED_PALM_TEMPLATE = "%s_av_masked_M01.%s.nc";
 	private static final String AV_MASKED_CSV_TEMPLATE = "%s_av_masked_M01.%s-%s.csv";
 	private static final String AV_MASKED_MERGED_CSV_TEMPLATE = "%s_av_masked_M01.all-%s.csv";
-	private static final String AV_MASKED_DAY2_CSV_TEMPLATE = "%s_av_masked_M01.day2-%s.csv";
+	private static final String AV_MASKED_DAY2_CSV_TEMPLATE = "%s_av_masked_M01.day2-si-units-%s.csv";
 	private static final String AV_MASKED_DAY2_EXPOSURE_CSV_TEMPLATE = "%s_av_masked_M01.day2-%s-exposure.csv";
 	private static final String AV_MASKED_DAY2_R_VALUES_CSV_TEMPLATE = "%s_av_masked_M01.day2-%s-r-values.csv";
 
@@ -51,7 +51,8 @@ public class ExposurePipeline {
 
 			// cut out second day
 			var day2File = getDay2CSVPath(input.root, input.palmRunId, species);
-			new ConvertPalmCsvOutputToSparse(mergedFile, day2File).run();
+			var conversion = getConverterFunction(species);
+			new ConvertPalmCsvOutputToSparse(mergedFile, day2File, conversion).run();
 
 			// calculate exposure
 			new CalculateExposure(day2File, Paths.get(input.eventsFile), getExposureCSVPath(input.root, input.palmRunId, species)).run();
@@ -114,6 +115,18 @@ public class ExposurePipeline {
 		// See FullFeaturedConverter::getInputSeconds
 		var time = startTime + offset;
 		return time >= 176400 ? time - 86400 : time;
+	}
+
+	private static ConvertPalmCsvOutputToSparse.DoubleToDoubleFunction getConverterFunction(String species) {
+		return switch (species) {
+			case "PM10" ->
+					// converts palm's kg/m3 into g/m3
+					value -> value * 1000;
+			case "NO2" ->
+					// convers palm's ppm into g/m3 with value * molecularWeight / 1000
+					value -> value * 46.01 / 1000;
+			default -> throw new RuntimeException("No conversion implemented for species: " + species);
+		};
 	}
 
 	@SuppressWarnings({"FieldMayBeFinal", "unused"})

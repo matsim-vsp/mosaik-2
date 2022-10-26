@@ -27,6 +27,7 @@ public class ConvertPalmCsvOutputToSparse {
 	private double startTime = 86400;
 	private double endTime = Double.MAX_VALUE;
 	private double minValue = 0.0;
+	private DoubleToDoubleFunction converter;
 
 	private ConvertPalmCsvOutputToSparse(InputArgs args) {
 		this(
@@ -38,13 +39,15 @@ public class ConvertPalmCsvOutputToSparse {
 				args.valueColumnName,
 				args.startTime,
 				args.endTime,
-				args.minValue
+				args.minValue,
+				value -> value
 		);
 	}
 
-	ConvertPalmCsvOutputToSparse(Path inputFile, Path outputFile) {
+	ConvertPalmCsvOutputToSparse(Path inputFile, Path outputFile, DoubleToDoubleFunction valueConverter) {
 		this.inputFile = inputFile;
 		this.outputFile = outputFile;
+		this.converter = valueConverter;
 	}
 
 	public static void main(String[] args) {
@@ -79,7 +82,8 @@ public class ConvertPalmCsvOutputToSparse {
 					values.put(timeColumnName, Double.toString(time - startTime));
 
 					// parse value
-					var value = Double.parseDouble(values.get(valueColumnName));
+					var parsedValue = Double.parseDouble(values.get(valueColumnName));
+					var value = this.converter.applyAsDouble(parsedValue);
 
 					if (value >= minValue && time >= startTime && time <= endTime) {
 						for (var column : headers) {
@@ -99,6 +103,12 @@ public class ConvertPalmCsvOutputToSparse {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
+	}
+
+	@FunctionalInterface
+	public interface DoubleToDoubleFunction {
+
+		double applyAsDouble(double value);
 	}
 
 	private static class InputArgs {

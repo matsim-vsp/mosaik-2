@@ -83,9 +83,10 @@ public class ConvertPalmCsvOutputToSparse {
 
 					// parse value
 					var parsedValue = Double.parseDouble(values.get(valueColumnName));
-					var value = this.converter.applyAsDouble(parsedValue);
+					var convertedValues = this.converter.applyAsDouble(parsedValue);
+					values.put(valueColumnName, Double.toString(convertedValues));
 
-					if (value >= minValue && time >= startTime && time <= endTime) {
+					if (convertedValues >= minValue && time >= startTime && time <= endTime) {
 						for (var column : headers) {
 							printer.print(values.get(column));
 						}

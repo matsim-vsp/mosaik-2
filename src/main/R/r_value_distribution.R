@@ -1,7 +1,7 @@
 library(tidyverse)
 library(dplyr)
 
-csv_data <- read_csv("C:/Users/Janekdererste/repos/runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-NO2-r-values.csv")
+csv_data <- read_csv("C:/Users/janek/repos/runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-PM10-r-values.xyt.csv")
 csv_data
 
 ggplot(csv_data, aes(x = value)) +

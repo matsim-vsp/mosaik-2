@@ -14,11 +14,11 @@ import java.util.List;
 public class ExposurePipeline {
 
 	private static final String AV_MASKED_PALM_TEMPLATE = "%s_av_masked_M01.%s.nc";
-	private static final String AV_MASKED_CSV_TEMPLATE = "%s_av_masked_M01.%s-%s.csv";
-	private static final String AV_MASKED_MERGED_CSV_TEMPLATE = "%s_av_masked_M01.all-%s.csv";
-	private static final String AV_MASKED_DAY2_CSV_TEMPLATE = "%s_av_masked_M01.day2-si-units-%s.csv";
-	private static final String AV_MASKED_DAY2_EXPOSURE_CSV_TEMPLATE = "%s_av_masked_M01.day2-%s-exposure.csv";
-	private static final String AV_MASKED_DAY2_R_VALUES_CSV_TEMPLATE = "%s_av_masked_M01.day2-%s-r-values.csv";
+	private static final String AV_MASKED_CSV_TEMPLATE = "%s_av_masked_M01.%s-%s.xyt.csv";
+	private static final String AV_MASKED_MERGED_CSV_TEMPLATE = "%s_av_masked_M01.all-%s.xyt.csv";
+	private static final String AV_MASKED_DAY2_CSV_TEMPLATE = "%s_av_masked_M01.day2-si-units-%s.xyt.csv";
+	private static final String AV_MASKED_DAY2_EXPOSURE_CSV_TEMPLATE = "%s_av_masked_M01.day2-%s-exposure.xyt.csv";
+	private static final String AV_MASKED_DAY2_R_VALUES_CSV_TEMPLATE = "%s_av_masked_M01.day2-%s-r-values.xyt.csv";
 
 	public static void main(String[] args) {
 
@@ -120,11 +120,13 @@ public class ExposurePipeline {
 	private static ConvertPalmCsvOutputToSparse.DoubleToDoubleFunction getConverterFunction(String species) {
 		return switch (species) {
 			case "PM10" ->
-					// converts palm's kg/m3 into g/m3
+				// converts palm's kg/m3 into g/m3
 					value -> value * 1000;
 			case "NO2" ->
-					// convers palm's ppm into g/m3 with value * molecularWeight / 1000
-					value -> value * 46.01 / 1000;
+				// converts palm's ppm into g/m3. We use Normal Temperature and Pressure (NTP) where 1 mole of gas is
+				// equal to 24.45L of gas. Then we divide by 1000 to convert mg into g
+				// value * molecularWeight / 22.45 / 1000
+					value -> value * 46.01 / 22.45 / 1000;
 			default -> throw new RuntimeException("No conversion implemented for species: " + species);
 		};
 	}

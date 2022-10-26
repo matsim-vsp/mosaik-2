@@ -16,8 +16,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @RequiredArgsConstructor
 public class LinearFit {
 
-	private final Path xPath;
-	private final Path yPath;
+	private final Path matsimPath;
+	private final Path palmPath;
 	private final Path output;
 
 	public static void main(String[] args) throws IOException {
@@ -26,7 +26,7 @@ public class LinearFit {
 		JCommander.newBuilder().addObject(input).build().parse(args);
 
 		new LinearFit(
-				Paths.get(input.xValues), Paths.get(input.yValues), Paths.get(input.output)
+				Paths.get(input.matsimValues), Paths.get(input.palmValues), Paths.get(input.output)
 		).run();
 	}
 
@@ -40,10 +40,10 @@ public class LinearFit {
 
 	private void run() throws IOException {
 
-		var xValues = PalmCsvOutput.read(this.xPath);
-		var yValues = PalmCsvOutput.read(this.yPath);
+		var xValues = PalmCsvOutput.read(this.matsimPath);
+		var yValues = PalmCsvOutput.read(this.palmPath);
 
-		try (var writer = Files.newBufferedWriter(this.output); var printer = Utils.createWriteFormat("id", "x", "y").print(writer)) {
+		try (var writer = Files.newBufferedWriter(this.output); var printer = Utils.createWriteFormat("id", "matsim", "palm").print(writer)) {
 
 			var counter = new AtomicInteger();
 			for (var bin : yValues.getTimeBins()) {
@@ -69,10 +69,10 @@ public class LinearFit {
 
 	private static class InputArgs {
 
-		@Parameter(names = "-x", required = true)
-		private String xValues;
-		@Parameter(names = "-y", required = true)
-		private String yValues;
+		@Parameter(names = "-matsim", required = true)
+		private String matsimValues;
+		@Parameter(names = "-palm", required = true)
+		private String palmValues;
 		@Parameter(names = "-o", required = true)
 		private String output;
 	}

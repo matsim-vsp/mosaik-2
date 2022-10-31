@@ -5,6 +5,7 @@ import com.beust.jcommander.Parameter;
 import lombok.AllArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVParser;
+import org.matsim.mosaik2.DoubleToDoubleFunction;
 import org.matsim.mosaik2.Utils;
 
 import java.io.IOException;
@@ -104,12 +105,6 @@ public class ConvertPalmCsvOutputToSparse {
 		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
-	}
-
-	@FunctionalInterface
-	public interface DoubleToDoubleFunction {
-
-		double applyAsDouble(double value);
 	}
 
 	private static class InputArgs {

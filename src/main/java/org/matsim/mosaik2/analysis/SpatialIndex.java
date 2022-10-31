@@ -35,6 +35,10 @@ public class SpatialIndex {
 				})
 				.filter(indexLine -> preparedBounds.covers(indexLine.geometry.getGeometry()))
 				.forEach(indexLine -> index.insert(indexLine.geometry.getGeometry().getEnvelopeInternal(), indexLine));
+
+		// this is important since otherwise build is implicitly called on index::query. build has side effects though
+		// and leads to crashes when query is called in parallel.
+		index.build();
 	}
 
 	Set<Id<Link>> query(double x, double y) {
@@ -42,6 +46,7 @@ public class SpatialIndex {
 		var point = geomFact.createPoint(new Coordinate(x, y));
 		Set<Id<Link>> result = new HashSet<>();
 		index.query(point.getEnvelopeInternal(), item -> {
+
 			var indexLine = (IndexLine) item;
 			if (indexLine.geometry.intersects(point))
 				result.add(indexLine.id);

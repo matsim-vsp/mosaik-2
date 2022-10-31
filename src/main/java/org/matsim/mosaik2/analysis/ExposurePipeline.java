@@ -4,6 +4,7 @@ import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
 import org.apache.commons.lang3.StringUtils;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.mosaik2.DoubleToDoubleFunction;
 import org.matsim.mosaik2.palm.PalmCsvOutput;
 import org.matsim.mosaik2.raster.DoubleRaster;
 
@@ -117,7 +118,7 @@ public class ExposurePipeline {
 		return time >= 176400 ? time - 86400 : time;
 	}
 
-	private static ConvertPalmCsvOutputToSparse.DoubleToDoubleFunction getConverterFunction(String species) {
+	private static DoubleToDoubleFunction getConverterFunction(String species) {
 		return switch (species) {
 			case "PM10" ->
 				// converts palm's kg/m3 into g/m3

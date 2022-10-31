@@ -13,6 +13,7 @@ import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.utils.gis.ShapeFileReader;
+import org.matsim.mosaik2.DoubleToDoubleFunction;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
 import org.matsim.mosaik2.chemistryDriver.PollutantToPalmNameConverter;
 import org.matsim.mosaik2.palm.PalmCsvOutput;
@@ -45,20 +46,51 @@ public class SpatialSmoothing {
 	private final int timeBinSize;
 	private final double scaleFactor;
 
+	private final DoubleToDoubleFunction fittingFunction;
+
 	public static void main(String[] args) throws FactoryException, TransformException {
 
 		var inputArgs = new InputArgs();
 		JCommander.newBuilder().addObject(inputArgs).build().parse(args);
 
+		var fittingFunction = getFittingFunction(inputArgs.species, inputArgs.fitting);
+
 		new SpatialSmoothing(
 				inputArgs.species, inputArgs.emissionEvents, inputArgs.networkPath, inputArgs.boundsFile, inputArgs.buildingsFile,
-				inputArgs.palmFile, inputArgs.outputFile, inputArgs.r, inputArgs.cellSize, inputArgs.timeBinSize, inputArgs.scaleFactor
+				inputArgs.palmFile, inputArgs.outputFile, inputArgs.r, inputArgs.cellSize, inputArgs.timeBinSize, inputArgs.scaleFactor,
+				fittingFunction
 		).run();
+	}
+
+	private static DoubleToDoubleFunction getFittingFunction(String species, String fitting) {
+		return switch (species) {
+			case "PM10" -> getFittingFunctionPM10(fitting);
+			case "NO2" -> getFittingFunctionNO2(fitting);
+			default -> throw new RuntimeException(species + " not supported.");
+		};
+	}
+
+	private static DoubleToDoubleFunction getFittingFunctionPM10(String fitting) {
+		return switch (fitting) {
+			case "linear" -> x -> 0.01386929 * x + 2.597027e-6;
+			case "quad" -> x -> -25.50912 * x*x + 0.02219018 * x + 2.517183e-06;
+			case "none" -> x -> x;
+			default -> throw new RuntimeException(fitting + " is not supported.");
+		};
+	}
+
+	private static DoubleToDoubleFunction getFittingFunctionNO2(String fitting) {
+		return switch (fitting) {
+			case "linear" -> x -> 0.01444081 * x + 4.003327e-5;
+			case "quad" -> x -> -3.15757 * x*x + 0.0205 * x + 3.970247e-5;
+			case "none" -> x -> x;
+			default -> throw new RuntimeException(fitting + " is not supported.");
+		};
 	}
 
 	/**
 	 * This aligns the two rasters, so that all raster tiles are on the same grid. This is necessary, because we want
-	 * the smoothed an the palm data on the same grid.
+	 * the smoothed and the palm data on the same grid.
 	 */
 	DoubleRaster.Bounds createAlignedBounds(DoubleRaster.Bounds bounds, DoubleRaster.Bounds alignTo, double cellSize) {
 
@@ -153,8 +185,6 @@ public class SpatialSmoothing {
 
 				// instead of calling sumf in the NumericSmoothing class we re-implement the logic here.
 				// this saves us one stream/collect in the inner loop here.
-				//
-
 				var linkIds = linkIndexRaster.getValueByCoord(x, y);
 
 				return linkIds.stream()
@@ -170,7 +200,8 @@ public class SpatialSmoothing {
 									r
 							);
 							var emission = linkEmission.value;
-							return emission * weight * normalizationFactor / cellVolume;
+							var concentration = emission * weight * normalizationFactor / cellVolume;
+							return fittingFunction.applyAsDouble(concentration);
 						})
 						.sum();
 			});
@@ -178,7 +209,7 @@ public class SpatialSmoothing {
 			rasterTimeSeries.getTimeBin(bin.getStartTime()).setValue(raster);
 		}
 
-		PalmCsvOutput.write(outputFile, rasterTimeSeries, -10);
+		PalmCsvOutput.write(outputFile, rasterTimeSeries);
 	}
 
 	@SuppressWarnings("FieldMayBeFinal")
@@ -206,6 +237,8 @@ public class SpatialSmoothing {
 		private int timeBinSize = 3600;
 		@Parameter(names = "-f")
 		private double scaleFactor = 10;
+		@Parameter(names = "-fitting")
+		private String fitting = "none";
 
 		private InputArgs() {
 		}

@@ -30,9 +30,9 @@ public class LinearFit {
 		).run();
 	}
 
-	private static void print(int id, double x, double y, CSVPrinter printer) {
+	private static void print(int id, double time, double x, double y, CSVPrinter printer) {
 		try {
-			printer.printRecord(id, x, y);
+			printer.printRecord(id, time, x, y);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -43,7 +43,7 @@ public class LinearFit {
 		var xValues = PalmCsvOutput.read(this.matsimPath);
 		var yValues = PalmCsvOutput.read(this.palmPath);
 
-		try (var writer = Files.newBufferedWriter(this.output); var printer = Utils.createWriteFormat("id", "matsim", "palm").print(writer)) {
+		try (var writer = Files.newBufferedWriter(this.output); var printer = Utils.createWriteFormat("id", "time", "matsim", "palm").print(writer)) {
 
 			var counter = new AtomicInteger();
 			for (var bin : yValues.getTimeBins()) {
@@ -51,6 +51,7 @@ public class LinearFit {
 				var yRaster = bin.getValue();
 				var xBin = xValues.getTimeBin(bin.getStartTime());
 				var xRaster = xBin.getValue();
+				var time = bin.getStartTime();
 
 				yRaster.forEachCoordinate((x, y, yValue) -> {
 
@@ -61,7 +62,7 @@ public class LinearFit {
 					if (xValue < 0 || yValue < 0) return;
 					
 					var id = counter.incrementAndGet();
-					print(id, xValue, yValue, printer);
+					print(id, time, xValue, yValue, printer);
 				});
 			}
 		}

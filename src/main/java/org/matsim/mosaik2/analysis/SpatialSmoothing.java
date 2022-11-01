@@ -2,6 +2,7 @@ package org.matsim.mosaik2.analysis;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import com.google.common.util.concurrent.AtomicDouble;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.locationtech.jts.geom.Geometry;
@@ -120,7 +121,7 @@ public class SpatialSmoothing {
 
 		log.info("Creating spatial link index");
 		// with a distance of 3*r, 99% of emissions of a link get distributet into the raster.
-		var linkIndex = new SpatialIndex(network, r * 5, berlinGeometry);
+		var linkIndex = new SpatialIndex(network, r * 3, berlinGeometry);
 		var linkIndexRaster = new ObjectRaster<Set<Id<Link>>>(bounds, cellSize);
 
 		log.info("Creating raster cache with link ids.");
@@ -209,7 +210,30 @@ public class SpatialSmoothing {
 			rasterTimeSeries.getTimeBin(bin.getStartTime()).setValue(raster);
 		}
 
+		var linkEmissionSum = sumUpLinkEmissions(emissionByLink);
+		var rasterEmissionSum = sumUpRasterEmissions(rasterTimeSeries);
+
+		log.info("link emissions: " + linkEmissionSum + ", raster emissions: " + rasterEmissionSum);
+
 		PalmCsvOutput.write(outputFile, rasterTimeSeries);
+	}
+
+	private static double sumUpLinkEmissions(TimeBinMap<Map<Id<Link>, LinkEmission>> emissionByLink) {
+
+		return emissionByLink.getTimeBins().stream()
+				.map(TimeBinMap.TimeBin::getValue)
+				.flatMap(idMap -> idMap.values().stream())
+				.mapToDouble(entry -> entry.value)
+				.sum();
+	}
+
+	private static double sumUpRasterEmissions(TimeBinMap<DoubleRaster> emissionRaster) {
+
+		var sum = new AtomicDouble();
+		emissionRaster.getTimeBins().stream()
+				.map(TimeBinMap.TimeBin::getValue)
+				.forEach(raster -> raster.forEachIndex((xi, yi, value) -> sum.getAndSet(value)));
+		return sum.get();
 	}
 
 	@SuppressWarnings("FieldMayBeFinal")

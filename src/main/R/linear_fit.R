@@ -3,8 +3,30 @@ library(dplyr)
 library(broom)
 
 print("starting to read csv")
-csv_data <- read_csv("C:/Users/Janekdererste/repos/runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/linear-fit-PM10.csv")
-#csv_data <- head(csv_data, 100000)
+csv_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/linear-fit-with-times.csv")
+#csv_data <- head(csv_data, 1000000)
+csv_data
+
+csv_data %>%
+  group_by(time) %>%
+  group_map(~ cor(.x$matsim, .x$palm))
+
+csv_data %>%
+  filter(palm < 0.001) %>%
+  group_by(time) %>%
+  group_map(~ summary(lm(.x$palm ~ .x$matsim, .x)))
+
+for(time in unique(csv_data$time)) {
+  print(time)
+  filtered <- filter(csv_data, time == time)
+  print(cor(filtered$matsim, filtered$palm))
+}
+
+plot <- ggplot(data = csv_data, mapping = aes(x = matsim, y = palm)) +
+  geom_point(pch='.') +
+  geom_smooth() +
+  facet_wrap(vars(time))
+plot
 
 summary <- summarize(csv_data)
 summary

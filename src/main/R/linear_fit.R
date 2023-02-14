@@ -1,20 +1,19 @@
 library(tidyverse)
 library(dplyr)
 library(broom)
+library(ggpointdensity)
 
 print("starting to read csv")
-csv_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/linear-fit-with-times.csv")
-#csv_data <- head(csv_data, 1000000)
+csv_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/linear-fit-PM10.csv")
+#csv_data <- head(csv_data, 100)
 csv_data
 
 csv_data %>%
   group_by(time) %>%
   group_map(~ cor(.x$matsim, .x$palm))
 
-csv_data %>%
-  filter(palm < 0.001) %>%
-  group_by(time) %>%
-  group_map(~ summary(lm(.x$palm ~ .x$matsim, .x)))
+csv_data <- csv_data %>%
+  filter(palm < 0.00001 & matsim < 0.01)
 
 for(time in unique(csv_data$time)) {
   print(time)
@@ -23,10 +22,13 @@ for(time in unique(csv_data$time)) {
 }
 
 plot <- ggplot(data = csv_data, mapping = aes(x = matsim, y = palm)) +
-  geom_point(pch='.') +
-  geom_smooth() +
+  ##geom_point(pch='.') +
+  geom_point(alpha = 0.05, shape = ".") +
+  #geom_pointdensity(adjust = 0.0001) +
   facet_wrap(vars(time))
+ggsave(plot=plot, filename="scatter.png", width=32, height=18)
 plot
+
 
 summary <- summarize(csv_data)
 summary

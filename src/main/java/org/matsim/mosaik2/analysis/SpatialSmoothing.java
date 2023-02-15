@@ -74,7 +74,7 @@ public class SpatialSmoothing {
 	private static DoubleToDoubleFunction getFittingFunctionPM10(String fitting) {
 		return switch (fitting) {
 			case "linear" -> x -> 0.01386929 * x + 2.597027e-6;
-			case "quad" -> x -> -25.50912 * x*x + 0.02219018 * x + 2.517183e-06;
+			case "quad" -> x -> -25.50912 * x * x + 0.02219018 * x + 2.517183e-06;
 			case "none" -> x -> x;
 			default -> throw new RuntimeException(fitting + " is not supported.");
 		};
@@ -83,7 +83,7 @@ public class SpatialSmoothing {
 	private static DoubleToDoubleFunction getFittingFunctionNO2(String fitting) {
 		return switch (fitting) {
 			case "linear" -> x -> 0.01444081 * x + 4.003327e-5;
-			case "quad" -> x -> -3.15757 * x*x + 0.0205 * x + 3.970247e-5;
+			case "quad" -> x -> -3.15757 * x * x + 0.0205 * x + 3.970247e-5;
 			case "none" -> x -> x;
 			default -> throw new RuntimeException(fitting + " is not supported.");
 		};
@@ -168,16 +168,19 @@ public class SpatialSmoothing {
 		// cell area = cellSize^2 (obviously), area under function = PI * r^2. This is described in Kickhoefer 2014
 		var normalizationFactor = cellSize * cellSize / (Math.PI * r * r);
 
-		// to get a concentration in g/m3 for a receiver point we divide the calculated value by cell volume after applying
-		// the normalized weight to the link emission.
-		var cellVolume = cellSize * cellSize * cellSize;
-
 		for (var bin : emissionByLink.getTimeBins()) {
 
-			log.info("Calculating concentrations for: [" + bin.getStartTime() + ", " + (bin.getStartTime() + timeBinSize) + "]");
+			var startTime = bin.getStartTime();
+			log.info("Calculating concentrations for: [" + startTime + ", " + (bin.getStartTime() + timeBinSize) + "]");
 			var raster = new DoubleRaster(bounds, cellSize);
 			var linkEmissions = bin.getValue();
 
+			// f(x) = -4.82253e-7*(x-43200)^2+1000 use curve which starts at 100m and has its peak at 1000m at noon and then
+			//                            goes back to 100 at midnight as approximation for boundary layer height into
+			//                            which we release the pollutant
+			//var heightBoundaryLayer = -4.82253e-7 * Math.pow(startTime - 43200, 2) + 1000;
+			var heightBoundaryLayer = cellSize;
+			var cellVolume = cellSize * cellSize * heightBoundaryLayer;
 
 			raster.setValueForEachCoordinate((x, y) -> {
 
@@ -232,7 +235,7 @@ public class SpatialSmoothing {
 		var sum = new AtomicDouble();
 		emissionRaster.getTimeBins().stream()
 				.map(TimeBinMap.TimeBin::getValue)
-				.forEach(raster -> raster.forEachIndex((xi, yi, value) -> sum.getAndSet(value)));
+				.forEach(raster -> raster.forEachIndex((xi, yi, value) -> sum.getAndAdd(value)));
 		return sum.get();
 	}
 

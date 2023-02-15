@@ -4,6 +4,7 @@ import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.mosaik2.raster.DoubleRaster;
 import ucar.ma2.ArrayChar;
 import ucar.ma2.DataType;
+import ucar.ma2.InvalidRangeException;
 import ucar.nc2.Variable;
 
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class NetcdfConverters {
 
@@ -35,6 +37,18 @@ public class NetcdfConverters {
 		}
 
 		return (double[]) oneDimensionalVariable.read().copyTo1DJavaArray();
+	}
+
+	public static double[] varToDoubleArray(Variable multiDimensionalVariable, int[] shape) throws IOException {
+
+
+		try {
+			var result = multiDimensionalVariable.read(new int[]{0, 0}, shape);
+			return IntStream.range(0, (int) result.getSize()).mapToDouble(result::getDouble).toArray();
+
+		} catch (InvalidRangeException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 	public static List<Double> toDoubleList(Variable oneDimensionalVariable) throws IOException {

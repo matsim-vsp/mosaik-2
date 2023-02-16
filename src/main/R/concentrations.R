@@ -1,4 +1,3 @@
-memory.limit(size=20000)
 library(tidyverse)
 
 # this finds values above 0.0005 but not the ones within bounding box [383546.5, 383566.5, 5817499.0, 5817509.0]

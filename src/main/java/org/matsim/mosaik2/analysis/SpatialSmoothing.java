@@ -39,7 +39,6 @@ public class SpatialSmoothing {
 	private final Path networkPath;
 	private final Path boundsFile;
 	private final Path buildingsFile;
-
 	private final Path palmFile;
 	private final Path outputFile;
 	private final double r;
@@ -127,14 +126,7 @@ public class SpatialSmoothing {
 		log.info("Creating raster cache with link ids.");
 		linkIndexRaster.setValueForEachCoordinate(linkIndex::query);
 
-		log.info("Creating spatial building index");
-		var options = new ShpOptions(buildingsFile, "EPSG:4326", Charset.defaultCharset());
-		var buildingIndex = options.createIndex("EPSG:25833", "");
-
-		log.info("Creating raster with building data.");
-		var rasteredBuildings = new DoubleRaster(bounds, cellSize);
-		rasteredBuildings.setValueForEachCoordinate((x, y) -> buildingIndex.contains(new Coord(x, y)) ? -1 : 0);
-
+		var rasteredBuildings = createRasteredBuildings(bounds);
 		var manager = EventsUtils.createEventsManager();
 		var converter = PollutantToPalmNameConverter.createForSingleSpecies(species);
 		var handler = new AggregateEmissionsByTimeHandler(network, converter.getPollutants(), timeBinSize, scaleFactor);
@@ -185,7 +177,7 @@ public class SpatialSmoothing {
 			raster.setValueForEachCoordinate((x, y) -> {
 
 				// this means this point is covered by a building
-				if (rasteredBuildings.getValueByCoord(x, y) < 0) return -1;
+				if (rasteredBuildings != null && rasteredBuildings.getValueByCoord(x, y) < 0) return -1;
 
 				// instead of calling sumf in the NumericSmoothing class we re-implement the logic here.
 				// this saves us one stream/collect in the inner loop here.
@@ -221,6 +213,19 @@ public class SpatialSmoothing {
 		PalmCsvOutput.write(outputFile, rasterTimeSeries);
 	}
 
+	private DoubleRaster createRasteredBuildings(DoubleRaster.Bounds bounds) {
+		if (buildingsFile == null) return null;
+
+		log.info("Creating spatial building index");
+		var options = new ShpOptions(buildingsFile, "EPSG:4326", Charset.defaultCharset());
+		var buildingIndex = options.createIndex("EPSG:25833", "");
+
+		log.info("Creating raster with building data.");
+		var rasteredBuildings = new DoubleRaster(bounds, cellSize);
+		rasteredBuildings.setValueForEachCoordinate((x, y) -> buildingIndex.contains(new Coord(x, y)) ? -1 : 0);
+		return rasteredBuildings;
+	}
+
 	private static double sumUpLinkEmissions(TimeBinMap<Map<Id<Link>, LinkEmission>> emissionByLink) {
 
 		return emissionByLink.getTimeBins().stream()
@@ -250,7 +255,7 @@ public class SpatialSmoothing {
 		private Path networkPath;
 		@Parameter(names = "-bounds", required = true)
 		private Path boundsFile;
-		@Parameter(names = "-buildings", required = true)
+		@Parameter(names = "-buildings")
 		private Path buildingsFile;
 		@Parameter(names = "-palm", required = true)
 		private Path palmFile;

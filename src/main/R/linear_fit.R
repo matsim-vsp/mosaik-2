@@ -1,8 +1,5 @@
+library(modelr)
 library(tidyverse)
-library(dplyr)
-library(broom)
-library(ggpointdensity)
-
 
 # read palm data
 print("read palm data")
@@ -11,86 +8,78 @@ palm_data <- read_csv("C:/Users/janek/repos/runs-svn/mosaik-2/berlin/mosaik-2-be
 # read matsim smoothing data
 print("read matsim data")
 matsim_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/output/berlin-with-geometry-attributes.outpute_emission_raster_NO2_r50.xyt.csv")
-# join the data on time, x, y so that we get the following tibble | time | x | y | palm-value | matsim-value |
+# join the data on time, x, y so that we get the following tibble | time | x | y | palm | matsim |
 joined <- palm_data %>%
-  inner_join(matsim_data, by = c("x", "y", "time"), suffix = c("-palm", "-matsim"))
+  inner_join(matsim_data, by = c("x", "y", "time"), suffix = c("-palm", "-matsim")) %>%
+  mutate(matsim = `value-matsim`, palm = `value-palm`, .keep = "unused")
+
+
+estimate_regression <- function(df) {
+  lm(palm ~ matsim, data = df)
+}
+
+# calculate linear fit for each time slice according to https://r4ds.had.co.nz/many-models.html
+nested <- joined %>%
+  #filter(time >= 21600 & time < 36000) %>%
+  group_by(time) %>%
+  nest() %>%
+  mutate(model = map(data, estimate_regression)) %>%
+  mutate(pred = map2(data, model, modelr::add_predictions)) %>%
+  mutate(residuals = map2(data, model, modelr::add_residuals))
+
+nested_matsim <- matsim_data %>%
+  #filter(time >= 21600 & time < 36000) %>%
+  mutate(matsim = value, .keep = "unused") %>%
+  group_by(time) %>%
+  nest()
+
+selected_models <- nested %>%
+  select(time, model)
+
+matsim_with_pred <- selected_models %>%
+  left_join(nested_matsim, by = "time") %>%
+  mutate(pred = map2(data, model, modelr::add_predictions)) %>%
+  unnest(pred)
+matsim_with_pred <- matsim_with_pred %>%
+  select(time, x, y, matsim, pred)
+
+residuals <- nested %>%
+  unnest(residuals)
+
+predicted <- nested %>%
+  unnest(pred)
+
+write_csv(matsim_with_pred, file = "./matsim-with-pred.xyt.csv")
+
+plot <- ggplot(data = predicted, mapping = aes(x = matsim, y = pred)) +
+  geom_point(shape = ".") +
+  ggtitle("MATSim Concentrations to predicted") +
+  facet_wrap(vars(hour))
+ggsave(plot, filename = "matsim-predict.png")
+
+plot <- ggplot(data = predicted, mapping = aes(x = palm, y = pred)) +
+  geom_point(shape = ".") +
+  ggtitle("PALM Concentrations to predicted") +
+  facet_wrap(vars(hour))
+ggsave(plot, filename = "palm-predict.png")
+
+plot <- ggplot(data = residuals, mapping = aes(x = matsim, y = resid)) +
+  geom_point(shape = ".") +
+  ggtitle("MATSim Concentrations to residuals") +
+  facet_wrap(vars(hour))
+ggsave(plot, filename = "matsim-resid.png")
+
+map_plot <- ggplot(data = matsim_with_pred, aes(x, y)) +
+  geom_raster(aes(fill = pred)) +
+  ggtitle("Predicted Concentrations") +
+  facet_wrap(vars(time))
+ggsave(map_plot, filename = "predicted-maps.png", height = 9, width = 16)
+
 # make scatter plots by time slice
-plot <- ggplot(data = joined, mapping = aes(x = `value-matsim`, y = `value-palm`)) +
+plot <- ggplot(data = joined, mapping = aes(x = matsim, y = palm)) +
   geom_point(alpha = 0.5, shape = ".") +
   geom_smooth(method = "lm") +
   ylim(0, 0.0002) +
+  ggtitle("MATSim Concentrations to PALM Concentrations") +
   facet_wrap(vars(time))
-ggsave(plot = plot, filename = "scatter.png", width = 18, height = 9)
-plot
-
-# calculate linear fit for each time slice
-fitted_models <- joined %>%
-  group_by(time) %>%
-  do(model = lm(`value-matsim` ~ `value-palm`, data = .))
-fitted_models$model
-# apply linear fit to matsim values by time step
-# https://stackoverflow.com/questions/1169539/linear-regression-and-group-by-in-r seems to be what I want
-
-
-print("starting to read csv")
-csv_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/linear-fit-PM10.csv")
-#csv_data <- head(csv_data, 100)
-csv_data
-
-csv_data %>%
-  group_by(time) %>%
-  group_map(~cor(.x$matsim, .x$palm))
-
-csv_data <- csv_data %>%
-  filter(palm < 0.00001 & matsim < 0.01)
-
-for (time in unique(csv_data$time)) {
-  print(time)
-  filtered <- filter(csv_data, time == time)
-  print(cor(filtered$matsim, filtered$palm))
-}
-
-plot <- ggplot(data = csv_data, mapping = aes(x = matsim, y = palm)) +
-  ##geom_point(pch='.') +
-  geom_point(alpha = 0.05, shape = ".") +
-  #geom_pointdensity(adjust = 0.0001) +
-  facet_wrap(vars(time))
-ggsave(plot = plot, filename = "scatter.png", width = 32, height = 18)
-plot
-
-
-summary <- summarize(csv_data)
-summary
-
-print("starting linear regression")
-linear_model <- lm(palm ~ matsim, data = csv_data)
-lm_summary <- summary(linear_model)
-lm_summary
-
-intercept <- lm_summary$coefficients["(Intercept)", "Estimate"]
-grade <- lm_summary$coefficients["matsim", "Estimate"]
-intercept
-grade
-
-print("starting linear regression with quadratic fitting")
-quad_model <- lm(palm ~ poly(matsim, 2, raw = TRUE), data = csv_data)
-quad_summary <- summary(quad_model)
-quad_summary
-
-quad_c <- quad_model$coefficients["(Intercept)"]
-quad_c
-quad_b <- quad_model$coefficients["poly(matsim, 2, raw = TRUE)1"]
-quad_b
-quad_a <- quad_model$coefficients["poly(matsim, 2, raw = TRUE)2"]
-quad_a
-
-
-print("plotting data")
-plot <- ggplot(data = csv_data, mapping = aes(x = matsim, y = palm)) +
-  geom_point(pch = '.') +
-  stat_function(fun = function(x) intercept + x * grade, color = "red", size = 1) +
-  stat_function(fun = function(x) quad_a * x * x + quad_b * x + quad_c, color = "blue", size = 1)
-print("finished plot")
-
-print("saving plot")
-ggsave(plot = plot, filename = "pm10.png", width = 16, height = 9)
+ggsave(plot, filename = "matsim-palm-concentrations.png")

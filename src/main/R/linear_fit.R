@@ -39,9 +39,9 @@ selected_models <- nested %>%
 matsim_with_pred <- selected_models %>%
   left_join(nested_matsim, by = "time") %>%
   mutate(pred = map2(data, model, modelr::add_predictions)) %>%
-  unnest(pred)
-matsim_with_pred <- matsim_with_pred %>%
-  select(time, x, y, matsim, pred)
+  unnest(pred) %>%
+  select(time, x, y, pred) %>%
+  mutate(value = pred, .keep = "unused")
 
 residuals <- nested %>%
   unnest(residuals)
@@ -70,7 +70,7 @@ plot <- ggplot(data = residuals, mapping = aes(x = matsim, y = resid)) +
 ggsave(plot, filename = "matsim-resid.png")
 
 map_plot <- ggplot(data = matsim_with_pred, aes(x, y)) +
-  geom_raster(aes(fill = pred)) +
+  geom_raster(aes(fill = value)) +
   ggtitle("Predicted Concentrations") +
   facet_wrap(vars(time))
 ggsave(map_plot, filename = "predicted-maps.png", height = 9, width = 16)

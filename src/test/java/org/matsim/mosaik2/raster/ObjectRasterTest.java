@@ -4,8 +4,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.junit.Test;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.*;
 
 public class ObjectRasterTest {
 
@@ -18,11 +17,22 @@ public class ObjectRasterTest {
 
         var raster = new ObjectRaster<>(bounds, cellSize);
 
-        assertEquals(length / cellSize + 1, raster.getXLength());
-        assertEquals(length / cellSize + 1, raster.getYLength());
+        assertEquals(length / cellSize, raster.getXLength());
+        assertEquals(length / cellSize, raster.getYLength());
         assertEquals(cellSize, raster.getCellSize(), Double.MIN_VALUE);
         assertEquals(bounds, raster.getBounds());
         raster.forEachIndex((xi, yi, value) -> assertNull(value));
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void testConstructorInvalidArgs() {
+        var length = 11;
+        var cellSize = 2;
+        var bounds = new AbstractRaster.Bounds(0, 0, length, length);
+
+        new ObjectRaster<>(bounds, cellSize);
+
+        fail("Expected IllegalArgumentException");
     }
 
     @Test
@@ -36,6 +46,26 @@ public class ObjectRasterTest {
         raster.setValueForEachIndex((xi, yi) -> new TestClass(xi + "_" + yi));
 
         raster.forEachIndex((xi, yi, value) -> assertEquals(xi + "_" + yi, value.getProperty()));
+    }
+
+    @Test
+    public void testCorrectCoords() {
+
+        var min = 10;
+        var length = 10;
+        var cellSize = 2;
+        var bounds = new AbstractRaster.Bounds(min, min, min + length, min + length);
+        var raster = new ObjectRaster<TestClass>(bounds, cellSize);
+
+        // test lower bounds
+        assertEquals(0, raster.getIndexForCoord(9, 9));
+
+        // test upper bounds
+        assertEquals(((long) raster.getXLength() * raster.getYLength()) - 1, raster.getIndexForCoord(20.9, 20.9));
+
+        // test some centroid in between
+        assertEquals(14, raster.getIndexForCoord(14, 14));
+
     }
 
     @Getter

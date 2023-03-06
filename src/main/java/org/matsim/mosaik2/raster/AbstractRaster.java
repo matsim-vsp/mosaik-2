@@ -20,6 +20,9 @@ class AbstractRaster {
 
     protected AbstractRaster(Bounds bounds, double cellSize) {
 
+        if ((bounds.maxX - bounds.minX) % cellSize != 0 || (bounds.maxY - bounds.minY) % cellSize != 0)
+            throw new IllegalArgumentException("bounds must be a multiple of cell size");
+
         this.bounds = bounds;
         this.cellSize = cellSize;
         this.xLength = getXIndex(bounds.maxX) + 1;
@@ -33,7 +36,7 @@ class AbstractRaster {
      * @return x-index
      */
     public int getXIndex(double x) {
-        return (int) ((x - bounds.minX) / cellSize);
+        return (int) ((x + cellSize / 2 - bounds.minX) / cellSize);
     }
 
     /**
@@ -43,7 +46,7 @@ class AbstractRaster {
      * @return y-index
      */
     public int getYIndex(double y) {
-        return (int) ((y - bounds.minY) / cellSize);
+        return (int) ((y + cellSize / 2 - bounds.minY) / cellSize);
     }
 
     int getIndex(int xi, int yi) {

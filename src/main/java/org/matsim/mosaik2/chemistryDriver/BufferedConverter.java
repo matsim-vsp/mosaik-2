@@ -1,0 +1,90 @@
+package org.matsim.mosaik2.chemistryDriver;
+
+import lombok.Builder;
+import lombok.extern.log4j.Log4j2;
+import org.matsim.contrib.emissions.events.EmissionEventsReader;
+import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.events.EventsUtils;
+import org.matsim.core.network.NetworkUtils;
+import org.matsim.core.utils.geometry.CoordinateTransformation;
+import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
+import org.matsim.mosaik2.raster.DoubleRaster;
+
+import java.time.LocalDateTime;
+
+@Log4j2
+public class BufferedConverter {
+
+    private final String networkFile;
+
+    private final String emissionEventsFile;
+
+    private final String outputFile;
+
+    private final DoubleRaster streetTypes;
+
+    private final double timeBinSize;
+
+    private final double scaleFactor;
+
+    private final CoordinateTransformation transformation;
+
+    private final PollutantToPalmNameConverter pollutantConverter;
+
+    private final LocalDateTime date;
+
+    private final int numberOfDays;
+
+    private final int utcOffset;
+
+    @Builder
+    public BufferedConverter(
+            String networkFile,
+            String emissionEventsFile,
+            String outputFile,
+            DoubleRaster streetTypes,
+            double timeBinSize,
+            double scaleFactor,
+            CoordinateTransformation coordinateTransformation,
+            PollutantToPalmNameConverter pollutantConverter,
+            LocalDateTime date,
+            int numberOfDays,
+            int utcOffset
+    ) {
+        this.networkFile = networkFile;
+        this.emissionEventsFile = emissionEventsFile;
+        this.outputFile = outputFile;
+        this.streetTypes = streetTypes;
+        this.timeBinSize = timeBinSize;
+        this.scaleFactor = scaleFactor;
+        this.transformation = coordinateTransformation == null ? new IdentityTransformation() : coordinateTransformation;
+        this.pollutantConverter = pollutantConverter == null ? new PollutantToPalmNameConverter() : pollutantConverter;
+        this.date = date == null ? LocalDateTime.of(2017, 7, 31, 0, 0) : date;
+        this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
+        this.utcOffset = utcOffset;
+    }
+
+    public void write() {
+
+        var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
+                .filter(link -> FullFeaturedConverter.isCoveredBy(link, streetTypes.getBounds()))
+                .collect(NetworkUtils.getCollector());
+
+        log.info("Unsimplifying network");
+        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
+
+        log.info("Converting segment map to network");
+        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
+
+        // read the emission events
+        var manager = EventsUtils.createEventsManager();
+        var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
+        manager.addHandler(handler);
+        new EmissionEventsReader(manager).readFile(emissionEventsFile);
+
+        var emissions = handler.getTimeBinMap();
+
+        // convert pollutants to palm names
+        var palmEmissions = pollutantConverter.convert(emissions);
+    }
+}

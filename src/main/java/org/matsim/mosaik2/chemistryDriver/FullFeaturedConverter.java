@@ -132,7 +132,7 @@ public class FullFeaturedConverter {
         }
     }
 
-    private static boolean isCoveredBy(Link link, DoubleRaster.Bounds bounds) {
+    static boolean isCoveredBy(Link link, DoubleRaster.Bounds bounds) {
         return bounds.covers(link.getFromNode().getCoord()) && bounds.covers(link.getToNode().getCoord());
     }
 

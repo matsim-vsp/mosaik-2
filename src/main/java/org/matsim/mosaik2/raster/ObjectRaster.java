@@ -53,8 +53,8 @@ public class ObjectRaster<T> extends AbstractRaster {
 		IntStream.range(0, getXLength()).forEach(xi -> IntStream.range(0, getYLength())
 				.forEach(yi -> {
 					var value = getValueByIndex(xi, yi);
-					var x = xi * getCellSize() + getBounds().getMinX();
-					var y = yi * getCellSize() + getBounds().getMinY();
+					var x = getCentroidXForIndex(xi);
+					var y = getCentroidYForIndex(yi);
 					consumer.consume(x, y, value);
 				}));
 	}
@@ -78,8 +78,8 @@ public class ObjectRaster<T> extends AbstractRaster {
 
 	public void setValueForEachCoordinate(CoordToObjectFunction<T> valueSupplier) {
 		setValueForEachIndex((xi, yi) -> {
-			var x = xi * getCellSize() + getBounds().getMinX();
-			var y = yi * getCellSize() + getBounds().getMinY();
+			var x = getCentroidXForIndex(xi);
+			var y = getCentroidYForIndex(yi);
 			return valueSupplier.apply(x, y);
 		});
 	}

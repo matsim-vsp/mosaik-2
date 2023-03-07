@@ -66,11 +66,18 @@ public class EmissionRastererTest {
         var timeBinMap = new TimeBinMap<Map<Pollutant, Map<Id<Link>, Double>>>(10);
         timeBinMap.getTimeBin(1).setValue(linkEmissionByPollutant);
         var streetTypes = new DoubleRaster(bounds, cellSize);
-        streetTypes.setValueForEachCoordinate((x, y) -> (x == 5) ? 1 : -1);
+        streetTypes.setValueForEachCoordinate((x, y) -> (x == 6) ? 1 : -1);
 
         var result = EmissionRasterer.rasterWithBuffer(timeBinMap, network, streetTypes);
 
-        assertTrue(false);
+        result.getTimeBins().iterator().next().getValue().get(Pollutant.NO2).forEachCoordinate((x, y, value) -> {
+            // the link should intersect x=6 and all cells between -6 and 2
+            if (x == 6 && -6 <= y && y <= 2) {
+                assertEquals(200, value, 0.001);
+            } else {
+                assertEquals(0, value, 0.0001);
+            }
+        });
     }
 
     @Test

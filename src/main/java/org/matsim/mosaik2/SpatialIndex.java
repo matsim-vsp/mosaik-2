@@ -18,7 +18,7 @@ public class SpatialIndex<T> {
     public SpatialIndex(Collection<Geometry> geometries, java.util.function.Function<Geometry, T> itemFunction) {
 
         geometries.stream()
-                .map(geom -> fact.create(geom))
+                .map(fact::create)
                 .forEach(geom -> {
 
                     var item = itemFunction.apply(geom.getGeometry());
@@ -28,13 +28,13 @@ public class SpatialIndex<T> {
         index.build();
     }
 
-    public Collection<T> overlaps(Geometry geom) {
+    public Collection<T> intersects(Geometry geom) {
 
         Set<T> result = new HashSet<>();
         index.query(geom.getEnvelopeInternal(), rawEntry -> {
             @SuppressWarnings("unchecked") // we are confident that the entry is what we have put inside.
             var entry = (Entry<T>) rawEntry;
-            if (entry.prepGeom.overlaps(geom)) {
+            if (entry.prepGeom.intersects(geom)) {
                 result.add(entry.item());
             }
         });

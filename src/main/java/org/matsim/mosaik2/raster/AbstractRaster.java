@@ -61,7 +61,11 @@ class AbstractRaster {
     }
 
     double getCentroidXForIndex(int xi) {
-        return xi
+        return xi * cellSize + bounds.minX;
+    }
+
+    double getCentroidYForIndex(int yi) {
+        return yi * cellSize + bounds.minY;
     }
 
     @EqualsAndHashCode

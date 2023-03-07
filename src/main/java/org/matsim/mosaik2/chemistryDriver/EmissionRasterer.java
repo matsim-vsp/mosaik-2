@@ -4,12 +4,12 @@ import lombok.RequiredArgsConstructor;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.operation.buffer.BufferParameters;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
-import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.mosaik2.SpatialIndex;
 import org.matsim.mosaik2.raster.DoubleRaster;
@@ -23,11 +23,6 @@ import java.util.stream.Collectors;
 public class EmissionRasterer {
 
     public static final double LANE_WIDTH = 3.5;
-
-    private final Map<Pollutant, String> pollutantToPalmName;
-    private final Network network;
-    private final DoubleRaster.Bounds bounds;
-    private final double cellSize;
 
     static <T> TimeBinMap<Map<T, DoubleRaster>> raster(TimeBinMap<Map<T, Map<Id<Link>, Double>>> timeBinMap, Network network, DoubleRaster.Bounds bounds, double cellSize) {
 
@@ -73,7 +68,7 @@ public class EmissionRasterer {
                     var lineString = factory.createLineString(new Coordinate[]{
                             intoOffsetCoordinate(link.getFromNode().getCoord()), intoOffsetCoordinate(link.getToNode().getCoord())
                     });
-                    var buffer = lineString.buffer(link.getNumberOfLanes() * 3.5);
+                    var buffer = lineString.buffer(link.getNumberOfLanes() * 3.5, 0, BufferParameters.CAP_FLAT);
                     return Tuple.of(link.getId(), buffer);
                 })
                 .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
@@ -88,10 +83,10 @@ public class EmissionRasterer {
                         var raster = new DoubleRaster(streetTypes.getBounds(), streetTypes.getCellSize());
 
                         for (var bufferedLink : bufferdLinks.entrySet()) {
-                            var cells = index.overlaps(bufferedLink.getValue());
+                            var cells = index.intersects(bufferedLink.getValue());
                             for (var cell : cells) {
                                 var value = emissionsByLink.get(bufferedLink.getKey());
-                                raster.adjustValueForCoord(cell.getX(), cell.getY(), value);
+                                raster.adjustValueForCoord(cell.getX(), cell.getY(), value / cells.size());
                             }
                         }
                         return Tuple.of(entry.getKey(), raster);

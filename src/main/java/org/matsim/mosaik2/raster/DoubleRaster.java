@@ -53,8 +53,8 @@ public class DoubleRaster extends AbstractRaster {
 		IntStream.range(0, getYLength())
 				.forEach(yi -> {
 					var value = getValueByIndex(xi, yi);
-					var x = xi * getCellSize() + getBounds().getMinX();
-					var y = yi * getCellSize() + getBounds().getMinY();
+					var x = getCentroidXForIndex(xi);
+					var y = getCentroidYForIndex(yi);
 					consumer.consume(x, y, value);
 				});
 	}
@@ -78,8 +78,8 @@ public class DoubleRaster extends AbstractRaster {
 
 	public void setValueForEachCoordinate(CoordToDoubleFunction valueSupplier) {
 		setValueForEachIndex((xi, yi) -> {
-			var x = xi * getCellSize() + getBounds().getMinX();
-			var y = yi * getCellSize() + getBounds().getMinY();
+			var x = getCentroidXForIndex(xi);
+			var y = getCentroidYForIndex(yi);
 			return valueSupplier.applyAsDouble(x, y);
 		});
 	}

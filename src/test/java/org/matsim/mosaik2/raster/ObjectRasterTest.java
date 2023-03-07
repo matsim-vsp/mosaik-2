@@ -17,8 +17,8 @@ public class ObjectRasterTest {
 
         var raster = new ObjectRaster<>(bounds, cellSize);
 
-        assertEquals(length / cellSize, raster.getXLength());
-        assertEquals(length / cellSize, raster.getYLength());
+        assertEquals((length / cellSize) + 1, raster.getXLength());
+        assertEquals((length / cellSize) + 1, raster.getYLength());
         assertEquals(cellSize, raster.getCellSize(), Double.MIN_VALUE);
         assertEquals(bounds, raster.getBounds());
         raster.forEachIndex((xi, yi, value) -> assertNull(value));
@@ -65,7 +65,43 @@ public class ObjectRasterTest {
 
         // test some centroid in between
         assertEquals(14, raster.getIndexForCoord(14, 14));
+    }
 
+    @Test
+    public void getXCentroid() {
+
+        var min = 10;
+        var length = 10;
+        var cellSize = 2;
+        var bounds = new AbstractRaster.Bounds(min, min, min + length, min + length);
+        var raster = new ObjectRaster<TestClass>(bounds, cellSize);
+
+        var xMin = raster.getCentroidXForIndex(0);
+        assertEquals(min, xMin, 0.00001);
+
+        var xMax = raster.getCentroidXForIndex(5);
+        assertEquals(min + length, xMax, 0.00001);
+
+        var xSome = raster.getCentroidXForIndex(2);
+        assertEquals(14, xSome, 0.000001);
+    }
+
+    @Test
+    public void getYCentroid() {
+        var min = 10;
+        var length = 10;
+        var cellSize = 2;
+        var bounds = new AbstractRaster.Bounds(min, min, min + length, min + length);
+        var raster = new ObjectRaster<TestClass>(bounds, cellSize);
+
+        var yMin = raster.getCentroidYForIndex(0);
+        assertEquals(min, yMin, 0.00001);
+
+        var yMax = raster.getCentroidYForIndex(5);
+        assertEquals(min + length, yMax, 0.00001);
+
+        var ySome = raster.getCentroidYForIndex(2);
+        assertEquals(14, ySome, 0.000001);
     }
 
     @Getter

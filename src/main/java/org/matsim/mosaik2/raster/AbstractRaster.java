@@ -60,6 +60,10 @@ class AbstractRaster {
         return getIndex(xi, yi);
     }
 
+    double getCentroidXForIndex(int xi) {
+        return xi
+    }
+
     @EqualsAndHashCode
     @ToString
     public static class Bounds {

@@ -29,11 +29,11 @@ public class PalmStaticDriverReader {
 			var cellSize = NetcdfConverters.getCellSize(x, y);
 			var raster = new DoubleRaster(bounds, cellSize);
 
-			ArrayByte.D2 streetTypeData = (ArrayByte.D2) variableVar.read();
+			ArrayByte.D2 data = (ArrayByte.D2) variableVar.read();
 
 			for (int xi = 0; xi < x.length; xi++) {
 				for (int yi = 0; yi < y.length; yi++) {
-					var byteValue = streetTypeData.get(yi, xi);
+					var byteValue = data.get(yi, xi);
 					// hm, ther shold be a way without boxing this.
 					var doubleValue = Double.valueOf(byteValue);
 					raster.adjustValueForIndex(xi, yi, doubleValue);

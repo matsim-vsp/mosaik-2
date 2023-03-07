@@ -2,6 +2,8 @@ package org.matsim.mosaik2.chemistryDriver;
 
 import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
+import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.events.EventsUtils;
@@ -11,6 +13,7 @@ import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
 import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Log4j2
 public class BufferedConverter {
@@ -86,5 +89,35 @@ public class BufferedConverter {
 
         // convert pollutants to palm names
         var palmEmissions = pollutantConverter.convert(emissions);
+
+        var rasteredEmissions = EmissionRasterer.rasterWithBuffer(palmEmissions, segmentNetwork, streetTypes);
+
+        addNoIfPossible(rasteredEmissions);
+
+        rasteredEmissions = FullFeaturedConverter.cutToFullDays(rasteredEmissions, numberOfDays, utcOffset);
+
+        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
+    }
+
+    private void addNoIfPossible(TimeBinMap<Map<String, DoubleRaster>> timeBinMap) {
+
+        if (pollutantConverter.getPollutants().contains(Pollutant.NO2) && pollutantConverter.getPollutants().contains(Pollutant.NOx)) {
+
+            for (var timeBin : timeBinMap.getTimeBins()) {
+
+                var no2 = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NO2));
+                var nox = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NOx));
+                var no = new DoubleRaster(no2.getBounds(), no2.getCellSize());
+
+                nox.forEachCoordinate((x, y, noxValue) -> {
+                    var no2Value = no2.getValueByCoord(x, y);
+                    var noValue = noxValue - no2Value;
+                    no.adjustValueForCoord(x, y, noValue);
+                });
+
+                timeBin.getValue().put("NO", no);
+                timeBin.getValue().remove("NOx");
+            }
+        }
     }
 }

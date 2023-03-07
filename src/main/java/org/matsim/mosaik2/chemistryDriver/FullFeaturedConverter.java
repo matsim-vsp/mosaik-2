@@ -93,12 +93,12 @@ public class FullFeaturedConverter {
         //var rasteredEmissions = EmissionRasterer.raster(palmEmissions, network, bounds, cellSize);
         addNoIfPossible(rasteredEmissions);
 
-        rasteredEmissions = cuttofulldays(rasteredEmissions, numberOfDays, offset);
+        rasteredEmissions = cutToFullDays(rasteredEmissions, numberOfDays, offset);
 
         PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
     }
 
-    private static TimeBinMap<Map<String, DoubleRaster>> cuttofulldays(TimeBinMap<Map<String, DoubleRaster>> rasteredEmissions, int numberOfDays, int offset) {
+    static TimeBinMap<Map<String, DoubleRaster>> cutToFullDays(TimeBinMap<Map<String, DoubleRaster>> rasteredEmissions, int numberOfDays, int offset) {
 
         TimeBinMap<Map<String, DoubleRaster>> result = new TimeBinMap<>(3600);
         for (int day = 0; day < numberOfDays; day++) {

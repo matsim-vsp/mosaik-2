@@ -16,12 +16,22 @@ import org.matsim.testcases.MatsimTestUtils;
 
 import java.util.Map;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class SimpleConverterTest {
 
     @Rule
     public MatsimTestUtils testUtils = new MatsimTestUtils();
+
+    @Test
+    public void testNan() {
+
+        var nan = Double.NaN;
+
+        if (nan < 0) System.out.println("is smaller than zero");
+        if (nan >= 0) System.out.println("is larger than zero");
+
+    }
 
     @Test
     public void singleLink() {
@@ -41,7 +51,7 @@ public class SimpleConverterTest {
 
         assertEquals(3, readResult.getTimeBins().size());
         assertEquals(3600, readResult.getBinSize(), 0.000001);
-        assertEquals( 0, readResult.getStartTime(), 0.00001);
+        assertEquals(0, readResult.getStartTime(), 0.00001);
 
         for (var timeBin : readResult.getTimeBins()) {
 
@@ -101,13 +111,13 @@ public class SimpleConverterTest {
                 var warmEmissionEvent = (WarmEmissionEvent) event;
                 handleEmissions(warmEmissionEvent.getWarmEmissions());
             } else if (ColdEmissionEvent.EVENT_TYPE.equals(event.getEventType())) {
-                var coldEmissionEvent = (ColdEmissionEvent)event;
+                var coldEmissionEvent = (ColdEmissionEvent) event;
                 handleEmissions(coldEmissionEvent.getColdEmissions());
             }
         }
 
         private void handleEmissions(Map<Pollutant, Double> emissions) {
-            collectedNO2  += emissions.get(Pollutant.NO2);
+            collectedNO2 += emissions.get(Pollutant.NO2);
         }
     }
 

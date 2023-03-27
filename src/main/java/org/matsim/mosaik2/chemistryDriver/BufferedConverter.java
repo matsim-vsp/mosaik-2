@@ -24,7 +24,7 @@ public class BufferedConverter {
 
     private final String outputFile;
 
-    private final DoubleRaster streetTypes;
+    private final DoubleRaster buildings;
 
     private final double timeBinSize;
 
@@ -45,7 +45,7 @@ public class BufferedConverter {
             String networkFile,
             String emissionEventsFile,
             String outputFile,
-            DoubleRaster streetTypes,
+            DoubleRaster buildings,
             double timeBinSize,
             double scaleFactor,
             CoordinateTransformation coordinateTransformation,
@@ -57,7 +57,7 @@ public class BufferedConverter {
         this.networkFile = networkFile;
         this.emissionEventsFile = emissionEventsFile;
         this.outputFile = outputFile;
-        this.streetTypes = streetTypes;
+        this.buildings = buildings;
         this.timeBinSize = timeBinSize;
         this.scaleFactor = scaleFactor;
         this.transformation = coordinateTransformation == null ? new IdentityTransformation() : coordinateTransformation;
@@ -70,14 +70,12 @@ public class BufferedConverter {
     public void write() {
 
         var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
-                .filter(link -> FullFeaturedConverter.isCoveredBy(link, streetTypes.getBounds()))
+                .filter(link -> FullFeaturedConverter.isCoveredBy(link, buildings.getBounds()))
                 .collect(NetworkUtils.getCollector());
 
         log.info("Unsimplifying network");
         var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
 
-        log.info("Converting segment map to network");
-        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments);
 
         // read the emission events
         var manager = EventsUtils.createEventsManager();
@@ -86,11 +84,16 @@ public class BufferedConverter {
         new EmissionEventsReader(manager).readFile(emissionEventsFile);
 
         var emissions = handler.getTimeBinMap();
+        var linksWithEmissions = handler.getLinksWithEmissions();
 
         // convert pollutants to palm names
         var palmEmissions = pollutantConverter.convert(emissions);
 
-        var rasteredEmissions = EmissionRasterer.rasterWithBuffer(palmEmissions, segmentNetwork, streetTypes);
+        log.info("Converting segment map to network");
+        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments).getLinks().values().stream()
+                .filter(link -> linksWithEmissions.contains(link.getId()))
+                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
+        var rasteredEmissions = EmissionRasterer.rasterWithBuffer(palmEmissions, segmentNetwork, buildings);
 
         addNoIfPossible(rasteredEmissions);
 

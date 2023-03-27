@@ -1,5 +1,6 @@
 package org.matsim.mosaik2;
 
+import lombok.extern.log4j.Log4j2;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
@@ -9,6 +10,7 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 
+@Log4j2
 public class SpatialIndex<T> {
 
     private static final PreparedGeometryFactory fact = new PreparedGeometryFactory();
@@ -17,6 +19,7 @@ public class SpatialIndex<T> {
 
     public SpatialIndex(Collection<Geometry> geometries, java.util.function.Function<Geometry, T> itemFunction) {
 
+        log.info("Create Spatial index for " + geometries.size() + " geometries.");
         geometries.stream()
                 .map(fact::create)
                 .forEach(geom -> {
@@ -26,6 +29,7 @@ public class SpatialIndex<T> {
                 });
 
         index.build();
+        log.info("Finished creating spatial index.");
     }
 
     public Collection<T> intersects(Geometry geom) {

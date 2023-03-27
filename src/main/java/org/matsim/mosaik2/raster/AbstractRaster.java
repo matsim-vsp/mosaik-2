@@ -11,7 +11,7 @@ import org.matsim.api.core.v01.Coord;
 import java.util.Set;
 
 @Getter
-class AbstractRaster {
+public class AbstractRaster {
 
     private final Bounds bounds;
     private final double cellSize;

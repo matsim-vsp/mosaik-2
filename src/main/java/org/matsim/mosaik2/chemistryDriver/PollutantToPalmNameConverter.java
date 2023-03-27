@@ -8,6 +8,7 @@ import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.core.utils.collections.Tuple;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -33,17 +34,32 @@ public class PollutantToPalmNameConverter {
 	}
 
 	public static PollutantToPalmNameConverter createForSingleSpecies(String species) {
-		return switch (species) {
-			case "PM10" -> new PollutantToPalmNameConverter(Map.of(
+
+		var mapping = mapSpecies(species);
+		return new PollutantToPalmNameConverter(mapping);
+	}
+
+	public static PollutantToPalmNameConverter createForSpecies(Collection<String> species) {
+
+		var mapping = species.stream()
+				.map(PollutantToPalmNameConverter::mapSpecies)
+				.flatMap(speciesMapping -> speciesMapping.entrySet().stream())
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+		return new PollutantToPalmNameConverter(mapping);
+	}
+
+	private static Map<Pollutant, String> mapSpecies(String speciesName) {
+		return switch (speciesName) {
+			case "PM10" -> Map.of(
 					Pollutant.PM, "PM10",
 					Pollutant.PM_non_exhaust, "PM10"
-			));
-			case "NO2" -> new PollutantToPalmNameConverter(Map.of(
-					Pollutant.NO2, "NO2"
-			));
-			default -> throw new RuntimeException("Species: " + species + " is not implemented");
+			);
+			case "NO2" -> Map.of(Pollutant.NO2, "NO2");
+			default -> throw new IllegalStateException("Unexpected value: " + speciesName);
 		};
 	}
+
 
 	public Set<Pollutant> getPollutants() {
 		return pollutantToName.keySet();

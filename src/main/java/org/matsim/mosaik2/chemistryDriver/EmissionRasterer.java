@@ -1,6 +1,7 @@
 package org.matsim.mosaik2.chemistryDriver;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -20,6 +21,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
+@Log4j2
 public class EmissionRasterer {
 
     public static final double LANE_WIDTH = 3.5;
@@ -43,15 +45,18 @@ public class EmissionRasterer {
         return rasterTimeBinMap;
     }
 
-    static <T> TimeBinMap<Map<T, DoubleRaster>> rasterWithBuffer(TimeBinMap<Map<T, Map<Id<Link>, Double>>> timeBinMap, Network network, DoubleRaster streetTypes) {
+    static <T> TimeBinMap<Map<T, DoubleRaster>> rasterWithBuffer(TimeBinMap<Map<T, Map<Id<Link>, Double>>> timeBinMap, Network network, DoubleRaster buildings) {
 
+        log.info("Starting raster process of buffered link geometries.");
         Set<Geometry> geometries = new HashSet<>();
         var factory = new GeometryFactory();
-        var halfCellSize = streetTypes.getCellSize() / 2;
-        streetTypes.forEachCoordinate((x, y, value) -> {
+        var halfCellSize = buildings.getCellSize() / 2;
 
-            // only create cells for raster points which are a street.
-            if (value < 0) return;
+        log.info("Create geometries for raster cells.");
+        buildings.forEachCoordinate((x, y, value) -> {
+
+            // don't create cells for buildings.
+            if (value > 0) return;
 
             var cell = factory.createPolygon(new Coordinate[]{
                     new Coordinate(x - halfCellSize, y - halfCellSize), new Coordinate(x + halfCellSize, y - halfCellSize),
@@ -60,9 +65,10 @@ public class EmissionRasterer {
             });
             geometries.add(cell);
         });
+
         SpatialIndex<Coordinate> index = new SpatialIndex<>(geometries, g -> g.getCentroid().getCoordinate());
 
-
+        log.info("Create geometries for links.");
         var bufferdLinks = network.getLinks().values().stream()
                 .map(link -> {
                     var lineString = factory.createLineString(new Coordinate[]{
@@ -72,20 +78,60 @@ public class EmissionRasterer {
                     return Tuple.of(link.getId(), buffer);
                 })
                 .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+        log.info("Finished creating link geometries");
 
-        // init result and populate time bins so that we can work concurrently
+        // init result map here, so we can rasterize concurrently
         TimeBinMap<Map<T, DoubleRaster>> result = new TimeBinMap<>(timeBinMap.getBinSize());
+        for (var bin : timeBinMap.getTimeBins()) {
+
+            // only take the first 24h
+            if (bin.getStartTime() > 86401) break;
+            
+            var startTime = bin.getStartTime();
+            result.getTimeBin(startTime);
+        }
+
+        log.info("Start rasterizing emissions. ");
+        result.getTimeBins().parallelStream().forEach(resultBin -> {
+
+            log.info("Rastering timestep: " + resultBin.getStartTime());
+            var bin = timeBinMap.getTimeBin(resultBin.getStartTime());
+            var rasterByPollutant = bin.getValue().entrySet().stream()
+                    .map(entry -> {
+                        var emissionsByLink = entry.getValue();
+                        var raster = new DoubleRaster(buildings.getBounds(), buildings.getCellSize());
+
+                        for (var linkEmission : emissionsByLink.entrySet()) {
+                            var bufferedLinkGeometry = bufferdLinks.get(linkEmission.getKey());
+                            var cells = index.intersects(bufferedLinkGeometry);
+                            for (var cell : cells) {
+                                var value = linkEmission.getValue();
+                                raster.adjustValueForCoord(cell.getX(), cell.getY(), value / cells.size());
+                            }
+                        }
+                        return Tuple.of(entry.getKey(), raster);
+                    })
+                    .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+            resultBin.setValue(rasterByPollutant);
+        });
+
+
+
+
+        /*
+
         for (var bin : timeBinMap.getTimeBins()) {
 
             var rasterByPollutant = bin.getValue().entrySet().stream()
                     .map(entry -> {
                         var emissionsByLink = entry.getValue();
-                        var raster = new DoubleRaster(streetTypes.getBounds(), streetTypes.getCellSize());
+                        var raster = new DoubleRaster(buildings.getBounds(), buildings.getCellSize());
 
-                        for (var bufferedLink : bufferdLinks.entrySet()) {
-                            var cells = index.intersects(bufferedLink.getValue());
+                        for (var linkEmission : emissionsByLink.entrySet()) {
+                            var bufferedLinkGeometry = bufferdLinks.get(linkEmission.getKey());
+                            var cells = index.intersects(bufferedLinkGeometry);
                             for (var cell : cells) {
-                                var value = emissionsByLink.get(bufferedLink.getKey());
+                                var value = linkEmission.getValue();
                                 raster.adjustValueForCoord(cell.getX(), cell.getY(), value / cells.size());
                             }
                         }
@@ -94,6 +140,9 @@ public class EmissionRasterer {
                     .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
             result.getTimeBin(bin.getStartTime()).setValue(rasterByPollutant);
         }
+        log.info("Finished rasterizing emissions.");
+
+         */
         return result;
     }
 

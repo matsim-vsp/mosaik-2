@@ -5,7 +5,6 @@ import lombok.Getter;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.network.Link;
-import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.ColdEmissionEvent;
@@ -13,10 +12,7 @@ import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.core.utils.collections.Tuple;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static org.matsim.mosaik2.chemistryDriver.NetworkUnsimplifier.LENGTH_FRACTION_KEY;
 
@@ -24,6 +20,8 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandler implements BasicEven
 
     @Getter
     private final TimeBinMap<Map<Pollutant, Map<Id<Link>, Double>>> timeBinMap;
+    @Getter
+    private final Set<Id<Link>> linksWithEmissions = new HashSet<>();
     private final Map<Id<Link>, List<Link>> links;
     private final Set<Pollutant> pollutantsOfInterest;
     private final double scaleFactor;
@@ -42,7 +40,7 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandler implements BasicEven
             var warmEmissionEvent = (WarmEmissionEvent) event;
             handleEmissions(event.getTime(), warmEmissionEvent.getLinkId(), warmEmissionEvent.getWarmEmissions());
         } else if (ColdEmissionEvent.EVENT_TYPE.equals(event.getEventType())) {
-            var coldEmissionEvent = (ColdEmissionEvent)event;
+            var coldEmissionEvent = (ColdEmissionEvent) event;
             handleEmissions(event.getTime(), coldEmissionEvent.getLinkId(), coldEmissionEvent.getColdEmissions());
         }
     }
@@ -61,6 +59,7 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandler implements BasicEven
 
         emissions.entrySet().stream()
                 .filter(entry -> pollutantsOfInterest.contains(entry.getKey()))
+                .filter(entry -> entry.getValue() > 0.0)
                 .flatMap(entry -> segments.stream().map(segment -> Tuple.of(segment, entry)))
                 .forEach(tuple -> {
                     var key = tuple.getSecond().getKey();
@@ -70,6 +69,7 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandler implements BasicEven
                     var value = emissionFromEvent * scaleFactor * lengthFraction;
                     var linkEmissions = emissionByPollutant.computeIfAbsent(key, p -> new Object2DoubleOpenHashMap<>());
                     linkEmissions.merge(segment.getId(), value, Double::sum);
+                    linksWithEmissions.add(segment.getId());
                 });
     }
 }

@@ -18,109 +18,109 @@ import java.util.Map;
 @Log4j2
 public class BufferedConverter {
 
-    private final String networkFile;
+	private final String networkFile;
 
-    private final String emissionEventsFile;
+	private final String emissionEventsFile;
 
-    private final String outputFile;
+	private final String outputFile;
 
-    private final DoubleRaster buildings;
+	private final DoubleRaster buildings;
 
-    private final double timeBinSize;
+	private final double timeBinSize;
 
-    private final double scaleFactor;
+	private final double scaleFactor;
 
-    private final CoordinateTransformation transformation;
+	private final CoordinateTransformation transformation;
 
-    private final PollutantToPalmNameConverter pollutantConverter;
+	private final PollutantToPalmNameConverter pollutantConverter;
 
-    private final LocalDateTime date;
+	private final LocalDateTime date;
 
-    private final int numberOfDays;
+	private final int numberOfDays;
 
-    private final int utcOffset;
+	private final int utcOffset;
 
-    @Builder
-    public BufferedConverter(
-            String networkFile,
-            String emissionEventsFile,
-            String outputFile,
-            DoubleRaster buildings,
-            double timeBinSize,
-            double scaleFactor,
-            CoordinateTransformation coordinateTransformation,
-            PollutantToPalmNameConverter pollutantConverter,
-            LocalDateTime date,
-            int numberOfDays,
-            int utcOffset
-    ) {
-        this.networkFile = networkFile;
-        this.emissionEventsFile = emissionEventsFile;
-        this.outputFile = outputFile;
-        this.buildings = buildings;
-        this.timeBinSize = timeBinSize;
-        this.scaleFactor = scaleFactor;
-        this.transformation = coordinateTransformation == null ? new IdentityTransformation() : coordinateTransformation;
-        this.pollutantConverter = pollutantConverter == null ? new PollutantToPalmNameConverter() : pollutantConverter;
-        this.date = date == null ? LocalDateTime.of(2017, 7, 31, 0, 0) : date;
-        this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
-        this.utcOffset = utcOffset;
-    }
+	@Builder
+	public BufferedConverter(
+			String networkFile,
+			String emissionEventsFile,
+			String outputFile,
+			DoubleRaster buildings,
+			double timeBinSize,
+			double scaleFactor,
+			CoordinateTransformation coordinateTransformation,
+			PollutantToPalmNameConverter pollutantConverter,
+			LocalDateTime date,
+			int numberOfDays,
+			int utcOffset
+	) {
+		this.networkFile = networkFile;
+		this.emissionEventsFile = emissionEventsFile;
+		this.outputFile = outputFile;
+		this.buildings = buildings;
+		this.timeBinSize = timeBinSize;
+		this.scaleFactor = scaleFactor;
+		this.transformation = coordinateTransformation == null ? new IdentityTransformation() : coordinateTransformation;
+		this.pollutantConverter = pollutantConverter == null ? new PollutantToPalmNameConverter() : pollutantConverter;
+		this.date = date == null ? LocalDateTime.of(2017, 7, 31, 0, 0) : date;
+		this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
+		this.utcOffset = utcOffset;
+	}
 
-    public void write() {
+	public void write() {
 
-        var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
-                .filter(link -> FullFeaturedConverter.isCoveredBy(link, buildings.getBounds()))
-                .collect(NetworkUtils.getCollector());
+		var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
+				.filter(link -> FullFeaturedConverter.isCoveredBy(link, buildings.getBounds()))
+				.collect(NetworkUtils.getCollector());
 
-        log.info("Unsimplifying network");
-        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
+		log.info("Unsimplifying network");
+		var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
 
 
-        // read the emission events
-        var manager = EventsUtils.createEventsManager();
-        var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
-        manager.addHandler(handler);
-        new EmissionEventsReader(manager).readFile(emissionEventsFile);
+		// read the emission events
+		var manager = EventsUtils.createEventsManager();
+		var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
+		manager.addHandler(handler);
+		new EmissionEventsReader(manager).readFile(emissionEventsFile);
 
-        var emissions = handler.getTimeBinMap();
-        var linksWithEmissions = handler.getLinksWithEmissions();
+		var emissions = handler.getTimeBinMap();
+		var linksWithEmissions = handler.getLinksWithEmissions();
 
-        // convert pollutants to palm names
-        var palmEmissions = pollutantConverter.convert(emissions);
+		// convert pollutants to palm names
+		var palmEmissions = pollutantConverter.convert(emissions);
 
-        log.info("Converting segment map to network");
-        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments).getLinks().values().stream()
-                .filter(link -> linksWithEmissions.contains(link.getId()))
-                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
-        var rasteredEmissions = EmissionRasterer.rasterWithBuffer(palmEmissions, segmentNetwork, buildings);
+		log.info("Converting segment map to network");
+		var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments).getLinks().values().stream()
+				.filter(link -> linksWithEmissions.contains(link.getId()))
+				.collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
+		var rasteredEmissions = EmissionRasterer.rasterWithSwing(palmEmissions, segmentNetwork, buildings);
 
-        addNoIfPossible(rasteredEmissions);
+		addNoIfPossible(rasteredEmissions);
 
-        rasteredEmissions = FullFeaturedConverter.cutToFullDays(rasteredEmissions, numberOfDays, utcOffset);
+		rasteredEmissions = FullFeaturedConverter.cutToFullDays(rasteredEmissions, numberOfDays, utcOffset);
 
-        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
-    }
+		PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
+	}
 
-    private void addNoIfPossible(TimeBinMap<Map<String, DoubleRaster>> timeBinMap) {
+	private void addNoIfPossible(TimeBinMap<Map<String, DoubleRaster>> timeBinMap) {
 
-        if (pollutantConverter.getPollutants().contains(Pollutant.NO2) && pollutantConverter.getPollutants().contains(Pollutant.NOx)) {
+		if (pollutantConverter.getPollutants().contains(Pollutant.NO2) && pollutantConverter.getPollutants().contains(Pollutant.NOx)) {
 
-            for (var timeBin : timeBinMap.getTimeBins()) {
+			for (var timeBin : timeBinMap.getTimeBins()) {
 
-                var no2 = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NO2));
-                var nox = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NOx));
-                var no = new DoubleRaster(no2.getBounds(), no2.getCellSize());
+				var no2 = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NO2));
+				var nox = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NOx));
+				var no = new DoubleRaster(no2.getBounds(), no2.getCellSize());
 
-                nox.forEachCoordinate((x, y, noxValue) -> {
-                    var no2Value = no2.getValueByCoord(x, y);
-                    var noValue = noxValue - no2Value;
-                    no.adjustValueForCoord(x, y, noValue);
-                });
+				nox.forEachCoordinate((x, y, noxValue) -> {
+					var no2Value = no2.getValueByCoord(x, y);
+					var noValue = noxValue - no2Value;
+					no.adjustValueForCoord(x, y, noValue);
+				});
 
-                timeBin.getValue().put("NO", no);
-                timeBin.getValue().remove("NOx");
-            }
-        }
-    }
+				timeBin.getValue().put("NO", no);
+				timeBin.getValue().remove("NOx");
+			}
+		}
+	}
 }

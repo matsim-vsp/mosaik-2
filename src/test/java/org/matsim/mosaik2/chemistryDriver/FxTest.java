@@ -6,51 +6,72 @@ import org.junit.Test;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferByte;
-import java.awt.image.DataBufferInt;
 
 public class FxTest {
 
+	static int minWithPadding(int val1, int val2, int padding, int minLimit) {
+		int delta = val2 - val1;
+		int min = delta >= 0 ? val1 : val2;
+		min -= padding;
+		return Math.max(minLimit, min);
+	}
+
+	static int maxWithPadding(int val1, int val2, int padding, int maxLimit) {
+		int delta = val2 - val1;
+		int max = delta >= 0 ? val2 : val1;
+		max += padding;
+		return Math.min(maxLimit, max);
+	}
 
 
-    @Test
-    public void rasterLine() throws JsonProcessingException {
+	@Test
+	public void rasterLine() throws JsonProcessingException {
 
-        var mapper = new ObjectMapper();
+		var mapper = new ObjectMapper();
 
-        BufferedImage bufferedImage = new BufferedImage(
-                10, 10, BufferedImage.TYPE_INT_RGB
-        );
-        var context = bufferedImage.createGraphics();
-        context.setStroke(new BasicStroke(3));
-        context.setColor(Color.BLACK);
-        context.fillRect(3, 5, 7, 5);
+		int width = 10;
+		int height = 10;
 
-        /*
-        for (var i = 0; i < 10; i++) {
-            for (var j = 0; j < 10; j++) {
-                int[] result = bufferedImage.getRaster().getPixel(i, j, new int[3]);
-                System.out.println(mapper.writeValueAsString(result));
-            }
-        }
+		// input
+		int w = 4;
+		int x0 = 1;
+		int x1 = 5;
+		int y0 = 1;
+		int y1 = 4;
 
-         */
+		// vars to calculate with
+		int padding = Math.round(w / 2);
+		int minX = minWithPadding(x0, x1, padding, 0);
+		int maxX = maxWithPadding(x0, x1, padding, width);
+		int minY = minWithPadding(y0, y1, padding, 0);
+		int maxY = maxWithPadding(y0, y1, padding, height);
 
-        /*
-        var data = ((DataBufferInt) bufferedImage.getRaster().getDataBuffer()).getData();
-        for (var datum : data) {
-            System.out.println(datum);
-        }
+		var img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+		var ctx = img.createGraphics();
+		ctx.setStroke(new BasicStroke(w));
+		ctx.setColor(Color.BLACK);
+		ctx.drawLine(x0, y0, x1, y1);
 
-         */
+		for (var xi = minX; xi <= maxX; xi++) {
+			for (var yi = minY; yi <= maxY; yi++) {
+				Object result = img.getRaster().getDataElements(xi, yi, null);
+				System.out.println("(" + xi + "," + yi + "): " + mapper.writeValueAsString(result));
+			}
+		}
 
-var bands = bufferedImage.getRaster().getNumBands();
-        for (var i = 0; i < 10; i++) {
-            for (var j = 0; j < 10; j++) {
-                System.out.println("(" + i + ", " + j + "): " + bufferedImage.getRGB(i, j));
-            }
-        }
-
-
-    }
+		// clear the buffer
+		var dataElement = new int[]{0};
+		for (var xi = minX; xi <= maxX; xi++) {
+			for (var yi = minY; yi <= maxY; yi++) {
+				img.getRaster().setDataElements(xi, yi, dataElement);
+			}
+		}
+		System.out.println("\nAfter clear\n");
+		for (var xi = 0; xi < width; xi++) {
+			for (var yi = 0; yi < height; yi++) {
+				Object result = img.getRaster().getDataElements(xi, yi, null);
+				System.out.println("(" + xi + "," + yi + "): " + mapper.writeValueAsString(result));
+			}
+		}
+	}
 }

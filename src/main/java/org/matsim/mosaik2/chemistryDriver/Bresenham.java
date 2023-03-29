@@ -53,7 +53,7 @@ public abstract class Bresenham {
      * equally distributed into the cells. Additionally the emissions per link are divided by cell area. If a link has
      * an emission value of 100g and the cellSize is 10m and the link covers 2 cells the resulting value per cell is
      * 100g / 2 / (10m * 10m) = 0.5g/m2
-     *
+     * <p>
      * Duplicate this to use with normal Map<Id<Link>, Double> backed by a fast utils Object2DoubleMap
      */
     static DoubleRaster rasterizeNetwork(final Network network, final DoubleRaster.Bounds bounds, final Map<Id<Link>, Double> emissions, final double cellSize) {
@@ -87,7 +87,7 @@ public abstract class Bresenham {
                 // wrap this in a stream to achieve cheap parallelism
                 .map(link -> {
                     List<Coord> cells = new ArrayList<>();
-                    rasterizeLink(link, cellSize, (x, y) ->  {
+                    rasterizeLink(link, cellSize, (x, y) -> {
                         var coord = new Coord(x, y);
                         if (bounds.covers(MGC.coord2Point(coord))) {
                             cells.add(coord);
@@ -114,11 +114,11 @@ public abstract class Bresenham {
         if (dx == 0 && dy == 0) {
             // the algorithm doesn't really support lines shorter than the cell size.
             // do avoid complicated computation within the loop, catch this case here
-            coordConsumer.accept(x0 * cellSize , y0 * cellSize);
+            coordConsumer.accept(x0 * cellSize, y0 * cellSize);
         }
 
         do {
-            coordConsumer.accept(x0 * cellSize , y0 * cellSize);
+            coordConsumer.accept(x0 * cellSize, y0 * cellSize);
 
             e2 = err + err;
             if (e2 >= dy) {
@@ -141,7 +141,7 @@ public abstract class Bresenham {
     }
 
     @FunctionalInterface
-    private interface DoubleBinaryConsumer {
+    interface DoubleBinaryConsumer {
         void accept(double x, double y);
     }
 }

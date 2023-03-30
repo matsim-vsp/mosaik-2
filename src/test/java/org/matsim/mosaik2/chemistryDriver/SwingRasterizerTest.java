@@ -21,7 +21,7 @@ public class SwingRasterizerTest {
 		var to = network.getFactory().createNode(Id.createNodeId("to"), new Coord(7, 5));
 		var link = network.getFactory().createLink(Id.createLinkId("link"), from, to);
 
-		var line = SwingRasterizer.PixelLine.fromLinkWithOffset(link, 2, raster);
+		var line = SwingRasterizer.PixelLine.fromLinkWithOffset(link, 4, raster);
 
 		assertEquals(3, line.x0());
 		assertEquals(3, line.y0());
@@ -38,7 +38,7 @@ public class SwingRasterizerTest {
 		var to = network.getFactory().createNode(Id.createNodeId("to"), new Coord(3, 5));
 		var link = network.getFactory().createLink(Id.createLinkId("link"), from, to);
 
-		var line = SwingRasterizer.PixelLine.fromLinkWithOffset(link, 2, raster);
+		var line = SwingRasterizer.PixelLine.fromLinkWithOffset(link, 4, raster);
 
 		assertEquals(7, line.x0());
 		assertEquals(7, line.y0());
@@ -55,7 +55,7 @@ public class SwingRasterizerTest {
 		var to = network.getFactory().createNode(Id.createNodeId("to"), new Coord(5, 7));
 		var link = network.getFactory().createLink(Id.createLinkId("link"), from, to);
 
-		var line = SwingRasterizer.PixelLine.fromLinkWithOffset(link, 2, raster);
+		var line = SwingRasterizer.PixelLine.fromLinkWithOffset(link, 4, raster);
 
 		assertEquals(7, line.x0());
 		assertEquals(3, line.y0());
@@ -72,7 +72,7 @@ public class SwingRasterizerTest {
 		var to = network.getFactory().createNode(Id.createNodeId("to"), new Coord(5, 3));
 		var link = network.getFactory().createLink(Id.createLinkId("link"), from, to);
 
-		var line = SwingRasterizer.PixelLine.fromLinkWithOffset(link, 2, raster);
+		var line = SwingRasterizer.PixelLine.fromLinkWithOffset(link, 4, raster);
 
 		assertEquals(3, line.x0());
 		assertEquals(7, line.y0());
@@ -125,7 +125,7 @@ public class SwingRasterizerTest {
 
 		target.forEachCoordinate((x, y, value) -> {
 			if (x == 50 && y == 50) assertEquals(0, value, 0.001); // the building
-			else if (x >= 15 && x <= 80 && y >= 35 && y <= 60)
+			else if (x >= 20 && x <= 75 && y >= 35 && y <= 50)
 				assertTrue(value > 0); // all the other cells under the link
 			else assertEquals(0, value, 0.00001); // all cells not part of the link
 		});

@@ -46,9 +46,9 @@ public class EmissionRasterer {
 		return rasterTimeBinMap;
 	}
 
-	static <T> TimeBinMap<Map<T, DoubleRaster>> rasterWithSwing(TimeBinMap<Map<T, Map<Id<Link>, Double>>> timeBinMap, Network network, DoubleRaster buildings) {
+	static <T> TimeBinMap<Map<T, DoubleRaster>> rasterWithSwing(TimeBinMap<Map<T, Map<Id<Link>, Double>>> timeBinMap, Network network, DoubleRaster buildings, double laneWidth) {
 
-		var rasterizer = new SwingRasterizer(buildings.getBounds(), buildings.getCellSize(), 5);
+		var rasterizer = new SwingRasterizer(buildings.getBounds(), buildings.getCellSize(), laneWidth);
 		// init result map here, so we can rasterize concurrently
 		TimeBinMap<Map<T, DoubleRaster>> result = new TimeBinMap<>(timeBinMap.getBinSize());
 		for (var bin : timeBinMap.getTimeBins()) {
@@ -56,7 +56,7 @@ public class EmissionRasterer {
 			result.getTimeBin(startTime);
 		}
 
-		result.getTimeBins().stream().forEach(resultBin -> {
+		result.getTimeBins().parallelStream().forEach(resultBin -> {
 
 			var bin = timeBinMap.getTimeBin(resultBin.getStartTime());
 			log.info("Processing time slice: " + bin.getStartTime());
@@ -199,5 +199,10 @@ public class EmissionRasterer {
 		var deltaY = coord.getY() != 0 ? v2 : -v1;
 
 		return new Coordinate(coord.getX() + deltaX, coord.getY() + deltaY);
+	}
+
+	public enum RasterMethod {
+		SinglePixel,
+		WithLaneWidth
 	}
 }

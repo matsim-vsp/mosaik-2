@@ -15,7 +15,7 @@ public class SwingRasterizer {
 	private final BufferedImage img;
 	private final Graphics2D graphics;
 
-	private final int laneWidth;
+	private final double laneWidth;
 
 	SwingRasterizer(AbstractRaster.Bounds bounds, double cellSize, double laneWidth) {
 
@@ -24,26 +24,25 @@ public class SwingRasterizer {
 		this.img = new BufferedImage((int) width, (int) height, BufferedImage.TYPE_INT_RGB);
 		this.graphics = img.createGraphics();
 		graphics.setColor(Color.BLACK);
-		this.laneWidth = (int) Math.round(laneWidth / cellSize);
+		this.laneWidth = laneWidth;
 	}
 
 	void rasterLink(Link link, double emissionValue, DoubleRaster target, DoubleRaster buildings) {
 
 		var pixelLine = PixelLine.fromLinkWithOffset(link, this.laneWidth / 2, target);
-		var strokeWidth = Math.max(1, (int) link.getNumberOfLanes() * this.laneWidth);
+		var strokeWidth = (int) Math.max(1, (link.getNumberOfLanes() * laneWidth) / target.getCellSize());
 		var area = target.getCellSize() * target.getCellSize();
 
 		// first pass for counting the raster tiles
 		var counter = new AtomicInteger();
 		rasterPixelLine(pixelLine, strokeWidth, (xi, yi) -> {
-
-			if (!isBuilding(xi, yi, buildings))
+			if (isNotBuilding(xi, yi, buildings))
 				counter.incrementAndGet();
 		});
 
 		// second pass for writing raster values
 		rasterPixelLine(pixelLine, strokeWidth, (xi, yi) -> {
-			if (!isBuilding(xi, yi, buildings))
+			if (isNotBuilding(xi, yi, buildings))
 				target.adjustValueForIndex(xi, yi, emissionValue / counter.get() / area);
 		});
 	}
@@ -56,9 +55,9 @@ public class SwingRasterizer {
 
 		// figure out a bounding box
 		int padding = Math.round(strokeWidth >> 1);
-		int minX = minWithPadding(line.x0, line.x1, padding, 0);
+		int minX = minWithPadding(line.x0, line.x1, padding);
 		int maxX = maxWithPadding(line.x0, line.x1, padding, img.getWidth() - 1);
-		int minY = minWithPadding(line.y0, line.y1, padding, 0);
+		int minY = minWithPadding(line.y0, line.y1, padding);
 		int maxY = maxWithPadding(line.y0, line.y1, padding, img.getHeight() - 1);
 
 		// read the pixels which were drawn within the bounding box
@@ -79,11 +78,11 @@ public class SwingRasterizer {
 		}
 	}
 
-	static int minWithPadding(int val1, int val2, int padding, int minLimit) {
+	static int minWithPadding(int val1, int val2, int padding) {
 		int delta = val2 - val1;
 		int min = delta >= 0 ? val1 : val2;
 		min -= padding;
-		return Math.max(minLimit, min);
+		return Math.max(0, min);
 	}
 
 	static int maxWithPadding(int val1, int val2, int padding, int maxLimit) {
@@ -93,19 +92,19 @@ public class SwingRasterizer {
 		return Math.min(maxLimit, max);
 	}
 
-	static boolean isBuilding(int xi, int yi, DoubleRaster buildings) {
+	static boolean isNotBuilding(int xi, int yi, DoubleRaster buildings) {
 		var value = buildings.getValueByIndex(xi, yi);
-		//return value > 0;
-		return false;
+		return !(value > 0);
 	}
 
 	record PixelLine(int x0, int y0, int x1, int y1) {
-		static PixelLine fromLinkWithOffset(Link link, double offset, AbstractRaster target) {
+		static PixelLine fromLinkWithOffset(Link link, double laneWidth, AbstractRaster target) {
 
 			var x0 = link.getFromNode().getCoord().getX();
 			var y0 = link.getFromNode().getCoord().getY();
 			var x1 = link.getToNode().getCoord().getX();
 			var y1 = link.getToNode().getCoord().getY();
+			var offset = link.getNumberOfLanes() * laneWidth / 2;
 
 			var dx = x1 - x0;
 			var dy = y1 - y0;
@@ -117,13 +116,7 @@ public class SwingRasterizer {
 			var xi1 = target.getXIndex(x1 + v1);
 			var yi1 = target.getYIndex(y1 + v2);
 
-			//return new PixelLine(xi0, yi0, xi1, yi1);
-			return new PixelLine(
-					target.getXIndex(x0),
-					target.getYIndex(y0),
-					target.getXIndex(x1),
-					target.getYIndex(y1)
-			);
+			return new PixelLine(xi0, yi0, xi1, yi1);
 		}
 	}
 }

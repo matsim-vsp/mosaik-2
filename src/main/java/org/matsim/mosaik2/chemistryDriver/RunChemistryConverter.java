@@ -44,6 +44,12 @@ public class RunChemistryConverter {
     @Parameter(names = {"--s", "--species"})
     private List<String> species = List.of("PM10", "NO2");
 
+    @Parameter(names = {"--lw", "--lane-width"})
+    private double laneWidth = 5;
+
+    @Parameter(names = {"--rm", "--raster-method"})
+    private String rasterMethod = "WithLaneWidth";
+
     public static void main(String[] args) {
 
         var converter = new RunChemistryConverter();
@@ -57,6 +63,7 @@ public class RunChemistryConverter {
         var names = PollutantToPalmNameConverter.createForSpecies(species);
         var dateTime = LocalDateTime.parse(date);
         var transformation = createTransformation(crsTransformation);
+        var rasterMethod = EmissionRasterer.RasterMethod.valueOf(this.rasterMethod);
 
         BufferedConverter.builder()
                 .networkFile(network)
@@ -68,8 +75,10 @@ public class RunChemistryConverter {
                 .timeBinSize(3600)// this could be configurable
                 .date(dateTime)
                 .utcOffset(utcOffset)
-                .coordinateTransformation(transformation)
+                .transformation(transformation)
                 .numberOfDays(numberOfDays)
+                .laneWidth(laneWidth)
+                .rasterMethod(rasterMethod)
                 .build()
                 .write();
     }

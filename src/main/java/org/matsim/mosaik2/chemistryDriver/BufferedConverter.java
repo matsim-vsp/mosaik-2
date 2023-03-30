@@ -1,7 +1,11 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.extern.log4j.Log4j2;
+import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
@@ -16,6 +20,8 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 @Log4j2
+@AllArgsConstructor
+@Builder
 public class BufferedConverter {
 
 	private final String networkFile;
@@ -26,46 +32,24 @@ public class BufferedConverter {
 
 	private final DoubleRaster buildings;
 
-	private final double timeBinSize;
-
-	private final double scaleFactor;
-
-	private final CoordinateTransformation transformation;
-
-	private final PollutantToPalmNameConverter pollutantConverter;
-
-	private final LocalDateTime date;
-
-	private final int numberOfDays;
-
-	private final int utcOffset;
-
-	@Builder
-	public BufferedConverter(
-			String networkFile,
-			String emissionEventsFile,
-			String outputFile,
-			DoubleRaster buildings,
-			double timeBinSize,
-			double scaleFactor,
-			CoordinateTransformation coordinateTransformation,
-			PollutantToPalmNameConverter pollutantConverter,
-			LocalDateTime date,
-			int numberOfDays,
-			int utcOffset
-	) {
-		this.networkFile = networkFile;
-		this.emissionEventsFile = emissionEventsFile;
-		this.outputFile = outputFile;
-		this.buildings = buildings;
-		this.timeBinSize = timeBinSize;
-		this.scaleFactor = scaleFactor;
-		this.transformation = coordinateTransformation == null ? new IdentityTransformation() : coordinateTransformation;
-		this.pollutantConverter = pollutantConverter == null ? new PollutantToPalmNameConverter() : pollutantConverter;
-		this.date = date == null ? LocalDateTime.of(2017, 7, 31, 0, 0) : date;
-		this.numberOfDays = numberOfDays == 0 ? 1 : numberOfDays;
-		this.utcOffset = utcOffset;
-	}
+	@Builder.Default
+	private final double timeBinSize = 3600;
+	@Builder.Default
+	private final double scaleFactor = 1;
+	@Builder.Default
+	private final CoordinateTransformation transformation = new IdentityTransformation();
+	@Builder.Default
+	private final PollutantToPalmNameConverter pollutantConverter = new PollutantToPalmNameConverter();
+	@Builder.Default
+	private final LocalDateTime date = LocalDateTime.of(2017, 7, 31, 0, 0);
+	@Builder.Default
+	private final int numberOfDays = 1;
+	@Builder.Default
+	private final int utcOffset = 0;
+	@Builder.Default
+	private final double laneWidth = 5;
+	@Builder.Default
+	private final EmissionRasterer.RasterMethod rasterMethod = EmissionRasterer.RasterMethod.WithLaneWidth;
 
 	public void write() {
 
@@ -75,7 +59,6 @@ public class BufferedConverter {
 
 		log.info("Unsimplifying network");
 		var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
-
 
 		// read the emission events
 		var manager = EventsUtils.createEventsManager();
@@ -93,7 +76,8 @@ public class BufferedConverter {
 		var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments).getLinks().values().stream()
 				.filter(link -> linksWithEmissions.contains(link.getId()))
 				.collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
-		var rasteredEmissions = EmissionRasterer.rasterWithSwing(palmEmissions, segmentNetwork, buildings);
+
+		var rasteredEmissions = raster(palmEmissions, segmentNetwork);
 
 		addNoIfPossible(rasteredEmissions);
 
@@ -121,6 +105,15 @@ public class BufferedConverter {
 				timeBin.getValue().put("NO", no);
 				timeBin.getValue().remove("NOx");
 			}
+		}
+	}
+
+	private TimeBinMap<Map<String, DoubleRaster>> raster(TimeBinMap<Map<String, Map<Id<Link>, Double>>> palmEmissions, Network segmentNetwork) {
+
+		if (rasterMethod.equals(EmissionRasterer.RasterMethod.WithLaneWidth)) {
+			return EmissionRasterer.rasterWithSwing(palmEmissions, segmentNetwork, buildings, laneWidth);
+		} else {
+			return EmissionRasterer.raster(palmEmissions, segmentNetwork, buildings.getBounds(), laneWidth);
 		}
 	}
 }

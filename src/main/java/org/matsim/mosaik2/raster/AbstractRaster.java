@@ -76,8 +76,6 @@ public class AbstractRaster {
 		private double maxX = Double.NEGATIVE_INFINITY;
 		private double maxY = Double.NEGATIVE_INFINITY;
 
-		private double cellSize;
-
 		public Bounds(double minX, double minY, double maxX, double maxY) {
 			this.minX = minX;
 			this.minY = minY;

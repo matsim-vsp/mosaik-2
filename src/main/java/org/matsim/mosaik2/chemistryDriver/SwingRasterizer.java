@@ -29,7 +29,7 @@ public class SwingRasterizer {
 
 	void rasterLink(Link link, double emissionValue, DoubleRaster target, DoubleRaster buildings) {
 
-		var pixelLine = PixelLine.fromLink(link, target);
+		var pixelLine = PixelLine.fromLinkWithOffset(link, this.laneWidth / 2, target);
 		var strokeWidth = Math.max(1, (int) link.getNumberOfLanes() * this.laneWidth);
 		var area = target.getCellSize() * target.getCellSize();
 
@@ -57,13 +57,13 @@ public class SwingRasterizer {
 		// figure out a bounding box
 		int padding = Math.round(strokeWidth >> 1);
 		int minX = minWithPadding(line.x0, line.x1, padding, 0);
-		int maxX = maxWithPadding(line.x0, line.x1, padding, img.getWidth());
+		int maxX = maxWithPadding(line.x0, line.x1, padding, img.getWidth() - 1);
 		int minY = minWithPadding(line.y0, line.y1, padding, 0);
-		int maxY = maxWithPadding(line.y0, line.y1, padding, img.getHeight());
+		int maxY = maxWithPadding(line.y0, line.y1, padding, img.getHeight() - 1);
 
 		// read the pixels which were drawn within the bounding box
-		for (var xi = minX; xi < maxX; xi++) {
-			for (var yi = minY; yi < maxY; yi++) {
+		for (var xi = minX; xi <= maxX; xi++) {
+			for (var yi = minY; yi <= maxY; yi++) {
 
 				int[] result = (int[]) img.getRaster().getDataElements(xi, yi, null);
 				if (result[0] != 0) setPixel.accept(xi, yi);
@@ -72,8 +72,8 @@ public class SwingRasterizer {
 
 		// clear the image buffer within the bbox
 		var dataElement = new int[]{0};
-		for (var xi = minX; xi < maxX; xi++) {
-			for (var yi = minY; yi < maxY; yi++) {
+		for (var xi = minX; xi <= maxX; xi++) {
+			for (var yi = minY; yi <= maxY; yi++) {
 				img.getRaster().setDataElements(xi, yi, dataElement);
 			}
 		}
@@ -95,17 +95,35 @@ public class SwingRasterizer {
 
 	static boolean isBuilding(int xi, int yi, DoubleRaster buildings) {
 		var value = buildings.getValueByIndex(xi, yi);
-		return value > 0;
+		//return value > 0;
+		return false;
 	}
 
 	record PixelLine(int x0, int y0, int x1, int y1) {
-		static PixelLine fromLink(Link link, AbstractRaster target) {
+		static PixelLine fromLinkWithOffset(Link link, double offset, AbstractRaster target) {
 
-			int x0 = target.getXIndex(link.getFromNode().getCoord().getX());
-			int y0 = target.getYIndex(link.getFromNode().getCoord().getY());
-			int x1 = target.getXIndex(link.getToNode().getCoord().getX());
-			int y1 = target.getYIndex(link.getToNode().getCoord().getY());
-			return new PixelLine(x0, y0, x1, y1);
+			var x0 = link.getFromNode().getCoord().getX();
+			var y0 = link.getFromNode().getCoord().getY();
+			var x1 = link.getToNode().getCoord().getX();
+			var y1 = link.getToNode().getCoord().getY();
+
+			var dx = x1 - x0;
+			var dy = y1 - y0;
+			var v1 = offset * dy / (Math.sqrt(dx * dx + dy * dy));
+			var v2 = dy == 0 ? -offset * Math.signum(dx) : -dx * v1 / dy;
+
+			var xi0 = target.getXIndex(x0 + v1);
+			var yi0 = target.getYIndex(y0 + v2);
+			var xi1 = target.getXIndex(x1 + v1);
+			var yi1 = target.getYIndex(y1 + v2);
+
+			//return new PixelLine(xi0, yi0, xi1, yi1);
+			return new PixelLine(
+					target.getXIndex(x0),
+					target.getYIndex(y0),
+					target.getXIndex(x1),
+					target.getYIndex(y1)
+			);
 		}
 	}
 }

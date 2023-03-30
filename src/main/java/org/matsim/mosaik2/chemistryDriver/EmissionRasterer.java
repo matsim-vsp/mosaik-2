@@ -48,14 +48,10 @@ public class EmissionRasterer {
 
 	static <T> TimeBinMap<Map<T, DoubleRaster>> rasterWithSwing(TimeBinMap<Map<T, Map<Id<Link>, Double>>> timeBinMap, Network network, DoubleRaster buildings) {
 
-		var rasterizer = new SwingRasterizer(buildings.getBounds(), buildings.getCellSize(), 3.5);
+		var rasterizer = new SwingRasterizer(buildings.getBounds(), buildings.getCellSize(), 5);
 		// init result map here, so we can rasterize concurrently
 		TimeBinMap<Map<T, DoubleRaster>> result = new TimeBinMap<>(timeBinMap.getBinSize());
 		for (var bin : timeBinMap.getTimeBins()) {
-
-			// only take the first 24h
-			if (bin.getStartTime() > 86401) break;
-
 			var startTime = bin.getStartTime();
 			result.getTimeBin(startTime);
 		}

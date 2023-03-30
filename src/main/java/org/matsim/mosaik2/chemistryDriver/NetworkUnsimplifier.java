@@ -21,6 +21,7 @@ import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
+import org.matsim.core.utils.geometry.transformations.IdentityTransformation;
 import org.matsim.core.utils.geometry.transformations.TransformationFactory;
 
 import java.io.File;
@@ -36,6 +37,13 @@ public class NetworkUnsimplifier {
 
 	public static final String LENGTH_FRACTION_KEY = "length_fraction";
 	public static final String NOT_MATCHED_KEY = "NOT_MATCHED";
+
+	public static void main(String[] args) {
+		var net = NetworkUtils.readNetwork(args[0]);
+		var segments = unsimplifyNetwork(net, new IdentityTransformation());
+		var result = segmentsToNetwork(segments);
+		NetworkUtils.writeNetwork(result, args[1]);
+	}
 
 	static Map<Id<Link>, List<Link>> unsimplifyNetwork(final Network network, CoordinateTransformation transformation) {
 

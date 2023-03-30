@@ -62,8 +62,8 @@ public class PalmChemistryInput2Csv {
 			// translate this from an origin point and then copy into a new raster.
 			var bounds = new DoubleRaster.Bounds(
 					origin.getX(), origin.getY(),
-					origin.getX() + speciesRaster.getBounds().getMaxX(),
-					origin.getY() + speciesRaster.getBounds().getMaxY()
+					origin.getX() + (speciesRaster.getBounds().getMaxX() - speciesRaster.getBounds().getMinX()),
+					origin.getY() + (speciesRaster.getBounds().getMaxY() - speciesRaster.getBounds().getMinY())
 			);
 			var raster = new DoubleRaster(bounds, speciesRaster.getCellSize());
 			raster.setValueForEachIndex(speciesRaster::getValueByIndex);

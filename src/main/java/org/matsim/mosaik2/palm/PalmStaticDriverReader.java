@@ -19,20 +19,32 @@ public class PalmStaticDriverReader {
 
         try (var file = NetcdfFiles.open(filePath.toString())) {
 
-            // somehow the x values are in N_UTM and vice versa. 🤷‍♀️
             var xVar = Objects.requireNonNull(file.findVariable("E_UTM"));
             var yVar = Objects.requireNonNull(file.findVariable("N_UTM"));
-            var variableVar = Objects.requireNonNull(file.findVariable(fieldName));
 
-            //var x = NetcdfConverters.varToDoubleArray(xVar, new int[]{1, xVar.getDimension(1).getLength()});
-            //var y = NetcdfConverters.varToDoubleArray(yVar, new int[]{yVar.getDimension(0).getLength(), 1});
             var x = NetcdfConverters.varToDoubleArray(xVar, new int[]{1, yVar.getDimension(1).getLength()});
             var y = NetcdfConverters.varToDoubleArray(yVar, new int[]{yVar.getDimension(0).getLength(), 1});
 
-            var bounds = NetcdfConverters.createBounds(x, y);
             var cellSize = NetcdfConverters.getCellSize(x, y);
+
+            // we have some static files which have the coords in the wrong order. If we detect a cell size of 0,
+            // we try the wrong format instead.
+            if (cellSize == 0.0) {
+                xVar = Objects.requireNonNull(file.findVariable("N_UTM"));
+                yVar = Objects.requireNonNull(file.findVariable("E_UTM"));
+                x = NetcdfConverters.varToDoubleArray(xVar, new int[]{1, xVar.getDimension(1).getLength()});
+                y = NetcdfConverters.varToDoubleArray(yVar, new int[]{yVar.getDimension(0).getLength(), 1});
+                cellSize = NetcdfConverters.getCellSize(x, y);
+            }
+
+            if (cellSize == 0.0) {
+                throw new RuntimeException("Detected a cell size of 0 for the static driver file. This is probably not what was intended. Fix your driver File!");
+            }
+
+            var bounds = NetcdfConverters.createBounds(x, y);
             var raster = new DoubleRaster(bounds, cellSize);
 
+            var variableVar = Objects.requireNonNull(file.findVariable(fieldName));
             var data = readIntoMemory(variableVar);
 
             for (int xi = 0; xi < x.length; xi++) {

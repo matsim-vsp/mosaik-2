@@ -6,8 +6,8 @@ import lombok.extern.log4j.Log4j2;
 import org.matsim.api.core.v01.Coord;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.mosaik2.palm.PalmCsvOutput;
+import org.matsim.mosaik2.palm.PalmStaticDriverReader;
 import org.matsim.mosaik2.raster.DoubleRaster;
-import ucar.ma2.InvalidRangeException;
 import ucar.nc2.NetcdfFiles;
 
 import java.io.IOException;
@@ -34,17 +34,13 @@ public class PalmChemistryInput2Csv {
 		log.info("trying to find origin from static driver file. ");
 		try (var staticDriverFile = NetcdfFiles.open(staticDriver.toString())) {
 
-			var eastingVar = staticDriverFile.findVariable("E_UTM");
-			var northingVar = staticDriverFile.findVariable("N_UTM");
-
-			var originY = eastingVar.read(new int[]{0, 0}, new int[]{1, 1}).getFloat(0);
-			var originX = northingVar.read(new int[]{0, 0}, new int[]{1, 1}).getFloat(0);
-			var origin = new Coord(originX, originY);
+			var raster = PalmStaticDriverReader.createTarget(staticDriverFile);
+			var origin = new Coord(raster.getBounds().getMinX(), raster.getBounds().getMinY());
 
 			log.info("Origin is at: " + origin);
 
 			run(input, output, species, origin);
-		} catch (IOException | InvalidRangeException e) {
+		} catch (IOException e) {
 			throw new RuntimeException(e);
 		}
 	}

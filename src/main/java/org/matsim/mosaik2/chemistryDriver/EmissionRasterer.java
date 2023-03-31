@@ -56,7 +56,7 @@ public class EmissionRasterer {
 			result.getTimeBin(startTime);
 		}
 
-		result.getTimeBins().parallelStream().forEach(resultBin -> {
+		result.getTimeBins().forEach(resultBin -> {
 
 			var bin = timeBinMap.getTimeBin(resultBin.getStartTime());
 			log.info("Processing time slice: " + bin.getStartTime());

@@ -3,11 +3,11 @@ library(tidyverse)
 
 # read palm data
 print("read palm data")
-palm_data <- read_csv("C:/Users/janekdererste/repos/runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/palm-output/no-outlier-NO2.xyt.csv")
+palm_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/palm-output/no-outlier-NO2.xyt.csv")
 
 # read matsim smoothing data
 print("read matsim data")
-matsim_data <- read_csv("C:/Users/janekdererste/Documents/work/palm/berlin_with_geometry_attributes/output/berlin-with-geometry-attributes.outpute_emission_raster_NO2_r50.xyt.csv")
+matsim_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/output/berlin-with-geometry-attributes.output_no2_smoothed_rastered.xyt.csv")
 # join the data on time, x, y so that we get the following tibble | time | x | y | palm | matsim |
 joined <- palm_data %>%
   inner_join(matsim_data, by = c("x", "y", "time"), suffix = c("-palm", "-matsim")) %>%

@@ -50,6 +50,9 @@ public class RunChemistryConverter {
     @Parameter(names = {"--rm", "--raster-method"})
     private String rasterMethod = "WithLaneWidth";
 
+    @Parameter(names = {"--ib", "--ignore-buildings"})
+    private boolean ignoreBuildings = false;
+
     public static void main(String[] args) {
 
         var converter = new RunChemistryConverter();
@@ -60,6 +63,12 @@ public class RunChemistryConverter {
     private void convert() {
 
         var buildings = PalmStaticDriverReader.read(Paths.get(staticDriver), "buildings_2d");
+
+        // set a negative height for all raster tiles. This is the same as no buildings
+        if (ignoreBuildings) {
+            buildings.setValueForEachIndex((xi, yi) -> -9999);
+        }
+
         var names = PollutantToPalmNameConverter.createForSpecies(species);
         var dateTime = LocalDateTime.parse(date);
         var transformation = createTransformation(crsTransformation);

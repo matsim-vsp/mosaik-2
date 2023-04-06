@@ -24,110 +24,125 @@ import java.util.Set;
 @Log4j2
 public class CalculateLinkExposure {
 
-	private final Path exposureFile;
-	private final Path outputFile;
+    private final Path exposureFile;
+    private final Path outputFile;
 
-	private final Network network;
-	private final ObjectRaster<Set<Id<Link>>> linkCache;
+    private final Network network;
 
-	private final double r;
+    private final Method method;
+    private final ObjectRaster<Set<Id<Link>>> linkCache;
 
-	public CalculateLinkExposure(InputArgs args) {
-		this(Paths.get(args.exposureFile), Paths.get(args.networkFile), Paths.get(args.outputFile), args.r);
-	}
+    private final double r;
 
-	public CalculateLinkExposure(Path exposureFile, Path networkFile, Path outputFile, double r) {
+    public CalculateLinkExposure(InputArgs args) {
+        this(Paths.get(args.exposureFile), Paths.get(args.networkFile), Paths.get(args.outputFile), args.r, args.method);
+    }
 
-		var info = PalmCsvOutput.readDataInfo(exposureFile);
-		network = CalculateRValues.loadNetwork(networkFile.toString(), info.getRasterInfo().getBounds().toGeometry());
-		//linkCache = CalculateRValues.createCache(network, info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());\
-		log.info("Create spatial index");
-		var linkIndex = new SpatialIndex(network, r * 5, info.getRasterInfo().getBounds().toGeometry());
-		linkCache = new ObjectRaster<>(info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());
-		log.info("Creating raster cache with link ids");
-		linkCache.setValueForEachCoordinate(linkIndex::query);
-		this.exposureFile = exposureFile;
-		this.r = r;
-		this.outputFile = outputFile;
-	}
+    public CalculateLinkExposure(Path exposureFile, Path networkFile, Path outputFile, double r, Method method) {
 
-	public static void main(String[] args) {
+        var info = PalmCsvOutput.readDataInfo(exposureFile);
+        network = CalculateRValues.loadNetwork(networkFile.toString(), info.getRasterInfo().getBounds().toGeometry());
+        //linkCache = CalculateRValues.createCache(network, info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());\
+        log.info("Create spatial index");
+        var linkIndex = new SpatialIndex(network, r * 5, info.getRasterInfo().getBounds().toGeometry());
+        linkCache = new ObjectRaster<>(info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());
+        log.info("Creating raster cache with link ids");
+        linkCache.setValueForEachCoordinate(linkIndex::query);
+        this.exposureFile = exposureFile;
+        this.r = r;
+        this.outputFile = outputFile;
+        this.method = method;
+    }
 
-		var input = new InputArgs();
-		JCommander.newBuilder().addObject(input).build().parse(args);
-		new CalculateLinkExposure(input).run();
-	}
+    public static void main(String[] args) {
 
-	void run() {
+        var input = new InputArgs();
+        JCommander.newBuilder().addObject(input).build().parse(args);
+        new CalculateLinkExposure(input).run();
+    }
 
-		var exposureData = PalmCsvOutput.read(exposureFile);
-		var result = new TimeBinMap<Object2DoubleMap<Id<Link>>>(exposureData.getBinSize());
+    void run() {
 
-		log.info("Starting to calculate exposure values for links");
+        var dataInfo = PalmCsvOutput.readDataInfo(exposureFile);
+        var exposureData = PalmCsvOutput.read(exposureFile, dataInfo);
+        var result = new TimeBinMap<Object2DoubleMap<Id<Link>>>(exposureData.getBinSize());
 
-		// populate result map, so that we can work on the bins in parallel
-		for (var bin : exposureData.getTimeBins()) {
-			result.getTimeBin(bin.getStartTime()).computeIfAbsent(Object2DoubleOpenHashMap::new);
-		}
+        log.info("Starting to calculate exposure values for links");
 
-		exposureData.getTimeBins().parallelStream().forEach(bin -> {
-			log.info("Calculating exposure values for Time Slice: [" + bin.getStartTime() + ", " + (bin.getStartTime() + exposureData.getBinSize()) + "]");
-			var exposurePerLink = result
-					.getTimeBin(bin.getStartTime())
-					.getValue();
-			var exposureSlice = bin.getValue();
-			exposureSlice.forEachCoordinate((x, y, value) -> {
+        // populate result map, so that we can work on the bins in parallel
+        for (var bin : exposureData.getTimeBins()) {
+            result.getTimeBin(bin.getStartTime()).computeIfAbsent(Object2DoubleOpenHashMap::new);
+        }
 
-				if (value <= 0.0) return; // no need to do anything here.
+        var cellSize = dataInfo.getRasterInfo().getCellSize();
+        var cellVolume = cellSize * cellSize * cellSize;
 
-				var linkIds = linkCache.getValueByCoord(x, y);
-				linkIds.stream()
-						.map(id -> network.getLinks().get(id))
-						.forEach(link -> {
-							var weight = NumericSmoothingRadiusEstimate.calculateWeight(
-									link.getFromNode().getCoord(),
-									link.getToNode().getCoord(),
-									new Coord(x, y),
-									link.getLength(),
-									r
-							);
-							if (weight > 0.0) {
-								var exposureImpact = value * weight;
-								exposurePerLink.mergeDouble(link.getId(), exposureImpact, Double::sum);
-							}
-						});
-			});
-		});
+        exposureData.getTimeBins().parallelStream().forEach(bin -> {
+            log.info("Calculating impact values for Time Slice: [" + bin.getStartTime() + ", " + (bin.getStartTime() + exposureData.getBinSize()) + "]");
+            var exposurePerLink = result
+                    .getTimeBin(bin.getStartTime())
+                    .getValue();
+            var exposureSlice = bin.getValue();
+            exposureSlice.forEachCoordinate((x, y, value) -> {
 
-		log.info("Finished Calculation");
+                if (value <= 0.0) return; // no need to do anything here.
 
-		log.info("Writing to : " + outputFile);
-		try (var writer = Files.newBufferedWriter(outputFile);
-			 var printer = new CSVPrinter(writer, Utils.createWriteFormat("time", "id", "exposureImpact"))) {
+                var linkIds = linkCache.getValueByCoord(x, y);
+                linkIds.stream()
+                        .map(id -> network.getLinks().get(id))
+                        .forEach(link -> {
+                            var weight = NumericSmoothingRadiusEstimate.calculateWeight(
+                                    link.getFromNode().getCoord(),
+                                    link.getToNode().getCoord(),
+                                    new Coord(x, y),
+                                    link.getLength(),
+                                    r
+                            );
+                            if (weight > 0.0) {
+                                var impactValue = value * weight;
+                                exposurePerLink.mergeDouble(link.getId(), impactValue, Double::sum);
+                            }
+                        });
+            });
+        });
 
-			for (var bin : result.getTimeBins()) {
+        log.info("Finished Calculation");
 
-				var time = bin.getStartTime();
-				for (var entry : bin.getValue().object2DoubleEntrySet()) {
-					var id = entry.getKey();
-					var exposureImpact = entry.getDoubleValue();
-					printer.printRecord(time, id, exposureImpact);
-				}
-			}
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
-	}
+        log.info("Writing to : " + outputFile);
+        var valueHeader = method.equals(Method.Concentrations) ? "emissions [g/m3]" : "exposure-impact [g*s]";
+        try (var writer = Files.newBufferedWriter(outputFile);
+             var printer = new CSVPrinter(writer, Utils.createWriteFormat("id", "time", valueHeader))) {
 
-	private static class InputArgs {
+            for (var bin : result.getTimeBins()) {
 
-		@Parameter(names = "-e", required = true)
-		public String exposureFile;
-		@Parameter(names = "-n", required = true)
-		public String networkFile;
-		@Parameter(names = "-o", required = true)
-		public String outputFile;
-		@Parameter(names = "-r", required = true)
-		public double r;
-	}
+                var time = bin.getStartTime();
+                for (var entry : bin.getValue().object2DoubleEntrySet()) {
+                    var id = entry.getKey();
+                    var exposureImpact = entry.getDoubleValue();
+                    printer.printRecord(id, time, exposureImpact);
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static class InputArgs {
+
+        @Parameter(names = "-e", required = true)
+        public String exposureFile;
+        @Parameter(names = "-n", required = true)
+        public String networkFile;
+        @Parameter(names = "-o", required = true)
+        public String outputFile;
+        @Parameter(names = "-r", required = true)
+        public double r;
+        @Parameter(names = "-m")
+        public Method method = Method.Concentrations;
+    }
+
+    static enum Method {
+        Concentrations,
+        Exposures
+    }
 }

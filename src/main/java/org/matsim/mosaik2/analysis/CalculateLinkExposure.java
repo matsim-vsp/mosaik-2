@@ -12,7 +12,7 @@ import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.mosaik2.Utils;
-import org.matsim.mosaik2.palm.PalmCsvOutput;
+import org.matsim.mosaik2.palm.XYTValueCsvData;
 import org.matsim.mosaik2.raster.ObjectRaster;
 
 import java.io.IOException;
@@ -40,7 +40,7 @@ public class CalculateLinkExposure {
 
     public CalculateLinkExposure(Path exposureFile, Path networkFile, Path outputFile, double r, Method method) {
 
-        var info = PalmCsvOutput.readDataInfo(exposureFile);
+        var info = XYTValueCsvData.readDataInfo(exposureFile);
         network = CalculateRValues.loadNetwork(networkFile.toString(), info.getRasterInfo().getBounds().toGeometry());
         //linkCache = CalculateRValues.createCache(network, info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());\
         log.info("Create spatial index");
@@ -63,8 +63,8 @@ public class CalculateLinkExposure {
 
     void run() {
 
-        var dataInfo = PalmCsvOutput.readDataInfo(exposureFile);
-        var exposureData = PalmCsvOutput.read(exposureFile, dataInfo);
+        var dataInfo = XYTValueCsvData.readDataInfo(exposureFile);
+        var exposureData = XYTValueCsvData.read(exposureFile, dataInfo);
         var result = new TimeBinMap<Object2DoubleMap<Id<Link>>>(exposureData.getBinSize());
 
         log.info("Starting to calculate exposure values for links");

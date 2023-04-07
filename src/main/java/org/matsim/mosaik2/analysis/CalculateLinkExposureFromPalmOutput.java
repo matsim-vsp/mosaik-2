@@ -2,21 +2,27 @@ package org.matsim.mosaik2.analysis;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
+import it.unimi.dsi.fastutil.objects.Object2DoubleArrayMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.lang3.StringUtils;
+import org.matsim.api.core.v01.Coord;
+import org.matsim.api.core.v01.Id;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.mosaik2.DoubleToDoubleFunction;
 import org.matsim.mosaik2.palm.PalmMergedOutputReader;
 import org.matsim.mosaik2.raster.DoubleRaster;
+import org.matsim.mosaik2.raster.ObjectRaster;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static org.matsim.mosaik2.Utils.createWriteFormat;
@@ -42,20 +48,100 @@ public class CalculateLinkExposureFromPalmOutput {
                 .limit(inputArgs.numFileParts)
                 .toList();
 
-        var allEmissions = PalmMergedOutputReader.readFiles(files, inputArgs.species);
         // this might be worth writing to either csv or netcdf
+        var allEmissions = PalmMergedOutputReader.readFiles(files, inputArgs.species);
 
         // we only want the second day
         var secondDayEmissions = getSecondDayInLocalTime(allEmissions, inputArgs.startTime, inputArgs.utcOffset);
         convertToSiUnits(secondDayEmissions);
-        writeToCsv(getDay2CSVPath(inputArgs.root, inputArgs.palmRunId), secondDayEmissions, inputArgs.species);
+        writePalmOutputToCsv(getDay2CSVPath(inputArgs.root, inputArgs.palmRunId), secondDayEmissions, inputArgs.species);
 
         // calculate link contributions to pollution
+        var network = CalculateRValues.loadNetwork(inputArgs.networkFile, allEmissions.getTimeBins().iterator().next().getValue().values().iterator().next().getBounds().toGeometry());
+        var linkContributions = calculateLinkContributions(secondDayEmissions, network);
 
-
+        writeLinkContributionsToCsv(Paths.get(inputArgs.root).resolve("link-contributions.csv"), linkContributions, inputArgs.species);
     }
 
-    private static void writeToCsv(Path output, TimeBinMap<Map<String, DoubleRaster>> data, Collection<String> species) {
+    private static TimeBinMap<Map<Id<Link>, LinkValue>> calculateLinkContributions(TimeBinMap<Map<String, DoubleRaster>> data, Network network) {
+
+        // assuming we have at least one time bin with one raster.
+        var exampleRaster = data.getTimeBins().iterator().next().getValue().values().iterator().next();
+
+        var linkIndex = new SpatialIndex(network, 250, exampleRaster.getBounds().toGeometry());
+        ObjectRaster<Set<Id<Link>>> linkCache = new ObjectRaster<>(exampleRaster.getBounds(), exampleRaster.getCellSize());
+        log.info("Creating raster cache with link ids");
+        linkCache.setValueForEachCoordinate(linkIndex::query);
+
+        var result = new TimeBinMap<Map<Id<Link>, LinkValue>>(data.getBinSize());
+        for (var bin : data.getTimeBins()) {
+            result.getTimeBin(bin.getStartTime()).computeIfAbsent(HashMap::new);
+        }
+
+        data.getTimeBins().parallelStream().forEach(bin -> {
+
+            log.info("Calculating link contributions for time step: " + bin.getStartTime());
+            var resultBin = result.getTimeBin(bin.getStartTime());
+            for (var speciesEntry : bin.getValue().entrySet()) {
+
+                exampleRaster.forEachCoordinate((x, y, exampleValue) -> {
+
+                    if (exampleValue <= 0.) return; // nothing to do here
+
+                    var value = speciesEntry.getValue().getValueByCoord(x, y);
+                    var linkIds = linkCache.getValueByCoord(x, y);
+                    linkIds.stream()
+                            .map(id -> network.getLinks().get(id))
+                            .forEach(link -> {
+
+                                var weight = NumericSmoothingRadiusEstimate.calculateWeight(
+                                        link.getFromNode().getCoord(),
+                                        link.getToNode().getCoord(),
+                                        new Coord(x, y),
+                                        link.getLength(),
+                                        50 // TODO make configurable
+                                );
+                                if (weight > 0.0) {
+                                    var impactValue = value * weight;
+                                    resultBin.getValue().computeIfAbsent(link.getId(), _id -> new LinkValue()).addValue(speciesEntry.getKey(), impactValue);
+                                }
+                            });
+                });
+            }
+        });
+        return result;
+    }
+
+    private static void writeLinkContributionsToCsv(Path output, TimeBinMap<Map<Id<Link>, LinkValue>> data, Collection<String> species) {
+
+        log.info("Writing link contributions to : " + output);
+
+        var header = new java.util.ArrayList<>(List.of("id", "time"));
+        header.addAll(species);
+
+        try (var writer = Files.newBufferedWriter(output);
+             var printer = new CSVPrinter(writer, createWriteFormat(header.toArray(new String[0])))) {
+
+            for (var bin : data.getTimeBins()) {
+
+                var time = bin.getStartTime();
+                for (var entry : bin.getValue().entrySet()) {
+                    var id = entry.getKey();
+                    printer.print(id);
+                    printer.print(time);
+                    for (var speciesName : species) {
+                        var value = entry.getValue().get(speciesName);
+                        printer.print(value);
+                    }
+                    printer.println();
+                }
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static void writePalmOutputToCsv(Path output, TimeBinMap<Map<String, DoubleRaster>> data, Collection<String> species) {
         log.info("Writing t,x,y,value data to: " + output);
 
         // assuming we have at least one time bin with one raster.
@@ -71,7 +157,7 @@ public class CalculateLinkExposureFromPalmOutput {
 
                 rasterToIterate.forEachCoordinate((x, y, value) -> {
                     if (value < 0) return; // this means this raster point is a building
-                    
+
                     print(printer, time);
                     print(printer, x);
                     print(printer, y);
@@ -128,13 +214,14 @@ public class CalculateLinkExposureFromPalmOutput {
     private static TimeBinMap<Map<String, DoubleRaster>> getSecondDayInLocalTime(TimeBinMap<Map<String, DoubleRaster>> source, double startTime, double utcOffset) {
 
         log.info("Converting time bins into local time. Utc Offset is: " + utcOffset + " Taking only time slices after " + startTime);
-        TimeBinMap<Map<String, DoubleRaster>> result = new TimeBinMap<>(source.getBinSize(), startTime);
+        TimeBinMap<Map<String, DoubleRaster>> result = new TimeBinMap<>(source.getBinSize());
 
         for (var bin : source.getTimeBins()) {
             var localTime = utcToLocalTimeWithWrapAround(bin.getStartTime(), utcOffset);
+            var localTimeFromStart = localTime - startTime;
 
             if (localTime >= startTime) {
-                result.getTimeBin(localTime).setValue(bin.getValue());
+                result.getTimeBin(localTimeFromStart).setValue(bin.getValue());
             }
         }
         return result;
@@ -182,6 +269,19 @@ public class CalculateLinkExposureFromPalmOutput {
         return localTime >= 176400 ? localTime - 86400 : localTime;
     }
 
+    @RequiredArgsConstructor
+    private static class LinkValue {
+
+        private final Object2DoubleMap<String> values = new Object2DoubleArrayMap<>();
+
+        void addValue(String species, double value) {
+            values.mergeDouble(species, value, Double::sum);
+        }
+
+        double get(String species) {
+            return values.getDouble(species);
+        }
+    }
 
     @SuppressWarnings({"FieldMayBeFinal", "unused"})
     static class InputArgs {
@@ -192,8 +292,8 @@ public class CalculateLinkExposureFromPalmOutput {
         @Parameter(names = "-root", required = true)
         private String root;
 
-        // @Parameter(names = "-network", required = true)
-        // private String networkFile;
+        @Parameter(names = "-network", required = true)
+        private String networkFile;
 
         @Parameter(names = "-numFileParts")
         private int numFileParts = 5;

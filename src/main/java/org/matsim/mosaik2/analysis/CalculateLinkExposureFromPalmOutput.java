@@ -13,6 +13,12 @@ import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.contrib.roadpricing.RoadPricingScheme;
+import org.matsim.contrib.roadpricing.RoadPricingSchemeImpl;
+import org.matsim.contrib.roadpricing.RoadPricingUtils;
+import org.matsim.contrib.roadpricing.RoadPricingWriterXMLv1;
+import org.matsim.core.config.ConfigUtils;
+import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.mosaik2.DoubleToDoubleFunction;
 import org.matsim.mosaik2.palm.PalmMergedOutputReader;
 import org.matsim.mosaik2.raster.DoubleRaster;
@@ -33,12 +39,13 @@ public class CalculateLinkExposureFromPalmOutput {
     private static final String AV_MASKED_PALM_TEMPLATE = "%s_av_masked_M01.%s.nc";
     private static final String AV_MASKED_DAY2_CSV_TEMPLATE = "%s_av_masked_M01.day2-si-units.xyt.csv";
 
+    private static final String TOLL_OUTPUT_TEMPLATE = "%s_.day2-link-tolls.xml";
+
     public static void main(String[] args) {
 
         var inputArgs = new InputArgs();
         JCommander.newBuilder().addObject(inputArgs).build().parse(args);
         run(inputArgs);
-
     }
 
     private static void run(InputArgs inputArgs) {
@@ -60,7 +67,8 @@ public class CalculateLinkExposureFromPalmOutput {
         var network = CalculateRValues.loadNetwork(inputArgs.networkFile, allEmissions.getTimeBins().iterator().next().getValue().values().iterator().next().getBounds().toGeometry());
         var linkContributions = calculateLinkContributions(secondDayEmissions, network);
 
-        writeLinkContributionsToCsv(Paths.get(inputArgs.root).resolve("link-contributions.csv"), linkContributions, inputArgs.species);
+        //writeLinkContributionsToCsv(Paths.get(inputArgs.root).resolve("link-contributions.csv"), linkContributions, inputArgs.species);
+        writeLinkContributionsToTollXml(getTollOutputPath(inputArgs.root, inputArgs.palmRunId), linkContributions, network);
     }
 
     private static TimeBinMap<Map<Id<Link>, LinkValue>> calculateLinkContributions(TimeBinMap<Map<String, DoubleRaster>> data, Network network) {
@@ -139,6 +147,54 @@ public class CalculateLinkExposureFromPalmOutput {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    private static void writeLinkContributionsToTollXml(Path output, TimeBinMap<Map<Id<Link>, LinkValue>> data, Network network) {
+
+        log.info("Writing link tolls to : " + output);
+
+        RoadPricingSchemeImpl scheme = RoadPricingUtils.addOrGetMutableRoadPricingScheme(ScenarioUtils.createScenario(ConfigUtils.createConfig()));
+        RoadPricingUtils.setType(scheme, RoadPricingScheme.TOLL_TYPE_LINK);
+        RoadPricingUtils.setName(scheme, "Toll_from_PALM");
+        RoadPricingUtils.setDescription(scheme, "Tolls are calculated from concentrations retrieved from a PALM simulation run.");
+        var volume = 1000; // this should be flexible but our showcase grid is 10x10x10=1000m3
+
+        for (var bin : data.getTimeBins()) {
+
+            var time = bin.getStartTime();
+            for (var linkEntry : bin.getValue().entrySet()) {
+
+                var id = linkEntry.getKey();
+                var linkLength = network.getLinks().get(id).getLength();
+
+                var tollOverAllSpecies = linkEntry.getValue().values.object2DoubleEntrySet().stream()
+                        .mapToDouble(entry -> calculateTollForSpecies(entry, volume, linkLength))
+                        .sum();
+
+                RoadPricingUtils.addLinkSpecificCost(scheme, id, time, time + data.getBinSize(), tollOverAllSpecies);
+            }
+        }
+
+        // write the scheme to a file
+        RoadPricingWriterXMLv1 writer1 = new RoadPricingWriterXMLv1(scheme);
+        writer1.writeFile(output.toString());
+    }
+
+    private static double calculateTollForSpecies(Object2DoubleMap.Entry<String> speciesEntry, final double volume, final double linkLength) {
+        var factor = getCostFactor(speciesEntry.getKey());
+        var value = speciesEntry.getDoubleValue();
+        // value is [g/m3] so do [g/m3] * [m3] * 1 * / m = g/m
+        return value * volume * factor / linkLength;
+    }
+
+    private static double getCostFactor(String species) {
+        // factors from “Handbook on the External Costs of Transport, Version 2019.” https://paperpile.com/app/p/9cd641c8-bb39-0cf0-a9ab-9b4fe386282c
+        // Table 14 (p54, ff.) Germany in €/kg. All factors divided by 1000 to get €/g
+        return switch (species) {
+            case "NO2" -> 36.8 / 1000; // NOx transport city
+            case "PM10" -> 39.6 / 1000; // PM10 average
+            default -> throw new RuntimeException("No cost factor defined for species: " + species);
+        };
     }
 
     private static void writePalmOutputToCsv(Path output, TimeBinMap<Map<String, DoubleRaster>> data, Collection<String> species) {
@@ -238,6 +294,11 @@ public class CalculateLinkExposureFromPalmOutput {
 
     private static Path getDay2CSVPath(String root, String runId) {
         var name = String.format(AV_MASKED_DAY2_CSV_TEMPLATE, runId);
+        return Paths.get(root).resolve(name);
+    }
+
+    private static Path getTollOutputPath(String root, String runId) {
+        var name = String.format(TOLL_OUTPUT_TEMPLATE, runId);
         return Paths.get(root).resolve(name);
     }
 

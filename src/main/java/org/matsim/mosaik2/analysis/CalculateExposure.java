@@ -38,188 +38,188 @@ import java.util.List;
 @AllArgsConstructor
 public class CalculateExposure {
 
-    private final Path palmPath;
-    private final Path eventsData;
-    private final Path outputPath;
+	private final Path palmPath;
+	private final Path eventsData;
+	private final Path outputPath;
 
-    public static void main(String[] args) {
+	public static void main(String[] args) {
 
-        var inputArgs = new InputArgs();
-        JCommander.newBuilder().addObject(inputArgs).build().parse(args);
-        new CalculateExposure(
-                Paths.get(inputArgs.palmData), Paths.get(inputArgs.eventsData), Paths.get(inputArgs.outputPath)
-        ).run();
-    }
+		var inputArgs = new InputArgs();
+		JCommander.newBuilder().addObject(inputArgs).build().parse(args);
+		new CalculateExposure(
+				Paths.get(inputArgs.palmData), Paths.get(inputArgs.eventsData), Paths.get(inputArgs.outputPath)
+		).run();
+	}
 
-    private static double getStartTime(Activity activity) {
-        if (activity.getStartTime().isDefined()) return activity.getStartTime().seconds();
-        if (activity.getEndTime().isDefined() && activity.getMaximumDuration().isDefined())
-            return activity.getEndTime().seconds() - activity.getMaximumDuration().seconds();
+	public static double getStartTime(Activity activity) {
+		if (activity.getStartTime().isDefined()) return activity.getStartTime().seconds();
+		if (activity.getEndTime().isDefined() && activity.getMaximumDuration().isDefined())
+			return activity.getEndTime().seconds() - activity.getMaximumDuration().seconds();
 
-        // we don't really know the start time. use 0 here, since we assume that most simulations start no earlier than 0 seconds
-        return Double.NEGATIVE_INFINITY;
-    }
+		// we don't really know the start time. use 0 here, since we assume that most simulations start no earlier than 0 seconds
+		return Double.NEGATIVE_INFINITY;
+	}
 
-    private static double getEndTime(Activity activity) {
-        if (activity.getEndTime().isDefined()) return activity.getEndTime().seconds();
-        if (activity.getStartTime().isDefined() && activity.getMaximumDuration().isDefined())
-            return activity.getStartTime().seconds() + activity.getMaximumDuration().seconds();
+	public static double getEndTime(Activity activity) {
+		if (activity.getEndTime().isDefined()) return activity.getEndTime().seconds();
+		if (activity.getStartTime().isDefined() && activity.getMaximumDuration().isDefined())
+			return activity.getStartTime().seconds() + activity.getMaximumDuration().seconds();
 
-        // we don't really know the end time. Treat as if activity would last forever
-        return Double.POSITIVE_INFINITY;
-    }
+		// we don't really know the end time. Treat as if activity would last forever
+		return Double.POSITIVE_INFINITY;
+	}
 
-    private static SimpleFeatureType getFeatureType() {
-        var b = new SimpleFeatureTypeBuilder();
-        b.setName("movement");
-        b.add("agentId", String.class);
-        b.add("the_geom", LineString.class);
-        try {
-            b.setCRS(CRS.decode("EPSG:25833"));
-        } catch (FactoryException e) {
-            throw new RuntimeException(e);
-        }
-        return b.buildFeatureType();
-    }
+	private static SimpleFeatureType getFeatureType() {
+		var b = new SimpleFeatureTypeBuilder();
+		b.setName("movement");
+		b.add("agentId", String.class);
+		b.add("the_geom", LineString.class);
+		try {
+			b.setCRS(CRS.decode("EPSG:25833"));
+		} catch (FactoryException e) {
+			throw new RuntimeException(e);
+		}
+		return b.buildFeatureType();
+	}
 
-    private static SimpleFeature createFeature(Coord from, Coord to, Id<Person> agentId, int featureId, GeometryFactory f, SimpleFeatureBuilder b) {
-        var line = f.createLineString(new Coordinate[]{
-                MGC.coord2Coordinate(from),
-                MGC.coord2Coordinate(to)
-        });
-        var feature = b.buildFeature(Integer.toString(featureId));
-        feature.setAttribute("agentId", agentId.toString());
-        feature.setAttribute("the_geom", line); // somehow setDefaultGeometry won't do the trick. This internal string works though 🙄
-        return feature;
-    }
+	private static SimpleFeature createFeature(Coord from, Coord to, Id<Person> agentId, int featureId, GeometryFactory f, SimpleFeatureBuilder b) {
+		var line = f.createLineString(new Coordinate[]{
+				MGC.coord2Coordinate(from),
+				MGC.coord2Coordinate(to)
+		});
+		var feature = b.buildFeature(Integer.toString(featureId));
+		feature.setAttribute("agentId", agentId.toString());
+		feature.setAttribute("the_geom", line); // somehow setDefaultGeometry won't do the trick. This internal string works though 🙄
+		return feature;
+	}
 
-    private static void addActToRaster(ObjectRaster<Tile> raster, Coord tileCoord, Activity act) {
-        var tile = raster.getValueByCoord(tileCoord.getX(), tileCoord.getY());
-        if (tile == null) {
-            tile = new Tile();
-            raster.setValueForCoord(tileCoord.getX(), tileCoord.getY(), tile);
-        }
-        tile.add(act);
-    }
+	private static void addActToRaster(ObjectRaster<Tile> raster, Coord tileCoord, Activity act) {
+		var tile = raster.getValueByCoord(tileCoord.getX(), tileCoord.getY());
+		if (tile == null) {
+			tile = new Tile();
+			raster.setValueForCoord(tileCoord.getX(), tileCoord.getY(), tile);
+		}
+		tile.add(act);
+	}
 
-    private static Path getMovementDataPath(Path exposureOutput) {
+	private static Path getMovementDataPath(Path exposureOutput) {
 
-        var name = exposureOutput.getFileName().toString();
-        name = name.substring(0, name.lastIndexOf('.'));
-        var shapeFileName = name + ".shp";
-        return exposureOutput.resolveSibling(shapeFileName);
-    }
+		var name = exposureOutput.getFileName().toString();
+		name = name.substring(0, name.lastIndexOf('.'));
+		var shapeFileName = name + ".shp";
+		return exposureOutput.resolveSibling(shapeFileName);
+	}
 
-    void run() {
+	void run() {
 
-        var dataInfo = XYTValueCsvData.readDataInfo(palmPath);
-        var palmData = XYTValueCsvData.read(palmPath, dataInfo);
+		var dataInfo = XYTValueCsvData.readDataInfo(palmPath);
+		var palmData = XYTValueCsvData.read(palmPath, dataInfo);
 
-        log.info("Create Spacial Index.");
-        // create spacial index for palmdata
-        QuadTree<Coord> index = new QuadTree<>(
-                dataInfo.getRasterInfo().getBounds().getMinX(),
-                dataInfo.getRasterInfo().getBounds().getMinY(),
-                dataInfo.getRasterInfo().getBounds().getMaxX(),
-                dataInfo.getRasterInfo().getBounds().getMaxY()
-        );
+		log.info("Create Spacial Index.");
+		// create spacial index for palmdata
+		QuadTree<Coord> index = new QuadTree<>(
+				dataInfo.getRasterInfo().getBounds().getMinX(),
+				dataInfo.getRasterInfo().getBounds().getMinY(),
+				dataInfo.getRasterInfo().getBounds().getMaxX(),
+				dataInfo.getRasterInfo().getBounds().getMaxY()
+		);
 
-        // use the 9am raster since this is our peak hour. This means the most of the raster points
-        // which will ever receive concentration values will have a value here.
-        // don't use a building filter explicitly, since the palm data has a more coarse resolution of
-        // buildings than what we receive from OSM. This is a bit hacky but will do.
-        var nineAmRaster = palmData.getTimeBin(9 * 3600).getValue();
-        nineAmRaster.forEachCoordinate((x, y, value) -> {
-            if (value >= 0.0)
-                index.put(x, y, new Coord(x, y));
-        });
-        var activityRaster = new ObjectRaster<Tile>(dataInfo.getRasterInfo().getBounds(), dataInfo.getRasterInfo().getCellSize());
+		// use the 9am raster since this is our peak hour. This means the most of the raster points
+		// which will ever receive concentration values will have a value here.
+		// don't use a building filter explicitly, since the palm data has a more coarse resolution of
+		// buildings than what we receive from OSM. This is a bit hacky but will do.
+		var nineAmRaster = palmData.getTimeBin(9 * 3600).getValue();
+		nineAmRaster.forEachCoordinate((x, y, value) -> {
+			if (value >= 0.0)
+				index.put(x, y, new Coord(x, y));
+		});
+		var activityRaster = new ObjectRaster<Tile>(dataInfo.getRasterInfo().getBounds(), dataInfo.getRasterInfo().getCellSize());
 
-        log.info("Map all activities onto raster tiles for which PALM calculated a concentration value.");
-        var fact = new GeometryFactory();
-        var featureBuilder = new SimpleFeatureBuilder(getFeatureType());
-        List<SimpleFeature> lines = new ArrayList<>();
-        var events2Activities = new EventsToActivities();
-        events2Activities.addActivityHandler(act -> {
+		log.info("Map all activities onto raster tiles for which PALM calculated a concentration value.");
+		var fact = new GeometryFactory();
+		var featureBuilder = new SimpleFeatureBuilder(getFeatureType());
+		List<SimpleFeature> lines = new ArrayList<>();
+		var events2Activities = new EventsToActivities();
+		events2Activities.addActivityHandler(act -> {
 
-            if (activityRaster.getBounds().covers(act.getActivity().getCoord()) && !act.getActivity().getType().contains(" interaction")) {
-                // find the closes raster tile for which PALM has created emissions (not in buildings)
-                var closestTile = index.getClosest(act.getActivity().getCoord().getX(), act.getActivity().getCoord().getY());
-                // For Debugging: Create a line between activity and tile
-                lines.add(createFeature(act.getActivity().getCoord(), closestTile, act.getAgentId(), lines.size(), fact, featureBuilder));
-                // put the activity into the corresponding raster tile.
-                addActToRaster(activityRaster, closestTile, act.getActivity());
-            }
-        });
-        var manager = EventsUtils.createEventsManager();
-        manager.addHandler(events2Activities);
-        // this actually invokes the events parsing and the sorting activities into tiles method above
-        EventsUtils.readEvents(manager, eventsData.toString());
-        events2Activities.finish(); // this is necessary to flush activities with end time undefined
+			if (activityRaster.getBounds().covers(act.getActivity().getCoord()) && !act.getActivity().getType().contains(" interaction")) {
+				// find the closes raster tile for which PALM has created emissions (not in buildings)
+				var closestTile = index.getClosest(act.getActivity().getCoord().getX(), act.getActivity().getCoord().getY());
+				// For Debugging: Create a line between activity and tile
+				lines.add(createFeature(act.getActivity().getCoord(), closestTile, act.getAgentId(), lines.size(), fact, featureBuilder));
+				// put the activity into the corresponding raster tile.
+				addActToRaster(activityRaster, closestTile, act.getActivity());
+			}
+		});
+		var manager = EventsUtils.createEventsManager();
+		manager.addHandler(events2Activities);
+		// this actually invokes the events parsing and the sorting activities into tiles method above
+		EventsUtils.readEvents(manager, eventsData.toString());
+		events2Activities.finish(); // this is necessary to flush activities with end time undefined
 
-        // write the feature list after all activities are parsed
-        ShapeFileWriter.writeGeometries(lines, getMovementDataPath(outputPath).toString());
+		// write the feature list after all activities are parsed
+		ShapeFileWriter.writeGeometries(lines, getMovementDataPath(outputPath).toString());
 
-        log.info("Start exposure calculation");
-        var resultMap = new TimeBinMap<DoubleRaster>(palmData.getBinSize(), palmData.getStartTime());
-        for (var bin : palmData.getTimeBins()) {
+		log.info("Start exposure calculation");
+		var resultMap = new TimeBinMap<DoubleRaster>(palmData.getBinSize(), palmData.getStartTime());
+		for (var bin : palmData.getTimeBins()) {
 
-            var exposureRaster = new DoubleRaster(dataInfo.getRasterInfo().getBounds(), dataInfo.getRasterInfo().getCellSize());
-            var emissions = bin.getValue();
-            var startTime = bin.getStartTime();
-            var endTime = startTime + palmData.getBinSize();
+			var exposureRaster = new DoubleRaster(dataInfo.getRasterInfo().getBounds(), dataInfo.getRasterInfo().getCellSize());
+			var emissions = bin.getValue();
+			var startTime = bin.getStartTime();
+			var endTime = startTime + palmData.getBinSize();
 
-            log.info("Calculating Exposure for time slice: [" + startTime + ", " + endTime + "]");
-            exposureRaster.setValueForEachIndex((xi, yi) -> {
-                var tile = activityRaster.getValueByIndex(xi, yi);
-                if (tile == null) return -1;
+			log.info("Calculating Exposure for time slice: [" + startTime + ", " + endTime + "]");
+			exposureRaster.setValueForEachIndex((xi, yi) -> {
+				var tile = activityRaster.getValueByIndex(xi, yi);
+				if (tile == null) return -1;
 
-                var spentTime = tile.calculateSpentTime(startTime, endTime);
-                var concentration = emissions.getValueByIndex(xi, yi);
-                return spentTime * concentration; // this is the exposure value
-            });
+				var spentTime = tile.calculateSpentTime(startTime, endTime);
+				var concentration = emissions.getValueByIndex(xi, yi);
+				return spentTime * concentration; // this is the exposure value
+			});
 
-            resultMap.getTimeBin(startTime).setValue(exposureRaster);
-        }
-        log.info("Finished exposure calculation.");
-        XYTValueCsvData.write(outputPath, resultMap);
-    }
+			resultMap.getTimeBin(startTime).setValue(exposureRaster);
+		}
+		log.info("Finished exposure calculation.");
+		XYTValueCsvData.write(outputPath, resultMap);
+	}
 
-    private static class InputArgs {
-        @Parameter(names = "-palmData", required = true)
-        private String palmData;
+	private static class InputArgs {
+		@Parameter(names = "-palmData", required = true)
+		private String palmData;
 
-        @Parameter(names = "-eventsData", required = true)
-        private String eventsData;
+		@Parameter(names = "-eventsData", required = true)
+		private String eventsData;
 
-        @Parameter(names = "-output", required = true)
-        private String outputPath;
+		@Parameter(names = "-output", required = true)
+		private String outputPath;
 
-        private InputArgs() {
-        }
-    }
+		private InputArgs() {
+		}
+	}
 
-    // make package private for testing
-    @Getter
-    static class Tile {
+	// make package private for testing
+	@Getter
+	static class Tile {
 
-        private final Collection<Activity> activities = new ArrayList<>();
+		private final Collection<Activity> activities = new ArrayList<>();
 
-        void add(Activity activity) {
-            activities.add(activity);
-        }
+		void add(Activity activity) {
+			activities.add(activity);
+		}
 
-        double calculateSpentTime(double fromTime, double toTime) {
+		double calculateSpentTime(double fromTime, double toTime) {
 
-            return activities.stream()
-                    .filter(act -> getStartTime(act) < toTime)
-                    .filter(act -> getEndTime(act) > fromTime)
-                    .mapToDouble(act -> {
-                        var start = Math.max(fromTime, getStartTime(act));
-                        var end = Math.min(toTime, getEndTime(act));
-                        return end - start;
-                    })
-                    .sum();
-        }
-    }
+			return activities.stream()
+					.filter(act -> getStartTime(act) < toTime)
+					.filter(act -> getEndTime(act) > fromTime)
+					.mapToDouble(act -> {
+						var start = Math.max(fromTime, getStartTime(act));
+						var end = Math.min(toTime, getEndTime(act));
+						return end - start;
+					})
+					.sum();
+		}
+	}
 }

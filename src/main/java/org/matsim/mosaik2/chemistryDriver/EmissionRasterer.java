@@ -99,7 +99,11 @@ public class EmissionRasterer {
 			geometries.add(cell);
 		});
 
-		SpatialIndex<Coordinate> index = new SpatialIndex<>(geometries, g -> g.getCentroid().getCoordinate());
+		var itemCollection = geometries.stream()
+				.map(g -> new SpatialIndex.GeometryItem<>(g.getCentroid().getCoordinate(), g))
+				.collect(Collectors.toSet());
+
+		SpatialIndex<Coordinate> index = new SpatialIndex<>(itemCollection);
 
 		log.info("Create geometries for links.");
 		var bufferdLinks = network.getLinks().values().stream()

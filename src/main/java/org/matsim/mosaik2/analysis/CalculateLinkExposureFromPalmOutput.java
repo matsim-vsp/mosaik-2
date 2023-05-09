@@ -79,10 +79,10 @@ public class CalculateLinkExposureFromPalmOutput {
 		// assuming we have at least one time bin with one raster.
 		var exampleRaster = data.getTimeBins().iterator().next().getValue().values().iterator().next();
 
-		var linkIndex = new SpatialIndex(network, 250, exampleRaster.getBounds().toGeometry());
+		var linkIndex = org.matsim.mosaik2.SpatialIndex.create(network, 250, exampleRaster.getBounds().toGeometry());
 		ObjectRaster<Set<Id<Link>>> linkCache = new ObjectRaster<>(exampleRaster.getBounds(), exampleRaster.getCellSize());
 		log.info("Creating raster cache with link ids");
-		linkCache.setValueForEachCoordinate(linkIndex::query);
+		linkCache.setValueForEachCoordinate(linkIndex::intersects);
 
 		var result = new TimeBinMap<Map<Id<Link>, LinkValue>>(data.getBinSize());
 		for (var bin : data.getTimeBins()) {

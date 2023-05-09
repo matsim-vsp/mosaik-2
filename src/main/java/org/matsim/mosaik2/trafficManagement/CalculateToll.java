@@ -21,13 +21,16 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 @Log4j2
-public class CalculateLinkExposureFromPalmOutput {
+public class CalculateToll {
 
 	private static final String AV_MASKED_PALM_TEMPLATE = "%s_av_masked_M01.%s.nc";
 	private static final String AV_MASKED_DAY2_CSV_TEMPLATE = "%s_av_masked_M01.day2-si-units.xyt.csv";
-	private static final String TOLL_OUTPUT_TEMPLATE = "%s.day2-link-tolls.xml";
-	private static final String TOLL_OUTPUT_CSV_TEMPLATE = "%s.day2-link-tolls.csv";
-	private static final String CONTRIBUTION_CSV_TEMPLATE = "%s.day2-link-contributions.csv";
+	private static final String CONCENTRATION_TOLL_OUTPUT_TEMPLATE = "%s.day2-link-concentration-tolls.xml";
+	private static final String EXPOSURE_TOLL_OUTPUT_TEMPLATE = "%s.day2-link-exposure-tolls.xml";
+	private static final String CONCENTRATION_TOLL_OUTPUT_CSV_TEMPLATE = "%s.day2-link-concentration-tolls.csv";
+	private static final String EXPOSURE_TOLL_OUTPUT_CSV_TEMPLATE = "%s.day2-link-exposure-tolls.csv";
+	private static final String CONCENTRATION_CONTRIBUTION_CSV_TEMPLATE = "%s.day2-link-concentration-contributions.csv";
+	private static final String EXPOSURE_CONTRIBUTION_CSV_TEMPLATE = "%s.day2-link-exposure-contributions.csv";
 
 	public static void main(String[] args) {
 
@@ -56,9 +59,17 @@ public class CalculateLinkExposureFromPalmOutput {
 		var linkContributions = LinkContributions.calculate(secondDayEmissions, network);
 
 		var scheme = LinkContributions.createRoadPricingScheme(linkContributions, inputArgs.scaleFactor);
-		LinkContributions.writeToCsv(getContributionsPath(inputArgs.root, inputArgs.palmRunId), linkContributions, inputArgs.species);
-		new RoadPricingWriterXMLv1(scheme).writeFile(getTollOutputPath(inputArgs.root, inputArgs.palmRunId).toString());
-		writeTollToCsv(getTollCsvOutputPath(inputArgs.root, inputArgs.palmRunId), scheme, linkContributions);
+		LinkContributions.writeToCsv(getConcentrationContributionsPath(inputArgs.root, inputArgs.palmRunId), linkContributions, inputArgs.species);
+		new RoadPricingWriterXMLv1(scheme).writeFile(getConcentrationTollOutputPath(inputArgs.root, inputArgs.palmRunId).toString());
+		writeTollToCsv(getConcentrationTollCsvOutputPath(inputArgs.root, inputArgs.palmRunId), scheme, linkContributions);
+
+		// calculate link contributions to exposure
+		var exposureData = ActivityExposure.calculate(Paths.get(inputArgs.eventsFile), secondDayEmissions);
+		var exposureContributions = LinkContributions.calculate(exposureData, network);
+		var exposureScheme = LinkContributions.createRoadPricingScheme(exposureContributions, inputArgs.scaleFactor);
+		LinkContributions.writeToCsv(getExposureContributionsPath(inputArgs.root, inputArgs.palmRunId), exposureContributions, inputArgs.species);
+		new RoadPricingWriterXMLv1(exposureScheme).writeFile(getExposureTollOutputPath(inputArgs.root, inputArgs.palmRunId).toString());
+		writeTollToCsv(getExposureTollCsvOutputPath(inputArgs.root, inputArgs.palmRunId), scheme, exposureContributions);
 	}
 
 	private static <T> void writeTollToCsv(Path output, RoadPricingSchemeImpl scheme, TimeBinMap<T> timeBinMap) {
@@ -152,18 +163,33 @@ public class CalculateLinkExposureFromPalmOutput {
 		return Paths.get(root).resolve(name);
 	}
 
-	private static Path getTollOutputPath(String root, String runId) {
-		var name = String.format(TOLL_OUTPUT_TEMPLATE, runId);
+	private static Path getConcentrationTollOutputPath(String root, String runId) {
+		var name = String.format(CONCENTRATION_TOLL_OUTPUT_TEMPLATE, runId);
 		return Paths.get(root).resolve(name);
 	}
 
-	private static Path getTollCsvOutputPath(String root, String runId) {
-		var name = String.format(TOLL_OUTPUT_CSV_TEMPLATE, runId);
+	private static Path getConcentrationTollCsvOutputPath(String root, String runId) {
+		var name = String.format(CONCENTRATION_TOLL_OUTPUT_CSV_TEMPLATE, runId);
 		return Paths.get(root).resolve(name);
 	}
 
-	private static Path getContributionsPath(String root, String runId) {
-		var name = String.format(CONTRIBUTION_CSV_TEMPLATE, runId);
+	private static Path getConcentrationContributionsPath(String root, String runId) {
+		var name = String.format(CONCENTRATION_CONTRIBUTION_CSV_TEMPLATE, runId);
+		return Paths.get(root).resolve(name);
+	}
+
+	private static Path getExposureTollOutputPath(String root, String runId) {
+		var name = String.format(CONCENTRATION_TOLL_OUTPUT_TEMPLATE, runId);
+		return Paths.get(root).resolve(name);
+	}
+
+	private static Path getExposureTollCsvOutputPath(String root, String runId) {
+		var name = String.format(CONCENTRATION_TOLL_OUTPUT_CSV_TEMPLATE, runId);
+		return Paths.get(root).resolve(name);
+	}
+
+	private static Path getExposureContributionsPath(String root, String runId) {
+		var name = String.format(CONCENTRATION_CONTRIBUTION_CSV_TEMPLATE, runId);
 		return Paths.get(root).resolve(name);
 	}
 
@@ -206,6 +232,9 @@ public class CalculateLinkExposureFromPalmOutput {
 
 		@Parameter(names = "-network", required = true)
 		private String networkFile;
+
+		@Parameter(names = "-events", required = true)
+		private String eventsFile;
 
 		@Parameter(names = "-numFileParts")
 		private int numFileParts = 5;

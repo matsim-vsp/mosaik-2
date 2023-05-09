@@ -111,7 +111,7 @@ public class NumericSmoothingRadiusEstimate {
 				.sum();
 	}
 
-	static double calculateWeight(final Coord from, final Coord to, final Coord receiverPoint, final double le, final double R) {
+	public static double calculateWeight(final Coord from, final Coord to, final Coord receiverPoint, final double le, final double R) {
 
 		double A = calculateA(from, receiverPoint);
 		double B = calculateB(from, to, receiverPoint);

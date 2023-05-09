@@ -66,6 +66,7 @@ public class CalculateToll {
 		// calculate link contributions to exposure
 		var exposureData = ActivityExposure.calculate(Paths.get(inputArgs.eventsFile), secondDayEmissions);
 		var exposureContributions = LinkContributions.calculate(exposureData, network);
+		//TODO this is perhaps not using the right cost factors
 		var exposureScheme = LinkContributions.createRoadPricingScheme(exposureContributions, inputArgs.scaleFactor);
 		LinkContributions.writeToCsv(getExposureContributionsPath(inputArgs.root, inputArgs.palmRunId), exposureContributions, inputArgs.species);
 		new RoadPricingWriterXMLv1(exposureScheme).writeFile(getExposureTollOutputPath(inputArgs.root, inputArgs.palmRunId).toString());
@@ -179,17 +180,17 @@ public class CalculateToll {
 	}
 
 	private static Path getExposureTollOutputPath(String root, String runId) {
-		var name = String.format(CONCENTRATION_TOLL_OUTPUT_TEMPLATE, runId);
+		var name = String.format(EXPOSURE_TOLL_OUTPUT_TEMPLATE, runId);
 		return Paths.get(root).resolve(name);
 	}
 
 	private static Path getExposureTollCsvOutputPath(String root, String runId) {
-		var name = String.format(CONCENTRATION_TOLL_OUTPUT_CSV_TEMPLATE, runId);
+		var name = String.format(EXPOSURE_TOLL_OUTPUT_CSV_TEMPLATE, runId);
 		return Paths.get(root).resolve(name);
 	}
 
 	private static Path getExposureContributionsPath(String root, String runId) {
-		var name = String.format(CONCENTRATION_CONTRIBUTION_CSV_TEMPLATE, runId);
+		var name = String.format(EXPOSURE_CONTRIBUTION_CSV_TEMPLATE, runId);
 		return Paths.get(root).resolve(name);
 	}
 

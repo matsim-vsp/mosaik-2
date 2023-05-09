@@ -18,7 +18,6 @@ import org.matsim.core.scoring.EventsToActivities;
 import org.matsim.core.scoring.PersonExperiencedActivity;
 import org.matsim.core.utils.collections.QuadTree;
 import org.matsim.core.utils.geometry.geotools.MGC;
-import org.matsim.mosaik2.raster.AbstractRaster;
 import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.mosaik2.raster.ObjectRaster;
 import org.opengis.feature.simple.SimpleFeature;
@@ -35,7 +34,7 @@ public class ActivityExposure {
 
 		var exampleRaster = emissions.getTimeBins().iterator().next().getValue().values().iterator().next();
 		var events2Act = new EventsToActivities();
-		var actHandler = new Handler(exampleRaster.getBounds(), exampleRaster.getCellSize());
+		var actHandler = new Handler(exampleRaster);
 		events2Act.addActivityHandler(actHandler);
 		var manager = EventsUtils.createEventsManager();
 		manager.addHandler(events2Act);
@@ -86,14 +85,19 @@ public class ActivityExposure {
 
 		private final List<SimpleFeature> lines = new ArrayList<>();
 
-		Handler(AbstractRaster.Bounds bounds, double cellSize) {
-			this.activityRaster = new ObjectRaster<>(bounds, cellSize);
+		Handler(DoubleRaster streets) {
+			this.activityRaster = new ObjectRaster<>(streets.getBounds(), streets.getCellSize());
 			this.spatialIndex = new QuadTree<>(
-					bounds.getMinX(),
-					bounds.getMinY(),
-					bounds.getMaxX(),
-					bounds.getMaxY()
+					streets.getBounds().getMinX(),
+					streets.getBounds().getMinY(),
+					streets.getBounds().getMaxX(),
+					streets.getBounds().getMaxY()
 			);
+			streets.forEachCoordinate((x, y, value) -> {
+				if (value >= 0.0) {
+					spatialIndex.put(x, y, new Coord(x, y));
+				}
+			});
 		}
 
 		@Override

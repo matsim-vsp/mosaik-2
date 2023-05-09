@@ -41,7 +41,7 @@ public class CalculateLinkExposure {
 	public CalculateLinkExposure(Path exposureFile, Path networkFile, Path outputFile, double r, Method method) {
 
 		var info = XYTValueCsvData.readDataInfo(exposureFile);
-		network = CalculateRValues.loadNetwork(networkFile.toString(), info.getRasterInfo().getBounds().toGeometry());
+		network = Utils.loadFilteredNetwork(networkFile.toString(), info.getRasterInfo().getBounds().toGeometry());
 		//linkCache = CalculateRValues.createCache(network, info.getRasterInfo().getBounds(), info.getRasterInfo().getCellSize());\
 		log.info("Create spatial index");
 		var linkIndex = org.matsim.mosaik2.SpatialIndex.create(network, r * 5, info.getRasterInfo().getBounds().toGeometry());

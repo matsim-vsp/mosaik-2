@@ -20,6 +20,7 @@ import org.matsim.contrib.roadpricing.RoadPricingWriterXMLv1;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.scenario.ScenarioUtils;
 import org.matsim.mosaik2.DoubleToDoubleFunction;
+import org.matsim.mosaik2.Utils;
 import org.matsim.mosaik2.palm.PalmMergedOutputReader;
 import org.matsim.mosaik2.raster.DoubleRaster;
 import org.matsim.mosaik2.raster.ObjectRaster;
@@ -65,7 +66,7 @@ public class CalculateLinkExposureFromPalmOutput {
 		writePalmOutputToCsv(getDay2CSVPath(inputArgs.root, inputArgs.palmRunId), secondDayEmissions, inputArgs.species);
 
 		// calculate link contributions to pollution
-		var network = CalculateRValues.loadNetwork(inputArgs.networkFile, allEmissions.getTimeBins().iterator().next().getValue().values().iterator().next().getBounds().toGeometry());
+		var network = Utils.loadFilteredNetwork(inputArgs.networkFile, allEmissions.getTimeBins().iterator().next().getValue().values().iterator().next().getBounds().toGeometry());
 		var linkContributions = calculateLinkContributions(secondDayEmissions, network);
 
 		var scheme = createRoadPricingSchemeBasedOnLinkContributions(linkContributions, inputArgs.scaleFactor);

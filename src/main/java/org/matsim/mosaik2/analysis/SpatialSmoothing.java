@@ -15,6 +15,7 @@ import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.utils.gis.ShapeFileReader;
 import org.matsim.mosaik2.DoubleToDoubleFunction;
+import org.matsim.mosaik2.Utils;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
 import org.matsim.mosaik2.chemistryDriver.PollutantToPalmNameConverter;
 import org.matsim.mosaik2.palm.XYTValueCsvData;
@@ -116,7 +117,7 @@ public class SpatialSmoothing {
 		var palmInfo = XYTValueCsvData.readDataInfo(palmFile);
 		var bounds = createAlignedBounds(berlinBounds, palmInfo.getRasterInfo().getBounds(), palmInfo.getRasterInfo().getCellSize());
 
-		var network = CalculateRValues.loadNetwork(networkPath.toString(), berlinGeometry);
+		var network = Utils.loadFilteredNetwork(networkPath.toString(), berlinGeometry);
 
 		log.info("Creating spatial link index");
 		// with a distance of 3*r, 99% of emissions of a link get distributet into the raster.

@@ -1,5 +1,6 @@
 package org.matsim.mosaik2.trafficManagement;
 
+import com.google.common.util.concurrent.AtomicDouble;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
@@ -30,160 +31,170 @@ import java.util.*;
 @Log4j2
 public class ActivityExposure {
 
-	public static TimeBinMap<Map<String, DoubleRaster>> calculate(Path eventsFile, TimeBinMap<Map<String, DoubleRaster>> emissions) {
+    public static TimeBinMap<Map<String, DoubleRaster>> calculate(Path eventsFile, TimeBinMap<Map<String, DoubleRaster>> emissions) {
 
-		var exampleRaster = emissions.getTimeBins().iterator().next().getValue().values().iterator().next();
-		var events2Act = new EventsToActivities();
-		var actHandler = new Handler(exampleRaster);
-		events2Act.addActivityHandler(actHandler);
-		var manager = EventsUtils.createEventsManager();
-		manager.addHandler(events2Act);
-		EventsUtils.readEvents(manager, eventsFile.toString());
-		events2Act.finish();
+        var exampleRaster = emissions.getTimeBins().iterator().next().getValue().values().iterator().next();
+        var events2Act = new EventsToActivities();
+        var actHandler = new Handler(exampleRaster);
+        events2Act.addActivityHandler(actHandler);
+        var manager = EventsUtils.createEventsManager();
+        manager.addHandler(events2Act);
+        EventsUtils.readEvents(manager, eventsFile.toString());
+        events2Act.finish();
 
-		log.info("Start exposure calculation");
+        log.info("Start exposure calculation");
 
-		var resultMap = new TimeBinMap<Map<String, DoubleRaster>>(emissions.getBinSize(), emissions.getStartTime());
-		for (var bin : emissions.getTimeBins()) {
+        var resultMap = new TimeBinMap<Map<String, DoubleRaster>>(emissions.getBinSize(), emissions.getStartTime());
+        for (var bin : emissions.getTimeBins()) {
 
-			var emissionsBySpecies = bin.getValue();
-			var startTime = bin.getStartTime();
-			var endTime = startTime + emissions.getBinSize();
-			Map<String, DoubleRaster> timeSliceData = new HashMap<>();
+            var emissionsBySpecies = bin.getValue();
+            var startTime = bin.getStartTime();
+            var endTime = startTime + emissions.getBinSize();
+            Map<String, DoubleRaster> timeSliceData = new HashMap<>();
 
-			log.info("Calculating Exposure for time slice: [" + startTime + ", " + endTime + "]");
-			for (var entry : emissionsBySpecies.entrySet()) {
+            log.info("Calculating Exposure for time slice: [" + startTime + ", " + endTime + "]");
+            for (var entry : emissionsBySpecies.entrySet()) {
 
-				var concentrations = entry.getValue();
-				var species = entry.getKey();
-				var exposures = new DoubleRaster(concentrations.getBounds(), concentrations.getCellSize());
-				exposures.setValueForEachIndex((xi, yi) -> {
-					var tile = actHandler.activityRaster.getValueByIndex(xi, yi);
-					if (tile == null) return -1;
+                var concentrations = entry.getValue();
+                var species = entry.getKey();
+                var exposures = new DoubleRaster(concentrations.getBounds(), concentrations.getCellSize());
+                var sum = new AtomicDouble(0);
+                exposures.setValueForEachIndex((xi, yi) -> {
+                    var tile = actHandler.activityRaster.getValueByIndex(xi, yi);
+                    if (tile == null) return -1;
 
-					var spentTime = tile.calculateSpentTime(startTime, endTime);
-					var concentration = concentrations.getValueByIndex(xi, yi);
-					return spentTime * concentration;
-				});
-				timeSliceData.put(species, exposures);
-			}
-			resultMap.getTimeBin(bin.getStartTime()).setValue(timeSliceData);
-		}
-		log.info("Finished exposure calculation.");
-		return resultMap;
-	}
+                    var spentTime = tile.calculateSpentTime(startTime, endTime);
+                    var concentration = concentrations.getValueByIndex(xi, yi);
+                    var exposureValue = spentTime * concentration;
+                    sum.accumulateAndGet(exposureValue, Double::sum);
+                    return exposureValue;
+                });
 
-	static class Handler implements EventsToActivities.ActivityHandler {
+                // accroding to https://paperpile.com/app/p/997831e1-3265-0603-ad6c-d483bd4e6b9d we need to normalize the
+                // exposure by average person seconds. We divide each expsoure value by the average exposure value over all
+                // cells for each time slice.
+                var average = sum.doubleValue() / exposures.getXLength() * exposures.getYLength();
+                exposures.setValueForEachIndex((xi, yi) -> exposures.getValueByIndex(xi, yi) / average);
 
-		private static final GeometryFactory gf = new GeometryFactory();
+                timeSliceData.put(species, exposures);
+            }
+            resultMap.getTimeBin(bin.getStartTime()).setValue(timeSliceData);
+        }
+        log.info("Finished exposure calculation.");
+        return resultMap;
+    }
 
-		private static final SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(getFeatureType());
-		private final ObjectRaster<Tile> activityRaster;
+    static class Handler implements EventsToActivities.ActivityHandler {
 
-		// use matsim quad tree because it has getClosest
-		private final QuadTree<Coord> spatialIndex;
+        private static final GeometryFactory gf = new GeometryFactory();
 
-		private final List<SimpleFeature> lines = new ArrayList<>();
+        private static final SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(getFeatureType());
+        private final ObjectRaster<Tile> activityRaster;
 
-		Handler(DoubleRaster streets) {
-			this.activityRaster = new ObjectRaster<>(streets.getBounds(), streets.getCellSize());
-			this.spatialIndex = new QuadTree<>(
-					streets.getBounds().getMinX(),
-					streets.getBounds().getMinY(),
-					streets.getBounds().getMaxX(),
-					streets.getBounds().getMaxY()
-			);
-			streets.forEachCoordinate((x, y, value) -> {
-				if (value >= 0.0) {
-					spatialIndex.put(x, y, new Coord(x, y));
-				}
-			});
-		}
+        // use matsim quad tree because it has getClosest
+        private final QuadTree<Coord> spatialIndex;
 
-		@Override
-		public void handleActivity(PersonExperiencedActivity expAct) {
-			if (activityRaster.getBounds().covers(expAct.getActivity().getCoord()) && !expAct.getActivity().getType().contains(" interaction")) {
+        private final List<SimpleFeature> lines = new ArrayList<>();
 
-				var act = expAct.getActivity();
-				var closest = spatialIndex.getClosest(act.getCoord().getX(), act.getCoord().getY());
-				lines.add(createFeature(act.getCoord(), closest, expAct.getAgentId(), lines.size()));
-				addActToRaster(closest, act);
-			}
-		}
+        Handler(DoubleRaster streets) {
+            this.activityRaster = new ObjectRaster<>(streets.getBounds(), streets.getCellSize());
+            this.spatialIndex = new QuadTree<>(
+                    streets.getBounds().getMinX(),
+                    streets.getBounds().getMinY(),
+                    streets.getBounds().getMaxX(),
+                    streets.getBounds().getMaxY()
+            );
+            streets.forEachCoordinate((x, y, value) -> {
+                if (value >= 0.0) {
+                    spatialIndex.put(x, y, new Coord(x, y));
+                }
+            });
+        }
 
-		private void addActToRaster(Coord tileCoord, Activity act) {
-			var tile = activityRaster.getValueByCoord(tileCoord.getX(), tileCoord.getY());
-			if (tile == null) {
-				tile = new Tile();
-				activityRaster.setValueForCoord(tileCoord.getX(), tileCoord.getY(), tile);
-			}
-			tile.add(act);
-		}
+        @Override
+        public void handleActivity(PersonExperiencedActivity expAct) {
+            if (activityRaster.getBounds().covers(expAct.getActivity().getCoord()) && !expAct.getActivity().getType().contains(" interaction")) {
 
-		private static SimpleFeature createFeature(Coord from, Coord to, Id<Person> agentId, int featureId) {
-			var line = gf.createLineString(new Coordinate[]{
-					MGC.coord2Coordinate(from),
-					MGC.coord2Coordinate(to)
-			});
-			var feature = featureBuilder.buildFeature(Integer.toString(featureId));
-			feature.setAttribute("agentId", agentId.toString());
-			feature.setAttribute("the_geom", line); // somehow setDefaultGeometry won't do the trick. This internal string works though 🙄
-			return feature;
-		}
+                var act = expAct.getActivity();
+                var closest = spatialIndex.getClosest(act.getCoord().getX(), act.getCoord().getY());
+                lines.add(createFeature(act.getCoord(), closest, expAct.getAgentId(), lines.size()));
+                addActToRaster(closest, act);
+            }
+        }
 
-		private static SimpleFeatureType getFeatureType() {
-			var b = new SimpleFeatureTypeBuilder();
-			b.setName("movement");
-			b.add("agentId", String.class);
-			b.add("the_geom", LineString.class);
-			try {
-				b.setCRS(CRS.decode("EPSG:25833"));
-			} catch (FactoryException e) {
-				throw new RuntimeException(e);
-			}
-			return b.buildFeatureType();
-		}
-	}
+        private void addActToRaster(Coord tileCoord, Activity act) {
+            var tile = activityRaster.getValueByCoord(tileCoord.getX(), tileCoord.getY());
+            if (tile == null) {
+                tile = new Tile();
+                activityRaster.setValueForCoord(tileCoord.getX(), tileCoord.getY(), tile);
+            }
+            tile.add(act);
+        }
 
-	// make package private for testing
-	@Getter
-	static class Tile {
+        private static SimpleFeature createFeature(Coord from, Coord to, Id<Person> agentId, int featureId) {
+            var line = gf.createLineString(new Coordinate[]{
+                    MGC.coord2Coordinate(from),
+                    MGC.coord2Coordinate(to)
+            });
+            var feature = featureBuilder.buildFeature(Integer.toString(featureId));
+            feature.setAttribute("agentId", agentId.toString());
+            feature.setAttribute("the_geom", line); // somehow setDefaultGeometry won't do the trick. This internal string works though 🙄
+            return feature;
+        }
 
-		private final Collection<Activity> activities = new ArrayList<>();
+        private static SimpleFeatureType getFeatureType() {
+            var b = new SimpleFeatureTypeBuilder();
+            b.setName("movement");
+            b.add("agentId", String.class);
+            b.add("the_geom", LineString.class);
+            try {
+                b.setCRS(CRS.decode("EPSG:25833"));
+            } catch (FactoryException e) {
+                throw new RuntimeException(e);
+            }
+            return b.buildFeatureType();
+        }
+    }
 
-		void add(Activity activity) {
-			activities.add(activity);
-		}
+    // make package private for testing
+    @Getter
+    static class Tile {
 
-		double calculateSpentTime(double fromTime, double toTime) {
+        private final Collection<Activity> activities = new ArrayList<>();
 
-			return activities.stream()
-					.filter(act -> getStartTime(act) < toTime)
-					.filter(act -> getEndTime(act) > fromTime)
-					.mapToDouble(act -> {
-						var start = Math.max(fromTime, getStartTime(act));
-						var end = Math.min(toTime, getEndTime(act));
-						return end - start;
-					})
-					.sum();
-		}
-	}
+        void add(Activity activity) {
+            activities.add(activity);
+        }
 
-	public static double getStartTime(Activity activity) {
-		if (activity.getStartTime().isDefined()) return activity.getStartTime().seconds();
-		if (activity.getEndTime().isDefined() && activity.getMaximumDuration().isDefined())
-			return activity.getEndTime().seconds() - activity.getMaximumDuration().seconds();
+        double calculateSpentTime(double fromTime, double toTime) {
 
-		// we don't really know the start time. use 0 here, since we assume that most simulations start no earlier than 0 seconds
-		return Double.NEGATIVE_INFINITY;
-	}
+            return activities.stream()
+                    .filter(act -> getStartTime(act) < toTime)
+                    .filter(act -> getEndTime(act) > fromTime)
+                    .mapToDouble(act -> {
+                        var start = Math.max(fromTime, getStartTime(act));
+                        var end = Math.min(toTime, getEndTime(act));
+                        return end - start;
+                    })
+                    .sum();
+        }
+    }
 
-	public static double getEndTime(Activity activity) {
-		if (activity.getEndTime().isDefined()) return activity.getEndTime().seconds();
-		if (activity.getStartTime().isDefined() && activity.getMaximumDuration().isDefined())
-			return activity.getStartTime().seconds() + activity.getMaximumDuration().seconds();
+    public static double getStartTime(Activity activity) {
+        if (activity.getStartTime().isDefined()) return activity.getStartTime().seconds();
+        if (activity.getEndTime().isDefined() && activity.getMaximumDuration().isDefined())
+            return activity.getEndTime().seconds() - activity.getMaximumDuration().seconds();
 
-		// we don't really know the end time. Treat as if activity would last forever
-		return Double.POSITIVE_INFINITY;
-	}
+        // we don't really know the start time. use 0 here, since we assume that most simulations start no earlier than 0 seconds
+        return Double.NEGATIVE_INFINITY;
+    }
+
+    public static double getEndTime(Activity activity) {
+        if (activity.getEndTime().isDefined()) return activity.getEndTime().seconds();
+        if (activity.getStartTime().isDefined() && activity.getMaximumDuration().isDefined())
+            return activity.getStartTime().seconds() + activity.getMaximumDuration().seconds();
+
+        // we don't really know the end time. Treat as if activity would last forever
+        return Double.POSITIVE_INFINITY;
+    }
 }

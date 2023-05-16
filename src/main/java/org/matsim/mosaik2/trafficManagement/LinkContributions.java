@@ -25,133 +25,132 @@ import java.util.*;
 @Log4j2
 public class LinkContributions {
 
-	public static TimeBinMap<Map<Id<Link>, LinkValue>> calculate(TimeBinMap<Map<String, DoubleRaster>> data, Network network) {
-		// assuming we have at least one time bin with one raster.
-		var exampleRaster = data.getTimeBins().iterator().next().getValue().values().iterator().next();
+    public static TimeBinMap<Map<Id<Link>, LinkValue>> calculate(TimeBinMap<Map<String, DoubleRaster>> data, Network network) {
+        // assuming we have at least one time bin with one raster.
+        var exampleRaster = data.getTimeBins().iterator().next().getValue().values().iterator().next();
 
-		var linkIndex = org.matsim.mosaik2.SpatialIndex.create(network, 250, exampleRaster.getBounds().toGeometry());
-		ObjectRaster<Set<Id<Link>>> linkCache = new ObjectRaster<>(exampleRaster.getBounds(), exampleRaster.getCellSize());
-		log.info("Creating raster cache with link ids");
-		linkCache.setValueForEachCoordinate(linkIndex::intersects);
+        var linkIndex = org.matsim.mosaik2.SpatialIndex.create(network, 250, exampleRaster.getBounds().toGeometry());
+        ObjectRaster<Set<Id<Link>>> linkCache = new ObjectRaster<>(exampleRaster.getBounds(), exampleRaster.getCellSize());
+        log.info("Creating raster cache with link ids");
+        linkCache.setValueForEachCoordinate(linkIndex::intersects);
 
-		var result = new TimeBinMap<Map<Id<Link>, LinkValue>>(data.getBinSize());
-		for (var bin : data.getTimeBins()) {
-			result.getTimeBin(bin.getStartTime()).computeIfAbsent(HashMap::new);
-		}
+        var result = new TimeBinMap<Map<Id<Link>, LinkValue>>(data.getBinSize());
+        for (var bin : data.getTimeBins()) {
+            result.getTimeBin(bin.getStartTime()).computeIfAbsent(HashMap::new);
+        }
 
-		data.getTimeBins().parallelStream().forEach(bin -> {
+        data.getTimeBins().parallelStream().forEach(bin -> {
 
-			log.info("Calculating link contributions for time step: " + bin.getStartTime());
-			var resultBin = result.getTimeBin(bin.getStartTime());
-			for (var speciesEntry : bin.getValue().entrySet()) {
+            log.info("Calculating link contributions for time step: " + bin.getStartTime());
+            var resultBin = result.getTimeBin(bin.getStartTime());
+            for (var speciesEntry : bin.getValue().entrySet()) {
 
-				exampleRaster.forEachCoordinate((x, y, exampleValue) -> {
+                exampleRaster.forEachCoordinate((x, y, exampleValue) -> {
 
-					if (exampleValue <= 0.) return; // nothing to do here
+                    if (exampleValue <= 0.) return; // nothing to do here
 
-					var value = speciesEntry.getValue().getValueByCoord(x, y);
-					var linkIds = linkCache.getValueByCoord(x, y);
-					linkIds.stream()
-							.map(id -> network.getLinks().get(id))
-							.forEach(link -> {
+                    var value = speciesEntry.getValue().getValueByCoord(x, y);
+                    var linkIds = linkCache.getValueByCoord(x, y);
+                    linkIds.stream()
+                            .map(id -> network.getLinks().get(id))
+                            .forEach(link -> {
 
-								var weight = NumericSmoothingRadiusEstimate.calculateWeight(
-										link.getFromNode().getCoord(),
-										link.getToNode().getCoord(),
-										new Coord(x, y),
-										link.getLength(),
-										50 // TODO make configurable
-								);
-								if (weight > 0.0) {
-									var impactValue = value * weight;
-									resultBin.getValue().computeIfAbsent(link.getId(), _id -> new LinkValue()).addValue(speciesEntry.getKey(), impactValue);
-								}
-							});
-				});
-			}
-		});
-		return result;
-	}
+                                var weight = NumericSmoothingRadiusEstimate.calculateWeight(
+                                        link.getFromNode().getCoord(),
+                                        link.getToNode().getCoord(),
+                                        new Coord(x, y),
+                                        link.getLength(),
+                                        50 // TODO make configurable
+                                );
+                                if (weight > 0.0) {
+                                    var impactValue = value * weight;
+                                    resultBin.getValue().computeIfAbsent(link.getId(), _id -> new LinkValue()).addValue(speciesEntry.getKey(), impactValue);
+                                }
+                            });
+                });
+            }
+        });
+        return result;
+    }
 
-	public static RoadPricingSchemeImpl createRoadPricingScheme(TimeBinMap<Map<Id<Link>, LinkValue>> data, double scaleFactor) {
-		log.info("Creating RoadPricingScheme");
+    public static RoadPricingSchemeImpl createRoadPricingScheme(TimeBinMap<Map<Id<Link>, LinkValue>> data, double volume, double scaleFactor) {
+        log.info("Creating RoadPricingScheme");
 
-		RoadPricingSchemeImpl scheme = RoadPricingUtils.addOrGetMutableRoadPricingScheme(ScenarioUtils.createScenario(ConfigUtils.createConfig()));
-		RoadPricingUtils.setType(scheme, RoadPricingScheme.TOLL_TYPE_LINK);
-		RoadPricingUtils.setName(scheme, "Toll_from_PALM");
-		RoadPricingUtils.setDescription(scheme, "Tolls are calculated from concentrations retrieved from a PALM simulation run.");
-		var volume = 1000; // this should be flexible but our showcase grid is 10x10x10=1000m3
+        RoadPricingSchemeImpl scheme = RoadPricingUtils.addOrGetMutableRoadPricingScheme(ScenarioUtils.createScenario(ConfigUtils.createConfig()));
+        RoadPricingUtils.setType(scheme, RoadPricingScheme.TOLL_TYPE_LINK);
+        RoadPricingUtils.setName(scheme, "Toll_from_PALM");
+        RoadPricingUtils.setDescription(scheme, "Tolls are calculated from concentrations retrieved from a PALM simulation run.");
 
-		for (var bin : data.getTimeBins()) {
+        for (var bin : data.getTimeBins()) {
 
-			var time = bin.getStartTime();
-			for (var linkEntry : bin.getValue().entrySet()) {
+            var time = bin.getStartTime();
+            for (var linkEntry : bin.getValue().entrySet()) {
 
-				var id = linkEntry.getKey();
+                var id = linkEntry.getKey();
 
-				var tollOverAllSpecies = linkEntry.getValue().values.object2DoubleEntrySet().stream()
-						.mapToDouble(entry -> calculateTollForSpecies(entry, volume))
-						.map(toll -> toll * scaleFactor)
-						.sum();
+                var tollOverAllSpecies = linkEntry.getValue().values.object2DoubleEntrySet().stream()
+                        .mapToDouble(entry -> calculateTollForSpecies(entry, volume))
+                        .map(toll -> toll * scaleFactor)
+                        .sum();
 
-				RoadPricingUtils.addLinkSpecificCost(scheme, id, time, time + data.getBinSize(), tollOverAllSpecies);
-			}
-		}
+                RoadPricingUtils.addLinkSpecificCost(scheme, id, time, time + data.getBinSize(), tollOverAllSpecies);
+            }
+        }
 
-		return scheme;
-	}
+        return scheme;
+    }
 
-	public static void writeToCsv(Path output, TimeBinMap<Map<Id<Link>, LinkValue>> data, Collection<String> species) {
+    public static void writeToCsv(Path output, TimeBinMap<Map<Id<Link>, LinkValue>> data, Collection<String> species) {
 
-		log.info("Writing link contributions to : " + output);
+        log.info("Writing link contributions to : " + output);
 
-		var header = new java.util.ArrayList<>(List.of("id", "time"));
-		header.addAll(species);
+        var header = new java.util.ArrayList<>(List.of("id", "time"));
+        header.addAll(species);
 
-		CSVUtils.writeTable(data.getTimeBins(), output, header, (p, bin) -> {
-			for (var entry : bin.getValue().entrySet()) {
-				var id = entry.getKey();
-				CSVUtils.print(p, id);
-				CSVUtils.print(p, bin.getStartTime());
-				for (var speciesName : species) {
-					var value = entry.getValue().get(speciesName);
-					CSVUtils.print(p, value);
-				}
-				CSVUtils.println(p);
-			}
-		});
-	}
+        CSVUtils.writeTable(data.getTimeBins(), output, header, (p, bin) -> {
+            for (var entry : bin.getValue().entrySet()) {
+                var id = entry.getKey();
+                CSVUtils.print(p, id);
+                CSVUtils.print(p, bin.getStartTime());
+                for (var speciesName : species) {
+                    var value = entry.getValue().get(speciesName);
+                    CSVUtils.print(p, value);
+                }
+                CSVUtils.println(p);
+            }
+        });
+    }
 
-	private static double calculateTollForSpecies(Object2DoubleMap.Entry<String> speciesEntry, final double volume) {
-		var factor = getCostFactor(speciesEntry.getKey());
-		var value = speciesEntry.getDoubleValue();
-		// value is [g/m3] so do [g/m3] * [m3] * [€/g] = €
-		// originally we thought we would have to divide by link length. However, the contribution value is already parameterized
-		// with regard to the link length. So, don't do it.
-		return value * volume * factor;
-	}
+    private static double calculateTollForSpecies(Object2DoubleMap.Entry<String> speciesEntry, final double volume) {
+        var factor = getCostFactor(speciesEntry.getKey());
+        var value = speciesEntry.getDoubleValue();
+        // value is [g/m3] so do [g/m3] * [m3] * [€/g] = €
+        // originally we thought we would have to divide by link length. However, the contribution value is already parameterized
+        // with regard to the link length. So, don't do it.
+        return value * volume * factor;
+    }
 
-	private static double getCostFactor(String species) {
-		// factors from “Handbook on the External Costs of Transport, Version 2019.” https://paperpile.com/app/p/9cd641c8-bb39-0cf0-a9ab-9b4fe386282c
-		// Table 14 (p54, ff.) Germany in €/kg. All factors divided by 1000 to get €/g
-		return switch (species) {
-			case "NO2" -> 36.8 / 1000; // NOx transport city
-			case "PM10" -> 39.6 / 1000; // PM10 average
-			default -> throw new RuntimeException("No cost factor defined for species: " + species);
-		};
-	}
+    private static double getCostFactor(String species) {
+        // factors from “Handbook on the External Costs of Transport, Version 2019.” https://paperpile.com/app/p/9cd641c8-bb39-0cf0-a9ab-9b4fe386282c
+        // Table 14 (p54, ff.) Germany in €/kg. All factors divided by 1000 to get €/g
+        return switch (species) {
+            case "NO2" -> 36.8 / 1000; // NOx transport city
+            case "PM10" -> 39.6 / 1000; // PM10 average
+            default -> throw new RuntimeException("No cost factor defined for species: " + species);
+        };
+    }
 
-	@RequiredArgsConstructor
-	private static class LinkValue {
+    @RequiredArgsConstructor
+    private static class LinkValue {
 
-		private final Object2DoubleMap<String> values = new Object2DoubleArrayMap<>();
+        private final Object2DoubleMap<String> values = new Object2DoubleArrayMap<>();
 
-		void addValue(String species, double value) {
-			values.mergeDouble(species, value, Double::sum);
-		}
+        void addValue(String species, double value) {
+            values.mergeDouble(species, value, Double::sum);
+        }
 
-		double get(String species) {
-			return values.getDouble(species);
-		}
-	}
+        double get(String species) {
+            return values.getDouble(species);
+        }
+    }
 }

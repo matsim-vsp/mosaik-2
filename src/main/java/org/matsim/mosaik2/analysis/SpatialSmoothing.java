@@ -2,7 +2,10 @@ package org.matsim.mosaik2.analysis;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
-import com.google.common.util.concurrent.AtomicDouble;
+import it.unimi.dsi.fastutil.doubles.AbstractDoubleList;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.objects.Object2DoubleArrayMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.locationtech.jts.geom.Geometry;
@@ -11,11 +14,13 @@ import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.application.options.ShpOptions;
 import org.matsim.contrib.analysis.time.TimeBinMap;
+import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.utils.gis.ShapeFileReader;
 import org.matsim.mosaik2.DoubleToDoubleFunction;
 import org.matsim.mosaik2.Utils;
+import org.matsim.mosaik2.analysis.run.CSVUtils;
 import org.matsim.mosaik2.chemistryDriver.AggregateEmissionsByTimeHandler;
 import org.matsim.mosaik2.chemistryDriver.PollutantToPalmNameConverter;
 import org.matsim.mosaik2.palm.XYTValueCsvData;
@@ -26,16 +31,13 @@ import org.opengis.referencing.operation.TransformException;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 @Log4j2
 @RequiredArgsConstructor
 public class SpatialSmoothing {
 
-	private final String species;
+	private final List<String> species;
 	private final Path emissionEvents;
 	private final Path networkPath;
 	private final Path boundsFile;
@@ -47,23 +49,27 @@ public class SpatialSmoothing {
 	private final int timeBinSize;
 	private final double scaleFactor;
 
-	private final DoubleToDoubleFunction fittingFunction;
+	//private final DoubleToDoubleFunction fittingFunction;
 
 	public static void main(String[] args) throws FactoryException, TransformException {
 
 		var inputArgs = new InputArgs();
 		JCommander.newBuilder().addObject(inputArgs).build().parse(args);
 
-		var fittingFunction = getFittingFunction(inputArgs.species, inputArgs.fitting);
+		//var fittingFunction = getFittingFunction(inputArgs.species, inputArgs.fitting);
 
 		new SpatialSmoothing(
 				inputArgs.species, inputArgs.emissionEvents, inputArgs.networkPath, inputArgs.boundsFile, inputArgs.buildingsFile,
-				inputArgs.palmFile, inputArgs.outputFile, inputArgs.r, inputArgs.cellSize, inputArgs.timeBinSize, inputArgs.scaleFactor,
-				fittingFunction
+				inputArgs.palmFile, inputArgs.outputFile, inputArgs.r, inputArgs.cellSize, inputArgs.timeBinSize, inputArgs.scaleFactor
 		).run();
 	}
 
 	private static DoubleToDoubleFunction getFittingFunction(String species, String fitting) {
+
+		if (fitting.equals("none")) {
+			return x -> x;
+		}
+
 		return switch (species) {
 			case "PM10" -> getFittingFunctionPM10(fitting);
 			case "NO2" -> getFittingFunctionNO2(fitting);
@@ -129,7 +135,7 @@ public class SpatialSmoothing {
 
 		var rasteredBuildings = createRasteredBuildings(bounds);
 		var manager = EventsUtils.createEventsManager();
-		var converter = PollutantToPalmNameConverter.createForSingleSpecies(species);
+		var converter = PollutantToPalmNameConverter.createForSpecies(species);
 		var handler = new AggregateEmissionsByTimeHandler(network, converter.getPollutants(), timeBinSize, scaleFactor);
 		manager.addHandler(handler);
 
@@ -146,16 +152,18 @@ public class SpatialSmoothing {
 			var emissionByPollutant = bin.getValue();
 			for (var pollutantEntry : emissionByPollutant.entrySet()) {
 				var emissionMap = pollutantEntry.getValue();
+				var pollutant = pollutantEntry.getKey();
+
 				for (var idEntry : emissionMap.object2DoubleEntrySet()) {
 
 					var link = network.getLinks().get(idEntry.getKey());
-					emissionResultMap.computeIfAbsent(link.getId(), id -> new LinkEmission(link)).add(idEntry.getDoubleValue());
+					emissionResultMap.computeIfAbsent(link.getId(), id -> new LinkEmission(link)).add(pollutant, idEntry.getDoubleValue());
 				}
 			}
 		});
 
 		log.info("Start calculating concentrations.");
-		TimeBinMap<DoubleRaster> rasterTimeSeries = new TimeBinMap<>(timeBinSize);
+		TimeBinMap<ObjectRaster<SmoothedTile>> rasterTimeSeries = new TimeBinMap<>(timeBinSize);
 
 		// the normalization factor gives the ratio between cell area and area under the gauss function
 		// cell area = cellSize^2 (obviously), area under function = PI * r^2. This is described in Kickhoefer 2014
@@ -165,7 +173,7 @@ public class SpatialSmoothing {
 
 			var startTime = bin.getStartTime();
 			log.info("Calculating concentrations for: [" + startTime + ", " + (bin.getStartTime() + timeBinSize) + "]");
-			var raster = new DoubleRaster(bounds, cellSize);
+			ObjectRaster<SmoothedTile> raster = new ObjectRaster<>(bounds, cellSize);
 			var linkEmissions = bin.getValue();
 
 			// f(x) = -4.82253e-7*(x-43200)^2+1000 use curve which starts at 100m and has its peak at 1000m at noon and then
@@ -178,40 +186,67 @@ public class SpatialSmoothing {
 			raster.setValueForEachCoordinate((x, y) -> {
 
 				// this means this point is covered by a building
-				if (rasteredBuildings != null && rasteredBuildings.getValueByCoord(x, y) < 0) return -1;
+				if (rasteredBuildings != null && rasteredBuildings.getValueByCoord(x, y) < 0) return null;
 
 				// instead of calling sumf in the NumericSmoothing class we re-implement the logic here.
 				// this saves us one stream/collect in the inner loop here.
 				var linkIds = linkIndexRaster.getValueByCoord(x, y);
-
-				return linkIds.stream()
+				var filteredLinkEmissions = linkIds.stream()
 						.map(linkEmissions::get)
 						.filter(Objects::nonNull)
-						.mapToDouble(linkEmission -> {
-							var link = linkEmission.link;
-							var weight = NumericSmoothingRadiusEstimate.calculateWeight(
-									link.getFromNode().getCoord(),
-									link.getToNode().getCoord(),
-									new Coord(x, y),
-									link.getLength(),
-									r
-							);
-							var emission = linkEmission.value;
-							var concentration = emission * weight * normalizationFactor / cellVolume;
-							return fittingFunction.applyAsDouble(concentration);
-						})
-						.sum();
-			});
+						.toList();
 
+				var weights = filteredLinkEmissions.stream()
+						.map(linkEmission -> linkEmission.link)
+						.mapToDouble(link -> NumericSmoothingRadiusEstimate.calculateWeight(
+								link.getFromNode().getCoord(),
+								link.getToNode().getCoord(),
+								new Coord(x, y),
+								link.getLength(),
+								r
+						))
+						.collect(DoubleArrayList::new, DoubleArrayList::add, AbstractDoubleList::addAll);
+				var result = new SmoothedTile();
+
+				for (int i = 0; i < filteredLinkEmissions.size(); i++) {
+					var linkEmission = filteredLinkEmissions.get(i);
+					var weight = weights.getDouble(i);
+
+					for (var entry : linkEmission.values.object2DoubleEntrySet()) {
+						var species = converter.getPalmName(entry.getKey());
+						var emission = entry.getDoubleValue();
+						var concentration = emission * weight * normalizationFactor / cellVolume;
+						result.add(species, concentration);
+					}
+				}
+				return result;
+			});
 			rasterTimeSeries.getTimeBin(bin.getStartTime()).setValue(raster);
 		}
 
-		var linkEmissionSum = sumUpLinkEmissions(emissionByLink);
-		var rasterEmissionSum = sumUpRasterEmissions(rasterTimeSeries);
+		//var linkEmissionSum = sumUpLinkEmissions(emissionByLink);
+		// var rasterEmissionSum = sumUpRasterEmissions(rasterTimeSeries);
 
-		log.info("link emissions: " + linkEmissionSum + ", raster emissions: " + rasterEmissionSum);
+//.info("link emissions: " + linkEmissionSum + ", raster emissions: " + rasterEmissionSum);
 
-		XYTValueCsvData.write(outputFile, rasterTimeSeries);
+		var headers = new ArrayList<>(List.of("time", "x", "y"));
+		headers.addAll(species);
+
+		CSVUtils.writeTable(rasterTimeSeries.getTimeBins(), outputFile, headers, (p, bin) -> {
+			var time = bin.getStartTime();
+
+			bin.getValue().forEachCoordinate((x, y, tile) -> {
+				CSVUtils.print(p, time);
+				CSVUtils.print(p, x);
+				CSVUtils.print(p, y);
+
+				for (var s : species) {
+					var concentration = tile.concentrations.getDouble(s);
+					CSVUtils.print(p, concentration);
+				}
+				CSVUtils.println(p);
+			});
+		});
 	}
 
 	private DoubleRaster createRasteredBuildings(DoubleRaster.Bounds bounds) {
@@ -227,29 +262,31 @@ public class SpatialSmoothing {
 		return rasteredBuildings;
 	}
 
-	private static double sumUpLinkEmissions(TimeBinMap<Map<Id<Link>, LinkEmission>> emissionByLink) {
+    /*private static double sumUpLinkEmissions(TimeBinMap<Map<Id<Link>, LinkEmission>> emissionByLink) {
 
-		return emissionByLink.getTimeBins().stream()
-				.map(TimeBinMap.TimeBin::getValue)
-				.flatMap(idMap -> idMap.values().stream())
-				.mapToDouble(entry -> entry.value)
-				.sum();
-	}
+        return emissionByLink.getTimeBins().stream()
+                .map(TimeBinMap.TimeBin::getValue)
+                .flatMap(idMap -> idMap.values().stream())
+                .mapToDouble(entry -> entry.value)
+                .sum();
+    }
 
-	private static double sumUpRasterEmissions(TimeBinMap<DoubleRaster> emissionRaster) {
+    private static double sumUpRasterEmissions(TimeBinMap<ObjectRaster<SmoothedTile>> emissionRaster) {
 
-		var sum = new AtomicDouble();
-		emissionRaster.getTimeBins().stream()
-				.map(TimeBinMap.TimeBin::getValue)
-				.forEach(raster -> raster.forEachIndex((xi, yi, value) -> sum.getAndAdd(value)));
-		return sum.get();
-	}
+        var sum = new AtomicDouble();
+        emissionRaster.getTimeBins().stream()
+                .map(TimeBinMap.TimeBin::getValue)
+                .forEach(raster -> raster.forEachIndex((xi, yi, value) -> sum.getAndAdd(value)));
+        return sum.get();
+    }
+
+     */
 
 	@SuppressWarnings("FieldMayBeFinal")
 	private static class InputArgs {
 
 		@Parameter(names = "-s", required = true)
-		private String species;
+		private List<String> species;
 		@Parameter(names = "-e", required = true)
 		private Path emissionEvents;
 		@Parameter(names = "-n", required = true)
@@ -281,11 +318,19 @@ public class SpatialSmoothing {
 	private static class LinkEmission {
 
 		private final Link link;
-		private double value;
+		private final Object2DoubleMap<Pollutant> values = new Object2DoubleArrayMap<>();
 
+		void add(Pollutant species, double emission) {
+			values.mergeDouble(species, emission, Double::sum);
+		}
+	}
 
-		void add(double emission) {
-			this.value += emission;
+	@RequiredArgsConstructor
+	private static class SmoothedTile {
+		private final Object2DoubleMap<String> concentrations = new Object2DoubleArrayMap<>();
+
+		void add(String species, double value) {
+			concentrations.mergeDouble(species, value, Double::sum);
 		}
 	}
 }

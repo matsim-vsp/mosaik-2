@@ -51,7 +51,7 @@ public class CalculateToll {
         // we only want the second day
         var secondDayEmissions = getSecondDayInLocalTime(allEmissions, inputArgs.startTime, inputArgs.utcOffset);
         convertToSiUnits(secondDayEmissions);
-        //writePalmOutputToCsv(getDay2CSVPath(inputArgs.root, inputArgs.palmRunId), secondDayEmissions, inputArgs.species);
+        writePalmOutputToCsv(getDay2CSVPath(inputArgs.root, inputArgs.palmRunId), secondDayEmissions, inputArgs.species);
 
         // calculate link contributions to pollution
         var network = Utils.loadFilteredNetwork(inputArgs.networkFile, allEmissions.getTimeBins().iterator().next().getValue().values().iterator().next().getBounds().toGeometry());
@@ -70,7 +70,7 @@ public class CalculateToll {
         var exposureScheme = LinkContributions.createRoadPricingScheme(exposureContributions, cellVolume, inputArgs.scaleFactor);
         LinkContributions.writeToCsv(getExposureContributionsPath(inputArgs.root, inputArgs.palmRunId), exposureContributions, inputArgs.species);
         new RoadPricingWriterXMLv1(exposureScheme).writeFile(getExposureTollOutputPath(inputArgs.root, inputArgs.palmRunId).toString());
-        writeTollToCsv(getExposureTollCsvOutputPath(inputArgs.root, inputArgs.palmRunId), scheme, exposureContributions);
+        writeTollToCsv(getExposureTollCsvOutputPath(inputArgs.root, inputArgs.palmRunId), exposureScheme, exposureContributions);
     }
 
     private static <T> void writeTollToCsv(Path output, RoadPricingSchemeImpl scheme, TimeBinMap<T> timeBinMap) {
@@ -204,6 +204,8 @@ public class CalculateToll {
                 // equal to 24.45L of gas. Then we divide by 1000 to convert mg into g
                 // value * molecularWeight / 22.45 / 1000
                     value -> value * 46.01 / 22.45 / 1000;
+            case "NO" -> value -> value * 30.0061 / 22.5 / 1000;
+            case "O3" -> value -> value * 47.9982 / 22.5 / 1000;
             default -> throw new RuntimeException("No conversion implemented for species: " + species);
         };
     }

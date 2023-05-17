@@ -58,7 +58,7 @@ public class ActivityExposure {
                 var concentrations = entry.getValue();
                 var species = entry.getKey();
                 var exposures = new DoubleRaster(concentrations.getBounds(), concentrations.getCellSize());
-                var sum = new AtomicDouble(0);
+                var sumOfPersonSeconds = new AtomicDouble(0);
                 exposures.setValueForEachIndex((xi, yi) -> {
                     var tile = actHandler.activityRaster.getValueByIndex(xi, yi);
                     if (tile == null) return -1;
@@ -66,14 +66,14 @@ public class ActivityExposure {
                     var spentTime = tile.calculateSpentTime(startTime, endTime);
                     var concentration = concentrations.getValueByIndex(xi, yi);
                     var exposureValue = spentTime * concentration;
-                    sum.accumulateAndGet(exposureValue, Double::sum);
+                    sumOfPersonSeconds.accumulateAndGet(spentTime, Double::sum);
                     return exposureValue;
                 });
 
                 // accroding to https://paperpile.com/app/p/997831e1-3265-0603-ad6c-d483bd4e6b9d we need to normalize the
                 // exposure by average person seconds. We divide each expsoure value by the average exposure value over all
                 // cells for each time slice.
-                var average = sum.doubleValue() / exposures.getXLength() * exposures.getYLength();
+                var average = sumOfPersonSeconds.doubleValue() / exposures.getXLength() * exposures.getYLength();
                 exposures.setValueForEachIndex((xi, yi) -> exposures.getValueByIndex(xi, yi) / average);
 
                 timeSliceData.put(species, exposures);

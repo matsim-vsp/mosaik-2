@@ -3,15 +3,43 @@ library(tidyverse)
 
 # read palm data
 print("read palm data")
-palm_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/palm-output/no-outlier-NO2.xyt.csv")
+palm_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units-no-outliers.xyt.csv",
+                      col_select = c(time, x, y, NO, NO2, PM10))
+palm_data <- mutate(palm_data, NOx = NO + NO2)
 
 # read matsim smoothing data
 print("read matsim data")
-matsim_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/output/berlin-with-geometry-attributes.output_no2_smoothed_rastered.xyt.csv")
+matsim_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/output/berlin-with-geometry-attributes.output_smoothed_rastered.xyt.csv")
+
+
 # join the data on time, x, y so that we get the following tibble | time | x | y | palm | matsim |
 joined <- palm_data %>%
-  inner_join(matsim_data, by = c("x", "y", "time"), suffix = c("-palm", "-matsim")) %>%
-  mutate(matsim = `value-matsim`, palm = `value-palm`, .keep = "unused")
+  inner_join(matsim_data, by = c("x", "y", "time"), suffix = c("_palm", "_matsim"))
+
+joined_nox <- joined %>%
+  select(time, x, y, NOx_matsim, NOx_palm)
+joined_pm <- joined %>%
+  select(time, x, y, PM10_matsim, PM10_palm)
+
+# make scatter plots by time slice
+plot <- ggplot(data = joined_nox, mapping = aes(x = NOx_matsim, y = NOx_palm)) +
+  geom_point(alpha = 0.5, shape = ".") +
+  geom_smooth(method = "lm") +
+  ylim(0, 0.0005) +
+  xlim(0, 0.01) +
+  ggtitle("MATSim NOx Concentrations to PALM NOx Concentrations") +
+  facet_wrap(vars(time))
+ggsave(plot, filename = "matsim-palm-nox-concentrations.png", height = 9, width = 16)
+
+# make scatter plots by time slice
+plot <- ggplot(data = joined_pm, mapping = aes(x = PM10_matsim, y = PM10_palm)) +
+  geom_point(alpha = 0.5, shape = ".") +
+  geom_smooth(method = "lm") +
+  ylim(0, 2.5e-5) +
+  xlim(0, 0.0005) +
+  ggtitle("MATSim PM10 Concentrations to PALM PM10 Concentrations") +
+  facet_wrap(vars(time))
+ggsave(plot, filename = "matsim-palm-pm10-concentrations.png", height = 9, width = 16)
 
 
 estimate_regression <- function(df) {

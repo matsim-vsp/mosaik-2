@@ -41,9 +41,9 @@ public class CountEmissions {
 		private Path emissionEvents;
 		@Parameter(names = "-n", required = true)
 		private Path networkPath;
-		@Parameter(names = "-bounds", required = false)
+		@Parameter(names = "-bounds")
 		private Path boundsFile;
-		@Parameter(names = "-sd", required = false)
+		@Parameter(names = "-sd")
 		private Path staticDriver;
 		@Parameter(names = "-t")
 		private int timeBinSize = 3600;
@@ -51,7 +51,7 @@ public class CountEmissions {
 		private double scaleFactor = 10;
 	}
 
-	private static Network loadNetwork(Path networkPath, Path shapePath, Path staticDriver) throws IOException {
+	private static Network loadNetwork(Path networkPath, Path shapePath, Path staticDriver) {
 
 		if (shapePath != null) {
 			var berlinGeometry = ShapeFileReader.getAllFeatures(shapePath.toString()).stream()

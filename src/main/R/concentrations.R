@@ -9,13 +9,13 @@ is_outlier <- function(value, x, y) {
 }
 
 print("Start reading csv.")
-csv_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units.xyt.csv")
+csv_data <- read_csv("C:/Users/Janekdererste/Documents/work/palm/berlin_with_geometry_attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units.xyt.csv")
 
 print("add hour column")
 data_hr <- mutate(csv_data, hour = time / 3600)
 
 outlier <- data_hr %>% filter(is_outlier(NO2, x, y))
-write_csv(outlier, "C:/Users/janekdererste/repos/runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units-NO2_outlier.xyt.csv")
+#write_csv(outlier, "C:/Users/janekdererste/repos/runs-svn/mosaik-2/berlin/mosaik-2-berlin-with-geometry-attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units-NO2_outlier.xyt.csv")
 
 print("filter outlier from main dataset")
 data_hr_no_outlier <- data_hr %>% dplyr::anti_join(outlier, by = c("x", "y"))
@@ -33,6 +33,51 @@ nox <- data_with_nox %>%
 
 pm <- data_with_nox %>%
   filter(species == "PM10")
+
+# apply volume to convert  from concentration [g/m3] to [g], our volumes are 10m3
+gpm <- pm %>%
+  filter(species == "PM10") %>%
+  mutate(value = concentration * 10 * 10 * 10) %>%
+  group_by(hour) %>%
+  summarise(time = time, value = sum(value)) %>%
+  distinct(hour, .keep_all = TRUE)
+gpm
+
+matsim_sums <- read_csv("./sums.csv")
+
+joined_sums_pm <- matsim_sums %>%
+  filter(species == "PM10") %>%
+  inner_join(gpm, by = "time", suffix = c(".matsim", ".palm")) %>%
+  pivot_longer(cols = c("value.matsim", "value.palm")) %>%
+  group_by(hour)
+
+joined_sums_pm
+
+p <- ggplot(joined_sums_pm, aes(x = hour, y = value, color = name)) +
+  geom_line() +
+  geom_point() +
+  ggtitle("Sum of PM10 [g] in PALM Area")
+ggsave(plot = p, filename = "pm10_sum.png", width = 16, height = 9)
+
+gnox <- nox %>%
+  filter(species == "NOx") %>%
+  mutate(value = concentration * 10 * 10 * 10) %>%
+  group_by(hour) %>%
+  summarise(time = time, value = sum(value)) %>%
+  distinct(hour, .keep_all = TRUE)
+gnox
+
+joined_sums_nox <- matsim_sums %>%
+  filter(species == "NOx") %>%
+  inner_join(gnox, by = "time", suffix = c(".matsim", ".palm")) %>%
+  pivot_longer(cols = c("value.matsim", "value.palm"))
+joined_sums_nox
+
+p <- ggplot(joined_sums_nox, aes(x = hour, y = value, color = name)) +
+  geom_line() +
+  geom_point() +
+  ggtitle("Sum of NOx [g] in PALM Area")
+ggsave(plot = p, filename = "nox_sum.png", width = 16, height = 9)
 
 p <- ggplot(nox_and_o3, aes(x = factor(hour), y = concentration, color = factor(species))) +
   ylim(0, 1e-4) +

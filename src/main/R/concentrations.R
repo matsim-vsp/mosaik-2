@@ -39,9 +39,10 @@ gpm <- pm %>%
   filter(species == "PM10") %>%
   mutate(value = concentration * 10 * 10 * 10) %>%
   group_by(hour) %>%
-  summarise(time = time, value = sum(value)) %>%
+  summarise(time = time, value = sum(value), factor = sum(value)/ 380) %>%
   distinct(hour, .keep_all = TRUE)
 gpm
+write_csv(gpm, "./pm10_hourly_factors.csv")
 
 matsim_sums <- read_csv("./sums.csv")
 
@@ -63,9 +64,10 @@ gnox <- nox %>%
   filter(species == "NOx") %>%
   mutate(value = concentration * 10 * 10 * 10) %>%
   group_by(hour) %>%
-  summarise(time = time, value = sum(value)) %>%
+  summarise(time = time, value = sum(value), factor = sum(value) / 10914) %>%
   distinct(hour, .keep_all = TRUE)
 gnox
+write_csv(gpm, "./nox_hourly_factors.csv")
 
 joined_sums_nox <- matsim_sums %>%
   filter(species == "NOx") %>%
@@ -78,6 +80,9 @@ p <- ggplot(joined_sums_nox, aes(x = hour, y = value, color = name)) +
   geom_point() +
   ggtitle("Sum of NOx [g] in PALM Area")
 ggsave(plot = p, filename = "nox_sum.png", width = 16, height = 9)
+
+# now, derive factor for pm
+gpm %>% slice_head( n = 1)
 
 p <- ggplot(nox_and_o3, aes(x = factor(hour), y = concentration, color = factor(species))) +
   ylim(0, 1e-4) +

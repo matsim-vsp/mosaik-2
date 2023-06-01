@@ -93,6 +93,7 @@ public class LinkContributions {
                         .map(toll -> toll * scaleFactor)
                         .sum();
 
+
                 RoadPricingUtils.addLinkSpecificCost(scheme, id, time, time + data.getBinSize(), tollOverAllSpecies);
             }
         }

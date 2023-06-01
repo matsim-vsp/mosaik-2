@@ -18,7 +18,6 @@ import org.matsim.vehicles.Vehicle;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -29,7 +28,7 @@ public class CompareTollChared {
         var input = new InputArgs();
         JCommander.newBuilder().addObject(input).build().parse(args);
 
-        var tables = Stream.iterate(0, i -> i + 1).parallel()
+        Map<String, TollHandler> tolls = Stream.iterate(0, i -> i + 1).parallel()
                 .limit(input.eventsFile.size())
                 .map(i -> Tuple.of(input.names.get(i), input.eventsFile.get(i)))
                 .map(t -> {
@@ -37,9 +36,13 @@ public class CompareTollChared {
                     var manager = EventsUtils.createEventsManager();
                     manager.addHandler(handler);
                     EventsUtils.readEvents(manager, t.getSecond());
-                    return Tuple.of(t.getFirst(), handler.flatTollPerLink());
+                    return Tuple.of(t.getFirst(), handler);
                 })
-                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond, (a, b) -> b, ConcurrentHashMap::new));
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+
+        var tables = tolls.entrySet().stream()
+                .map(entry -> Tuple.of(entry.getKey(), entry.getValue().flatTollPerLink()))
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
 
         tables.entrySet().parallelStream()
                 .forEach(e -> writeTable(e.getValue(), Paths.get(input.outputFolder).resolve(e.getKey() + ".csv")));
@@ -51,12 +54,36 @@ public class CompareTollChared {
                 })
                 .toList();
 
+        var amountPerHour = tolls.entrySet().stream()
+                .map(entry -> {
+
+                    TimeBinMap<Double> result = new TimeBinMap<>(entry.getValue().getTollPerLink().getBinSize());
+                    entry.getValue().getTollPerLink().getTimeBins()
+                            .forEach(bin -> {
+                                var sum = bin.getValue().values().stream().mapToDouble(d -> d).sum();
+                                result.getTimeBin(bin.getStartTime()).setValue(sum);
+                            });
+                    return Tuple.of(entry.getKey(), result);
+                })
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+
+
         CSVUtils.writeTable(
                 amountPerRun,
                 Paths.get(input.outputFolder).resolve("sums.csv"),
                 List.of("run-id", "toll-sum"),
                 (printer, entry) -> CSVUtils.printRecord(printer, entry.getFirst(), entry.getSecond())
         );
+
+        CSVUtils.writeTable(amountPerHour.entrySet(), Paths.get(input.outputFolder).resolve("sum-hour.csv"), List.of("name", "time", "sum"), (p, e) -> {
+
+            var name = e.getKey();
+            for (var bin : e.getValue().getTimeBins()) {
+                var time = bin.getStartTime();
+                var sum = bin.getValue();
+                CSVUtils.printRecord(p, name, time, sum);
+            }
+        });
     }
 
     private static void writeTable(Collection<TollPerLink> data, Path output) {

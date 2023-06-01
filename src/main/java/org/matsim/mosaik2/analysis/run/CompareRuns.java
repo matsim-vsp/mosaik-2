@@ -13,8 +13,10 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
+import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.core.utils.collections.Tuple;
 import org.matsim.core.utils.gis.ShapeFileReader;
+import org.matsim.core.utils.misc.Time;
 import org.matsim.mosaik2.QuadTree;
 import org.matsim.mosaik2.palm.PalmStaticDriverReader;
 import org.opengis.referencing.FactoryException;
@@ -40,7 +42,6 @@ public class CompareRuns {
         var input = new InputArgs();
         JCommander.newBuilder().addObject(input).build().parse(args);
 
-
         var shapeFilter = createSpatialFilter(input);
 
         var tables = Stream.iterate(0, i -> i + 1).parallel()
@@ -51,10 +52,28 @@ public class CompareRuns {
 
         log.info("Computing modal splits");
         var modalSplits = tables.entrySet().parallelStream()
-                .map(entry -> Tuple.of(entry.getKey(), entry.getValue().modalShare(shapeFilter)))
+                .map(entry -> Tuple.of(entry.getKey(), entry.getValue().modalSplit(shapeFilter)))
                 .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond, (a, b) -> b, ConcurrentHashMap::new));
 
-        var modes = new ArrayList<>(modalSplits.values().iterator().next().keySet().stream().toList());
+        var sums = modalSplits.entrySet().parallelStream()
+                .map(entry -> {
+                    var sum = entry.getValue().values().stream()
+                            .mapToDouble(v -> v)
+                            .sum();
+                    return Tuple.of(entry.getKey(), sum);
+                })
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+
+        var modalShares = modalSplits.entrySet().parallelStream()
+                .map(entry -> {
+                    var shares = entry.getValue().object2DoubleEntrySet().stream()
+                            .map(de -> Tuple.of(de.getKey(), de.getDoubleValue() / sums.get(entry.getKey()).doubleValue()))
+                            .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+                    return Tuple.of(entry.getKey(), shares);
+                })
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+
+        var modes = new ArrayList<>(modalSplits.values().iterator().next().keySet().stream().sorted().toList());
 
         var headerValues = new ArrayList<>(modes);
         headerValues.add(0, "name");
@@ -69,6 +88,53 @@ public class CompareRuns {
                 print(printer, value);
             }
             println(printer);
+        });
+
+        writeTable(modalShares.entrySet(), Paths.get(input.outputFolder).resolve("modal-share.csv"), headerValues, (p, e) -> {
+            var name = e.getKey();
+            print(p, name);
+
+            for (var mode : modes) {
+                Double value = e.getValue().get(mode);
+                print(p, value);
+            }
+            println(p);
+
+        });
+
+        var splitByHour = tables.entrySet().parallelStream()
+                .map(entry -> Tuple.of(entry.getKey(), entry.getValue().modalSplitByHour(shapeFilter)))
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+
+        var shareByHour = tables.entrySet().parallelStream()
+                .map(entry -> Tuple.of(entry.getKey(), entry.getValue().modalShareByHour(shapeFilter)))
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+
+        var tidyHeaders = List.of("name", "time", "mode", "value");
+        writeTable(splitByHour.entrySet(), Paths.get(input.outputFolder).resolve("modal-split-hour.csv"), tidyHeaders, (p, e) -> {
+
+            var name = e.getKey();
+
+            for (var bin : e.getValue().getTimeBins()) {
+                var time = bin.getStartTime();
+                for (var mode : modes) {
+                    var value = bin.getValue().getDouble(mode);
+                    printRecord(p, name, time, mode, value);
+                }
+            }
+        });
+
+        writeTable(shareByHour.entrySet(), Paths.get(input.outputFolder).resolve("modal-share-hour.csv"), tidyHeaders, (p, e) -> {
+
+            var name = e.getKey();
+
+            for (var bin : e.getValue().getTimeBins()) {
+                var time = bin.getStartTime();
+                for (var mode : modes) {
+                    var value = bin.getValue().getDouble(mode);
+                    printRecord(p, name, time, mode, value);
+                }
+            }
         });
     }
 
@@ -95,8 +161,9 @@ public class CompareRuns {
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        } else {
+            return null;
         }
-        throw new RuntimeException("Either shp file or static file must be specified.");
     }
 
     static class InputArgs {
@@ -123,6 +190,7 @@ public class CompareRuns {
         private final String mainMode;
         private final double travelledDistance;
         private final double euclideanDistance;
+        private final double depTime;
         private final LineString line;
 
         public static TripRecord fromCsvRecord(CSVRecord csvRecord) {
@@ -136,8 +204,9 @@ public class CompareRuns {
             var line = new GeometryFactory().createLineString(new Coordinate[]{
                     new Coordinate(startX, startY), new Coordinate(endX, endY)
             });
+            var depTime = Time.parseTime(csvRecord.get("dep_time"));
 
-            return new TripRecord(mainMode, travelledDistance, euclideanDistance, line);
+            return new TripRecord(mainMode, travelledDistance, euclideanDistance, depTime, line);
         }
     }
 
@@ -154,9 +223,48 @@ public class CompareRuns {
             }
         }
 
-        public Object2DoubleMap<String> modalShare(PreparedGeometry filter) {
+        public Object2DoubleMap<String> modalSplit(PreparedGeometry filter) {
+            if (filter == null) {
+                return records.stream()
+                        .collect(Collectors.toMap(r -> r.mainMode, r -> 10.0, Double::sum, Object2DoubleArrayMap::new));
+            }
+
             return spatialIndex.intersects(filter).stream()
-                    .collect(Collectors.toMap(r -> r.mainMode, r -> 1., Double::sum, Object2DoubleArrayMap::new));
+                    .collect(Collectors.toMap(r -> r.mainMode, r -> 10., Double::sum, Object2DoubleArrayMap::new));
+        }
+
+        public TimeBinMap<Object2DoubleMap<String>> modalSplitByHour(PreparedGeometry filter) {
+
+            var r = filter == null ? records : spatialIndex.intersects(filter);
+
+            TimeBinMap<Object2DoubleMap<String>> result = new TimeBinMap<>(3600);
+
+            for (var record : r) {
+                var bin = result.getTimeBin(record.depTime);
+                var map = bin.computeIfAbsent(Object2DoubleArrayMap::new);
+                map.mergeDouble(record.mainMode, 10, Double::sum);
+            }
+
+            return result;
+        }
+
+        public TimeBinMap<Object2DoubleMap<String>> modalShareByHour(PreparedGeometry filter) {
+
+            var split = modalSplitByHour(filter);
+
+            TimeBinMap<Object2DoubleMap<String>> result = new TimeBinMap<>(3600);
+
+            for (var splitBin : split.getTimeBins()) {
+
+                var sum = splitBin.getValue().values().stream().mapToDouble(v -> v).sum();
+                var bin = result.getTimeBin(splitBin.getStartTime());
+                var map = bin.computeIfAbsent(Object2DoubleArrayMap::new);
+                for (var entry : splitBin.getValue().object2DoubleEntrySet()) {
+                    map.put(entry.getKey(), entry.getDoubleValue() / sum);
+                }
+            }
+
+            return result;
         }
     }
 

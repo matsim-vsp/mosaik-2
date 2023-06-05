@@ -4,7 +4,11 @@ import com.beust.jcommander.Parameter;
 import it.unimi.dsi.fastutil.objects.Object2DoubleArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
+import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.events.Event;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
 import org.matsim.contrib.analysis.time.TimeBinMap;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.events.ColdEmissionEvent;
@@ -12,13 +16,17 @@ import org.matsim.contrib.emissions.events.EmissionEventsReader;
 import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.handler.BasicEventHandler;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.mosaik2.chemistryDriver.PollutantToPalmNameConverter;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+@Log4j2
 public class EmissionByTime {
 
     public static void main(String[] args) {
@@ -27,13 +35,15 @@ public class EmissionByTime {
         //     JCommander.newBuilder().addObject(input).build().parse(args);
 
         var converter = PollutantToPalmNameConverter.createForSpecies(List.of("NOx", "PM10"));
-        var handler = new Handler(converter.getPollutants());
+        var network = NetworkUtils.readNetwork("C:\\Users\\janek\\Documents\\work\\palm\\berlin_with_geometry_attributes\\output\\berlin-with-geometry-attributes.output_network.xml.gz");
+        var handler = new Handler(converter.getPollutants(), network);
         var manager = EventsUtils.createEventsManager();
         var reader = new EmissionEventsReader(manager);
         manager.addHandler(handler);
         reader.readFile("C:\\Users\\janek\\Documents\\work\\palm\\berlin_with_geometry_attributes\\output\\berlin-with-geometry-attributes.output_only_emission_events.xml.gz");
 
-        CSVUtils.writeTable(handler.summedEmissions.getTimeBins(), Paths.get("./").resolve("hourly-matsim-emissions.csv"), List.of("time", "species", "sum"), (p, b) -> {
+        Path root = Paths.get("./");
+        CSVUtils.writeTable(handler.summedEmissions.getTimeBins(), root.resolve("hourly-matsim-emissions.csv"), List.of("time", "species", "sum"), (p, b) -> {
 
             var time = b.getStartTime();
             for (var e : b.getValue().object2DoubleEntrySet()) {
@@ -42,36 +52,79 @@ public class EmissionByTime {
                 CSVUtils.printRecord(p, time, species, sum);
             }
         });
+
+        CSVUtils.writeTable(handler.emissionPerMeter.getTimeBins(), root.resolve("hourly-emissions-per-meter.csv"), List.of("time", "link", "species", "value"), (p, b) -> {
+
+            var time = b.getStartTime();
+            for (var s : b.getValue().entrySet()) {
+
+                var species = s.getKey();
+                for (var l : s.getValue().entrySet()) {
+                    var link = l.getKey();
+                    var value = l.getValue().getAvg();
+                    CSVUtils.printRecord(p, time, link, species, value);
+                }
+            }
+        });
     }
 
     @RequiredArgsConstructor
     private static class Handler implements BasicEventHandler {
 
         private final TimeBinMap<Object2DoubleMap<Pollutant>> summedEmissions = new TimeBinMap<>(3600);
+        private final TimeBinMap<Map<Pollutant, Map<Id<Link>, LinkCollector>>> emissionPerMeter = new TimeBinMap<>(3600);
         private final Set<Pollutant> species;
+        private final Network network;
+
+        private int counter = 0;
 
         @Override
         public void handleEvent(Event e) {
             switch (e.getEventType()) {
                 case WarmEmissionEvent.EVENT_TYPE ->
-                        handleEvent(e.getTime(), ((WarmEmissionEvent) e).getWarmEmissions());
+                        handleEvent(e.getTime(), ((WarmEmissionEvent) e).getLinkId(), ((WarmEmissionEvent) e).getWarmEmissions());
                 case ColdEmissionEvent.EVENT_TYPE ->
-                        handleEvent(e.getTime(), ((ColdEmissionEvent) e).getColdEmissions());
+                        handleEvent(e.getTime(), ((ColdEmissionEvent) e).getLinkId(), ((ColdEmissionEvent) e).getColdEmissions());
             }
         }
 
-        private void handleEvent(double time, Map<Pollutant, Double> emissions) {
+        private void handleEvent(double time, Id<Link> linkId, Map<Pollutant, Double> emissions) {
 
-            var bin = summedEmissions.getTimeBin(time);
-            var map = bin.computeIfAbsent(Object2DoubleArrayMap::new);
+            counter++;
+            var sumBin = summedEmissions.getTimeBin(time);
+            var sumMap = sumBin.computeIfAbsent(Object2DoubleArrayMap::new);
+            var meterBin = emissionPerMeter.getTimeBin(time);
+            var meterMap = meterBin.computeIfAbsent(HashMap::new);
 
             emissions.entrySet().stream()
                     .filter(e -> species.contains(e.getKey()))
                     .forEach(e -> {
                         // combine pm10 and pm10 non exhaust
                         var species = e.getKey() == Pollutant.PM_non_exhaust ? Pollutant.PM : e.getKey();
-                        map.mergeDouble(species, e.getValue(), Double::sum);
+                        sumMap.mergeDouble(species, e.getValue(), Double::sum);
+
+                        var link = network.getLinks().get(linkId);
+                        var linkMap = meterMap.computeIfAbsent(species, s -> new HashMap<>());
+                        var collector = linkMap.computeIfAbsent(linkId, id -> new LinkCollector());
+                        collector.add(link.getLength(), e.getValue());
+
+                        if (counter % 10000 == 0)
+                            log.info(species + " " + e.getValue() + " " + link.getLength() + " " + collector.getAvg());
                     });
+        }
+    }
+
+    private static class LinkCollector {
+        double accLength;
+        double accEmission;
+
+        void add(double length, double value) {
+            this.accLength += length;
+            this.accEmission += value;
+        }
+
+        double getAvg() {
+            return accEmission / accLength;
         }
     }
 

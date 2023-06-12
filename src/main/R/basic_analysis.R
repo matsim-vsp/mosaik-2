@@ -29,13 +29,13 @@ p <- ggplot(runs_100, aes(mode, value)) +
   theme_light()
 p
 
-ggplot(filtered, aes(x = hour,)) +
+ggplot(runs_100, aes(x = hour,)) +
   geom_line(aes(y = value, color = mode)) +
   facet_wrap(vars(name)) +
   scale_color_manual(values = cbPalette) +
   theme_light()
 
-ggplot(filtered, aes(x = hour,)) +
+ggplot(runs_100, aes(x = hour,)) +
   geom_line(aes(y = value, color = name)) +
   facet_wrap(vars(mode)) +
   scale_color_manual(values = cbPalette) +

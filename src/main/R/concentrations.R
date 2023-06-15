@@ -11,7 +11,7 @@ is_outlier <- function(value, x, y) {
 }
 
 print("Start reading csv.")
-csv_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units.xyt.csv")
+csv_data <- read_csv("C:/Users/janekdererste/Documents/work/palm/berlin_with_geometry_attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units.xyt.csv")
 
 print("add hour column")
 data_hr <- mutate(csv_data, hour = time / 3600)
@@ -64,10 +64,24 @@ joined_factors <- gpm %>%
   pivot_longer(cols = starts_with("factor."), names_to = "species", values_to = "factor", names_prefix = "factor.")
 joined_factors
 
-ggplot(joined_factors, aes(hour, factor, color = species)) +
+p <- ggplot(joined_factors, aes(hour, factor, color = species)) +
   geom_line() +
   scale_color_manual(values = cbPalette) +
-  theme_light()
+  theme_light() +
+  ggtitle("Normalized Sums of Emissions from PALM simulation.") +
+  labs(y = "Normalized sum of Emissions", x = "Hour of Day")
+p
+ggsave(plot = p, filename = "normalized_sums_pollutants_over_time.png", width = 8, height = 6)
+
+tolls <- read_csv("./tolls.csv") %>%
+  mutate(hour = time / 3600)
+p <- ggplot(tolls, aes(hour, toll)) +
+  geom_line(color ="#4285f4") +
+  theme_light() +
+  ggtitle("Toll over hour of day") +
+  labs(y = "Toll [g/m]", x = "Hour of Day")
+p
+ggsave(plot = p, filename = "toll-over-hour.png", width = 8, height = 6)
 
 matsim_sums <- read_csv("./sums.csv")
 

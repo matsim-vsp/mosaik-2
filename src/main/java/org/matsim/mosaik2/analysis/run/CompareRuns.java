@@ -55,6 +55,10 @@ public class CompareRuns {
                 .map(entry -> Tuple.of(entry.getKey(), entry.getValue().modalSplit(shapeFilter)))
                 .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond, (a, b) -> b, ConcurrentHashMap::new));
 
+        var modalSplitsInside = tables.entrySet().parallelStream()
+                .map(entry -> Tuple.of(entry.getKey(), entry.getValue().modalSplitStartEnd(shapeFilter)))
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond, (a, b) -> b, ConcurrentHashMap::new));
+
         var sums = modalSplits.entrySet().parallelStream()
                 .map(entry -> {
                     var sum = entry.getValue().values().stream()
@@ -99,11 +103,25 @@ public class CompareRuns {
                 print(p, value);
             }
             println(p);
+        });
 
+        writeTable(modalSplitsInside.entrySet(), Paths.get(input.outputFolder).resolve("modal-split-inside.csv"), headerValues, (printer, entry) -> {
+            var name = entry.getKey();
+            print(printer, name);
+
+            for (var mode : modes) {
+                var value = entry.getValue().getDouble(mode);
+                print(printer, value);
+            }
+            println(printer);
         });
 
         var splitByHour = tables.entrySet().parallelStream()
                 .map(entry -> Tuple.of(entry.getKey(), entry.getValue().modalSplitByHour(shapeFilter)))
+                .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
+
+        var splitByHourInside = tables.entrySet().parallelStream()
+                .map(entry -> Tuple.of(entry.getKey(), entry.getValue().modalSplitByHourStartEnd(shapeFilter)))
                 .collect(Collectors.toMap(Tuple::getFirst, Tuple::getSecond));
 
         var shareByHour = tables.entrySet().parallelStream()
@@ -112,6 +130,19 @@ public class CompareRuns {
 
         var tidyHeaders = List.of("name", "time", "mode", "value");
         writeTable(splitByHour.entrySet(), Paths.get(input.outputFolder).resolve("modal-split-hour.csv"), tidyHeaders, (p, e) -> {
+
+            var name = e.getKey();
+
+            for (var bin : e.getValue().getTimeBins()) {
+                var time = bin.getStartTime();
+                for (var mode : modes) {
+                    var value = bin.getValue().getDouble(mode);
+                    printRecord(p, name, time, mode, value);
+                }
+            }
+        });
+
+        writeTable(splitByHourInside.entrySet(), Paths.get(input.outputFolder).resolve("modal-split-hour-inside.csv"), tidyHeaders, (p, e) -> {
 
             var name = e.getKey();
 
@@ -233,6 +264,14 @@ public class CompareRuns {
                     .collect(Collectors.toMap(r -> r.mainMode, r -> 10., Double::sum, Object2DoubleArrayMap::new));
         }
 
+        public Object2DoubleMap<String> modalSplitStartEnd(PreparedGeometry filter) {
+            var r = filter == null ? records : spatialIndex.intersects(filter);
+
+            return r.stream()
+                    .filter(record -> (filter.covers(record.line.getStartPoint()) || filter.covers(record.line.getEndPoint())))
+                    .collect(Collectors.toMap(record -> record.mainMode, record -> 10., Double::sum, Object2DoubleArrayMap::new));
+        }
+
         public TimeBinMap<Object2DoubleMap<String>> modalSplitByHour(PreparedGeometry filter) {
 
             var r = filter == null ? records : spatialIndex.intersects(filter);
@@ -243,6 +282,23 @@ public class CompareRuns {
                 var bin = result.getTimeBin(record.depTime);
                 var map = bin.computeIfAbsent(Object2DoubleArrayMap::new);
                 map.mergeDouble(record.mainMode, 10, Double::sum);
+            }
+
+            return result;
+        }
+
+        public TimeBinMap<Object2DoubleMap<String>> modalSplitByHourStartEnd(PreparedGeometry filter) {
+
+            var r = filter == null ? records : spatialIndex.intersects(filter);
+
+            TimeBinMap<Object2DoubleMap<String>> result = new TimeBinMap<>(3600);
+
+            for (var record : r) {
+                if (filter.covers(record.line.getStartPoint()) || filter.covers(record.line.getEndPoint())) {
+                    var bin = result.getTimeBin(record.depTime);
+                    var map = bin.computeIfAbsent(Object2DoubleArrayMap::new);
+                    map.mergeDouble(record.mainMode, 10, Double::sum);
+                }
             }
 
             return result;

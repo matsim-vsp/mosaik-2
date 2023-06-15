@@ -1,14 +1,7 @@
 library(tidyverse)
 
 cbPalette <- c("#4285f4", "#ea4335", "#fbbc04", "#34a853", "#ff6d01", "#46bdc6", "#7baaf7", "#f07b72", "#fcd04f", "#71c287")
-share_by_hour <- read_csv("C:/Users/janek/Desktop/rp-time/modal-split-hour.csv")
-noxf <- read_csv("./nox_hourly_factors.csv")
-pmf <- read_csv("./pm10_hourly_factors.csv")
-
-factors <- noxf %>%
-  left_join(pmf, by = join_by(hour), suffix = c(".nox", ".pm10")) %>%
-  mutate(factor = factor.nox * 0.5 + factor.pm10 * 0.5)
-
+share_by_hour <- read_csv("C:/Users/Janekdererste/Documents/work/berlin-roadpricing/output_roadpricing/modal-split-hour-inside.csv")
 
 filtered <- share_by_hour %>%
   filter(time < 86400) %>%
@@ -22,14 +15,14 @@ runs_100 <- filtered %>%
            name == "time-center-100" |
            name == "base-case")
 
-p <- ggplot(runs_100, aes(mode, value)) +
+p <- ggplot(filtered, aes(mode, value)) +
   geom_bar(aes(fill = name), position = "dodge", stat = "identity") +
   facet_wrap(vars(hour)) +
   scale_fill_manual(values = cbPalette) +
   theme_light()
 p
 
-ggplot(runs_100, aes(x = hour,)) +
+ggplot(filtered, aes(x = hour,)) +
   geom_line(aes(y = value, color = mode)) +
   facet_wrap(vars(name)) +
   scale_color_manual(values = cbPalette) +
@@ -45,4 +38,3 @@ ggplot(factors, aes(x = hour,)) +
   geom_line(aes(y = factor)) +
   scale_color_manual(values = cbPalette) +
   theme_light()
-

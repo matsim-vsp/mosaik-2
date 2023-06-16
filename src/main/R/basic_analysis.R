@@ -1,7 +1,7 @@
 library(tidyverse)
 
 cbPalette <- c("#4285f4", "#ea4335", "#fbbc04", "#34a853", "#ff6d01", "#46bdc6", "#7baaf7", "#f07b72", "#fcd04f", "#71c287")
-share_by_hour <- read_csv("C:/Users/Janekdererste/Documents/work/berlin-roadpricing/output_roadpricing/modal-split-hour-inside.csv")
+share_by_hour <- read_csv("C:/Users/janek/Documents/work/berlin-roadpricing/output_roadpricing/modal-split-hour-inside.csv")
 
 filtered <- share_by_hour %>%
   filter(time < 86400) %>%

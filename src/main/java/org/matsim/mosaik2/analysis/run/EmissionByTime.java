@@ -41,8 +41,8 @@ public class EmissionByTime {
 
         var prepFact = new PreparedGeometryFactory();
         var converter = PollutantToPalmNameConverter.createForSpecies(List.of("NOx", "PM10"));
-        var network = NetworkUtils.readNetwork("C:\\Users\\Janekdererste\\Documents\\work\\berlin-roadpricing\\output-rp-time-berlin-100\\berlin-with-geometries-rp-time-berlin-100.output_network.xml.gz");
-        var filter = ShapeFileReader.getAllFeatures("C:\\Users\\Janekdererste\\Documents\\work\\berlin-roadpricing\\berlin-epsg25833.shp").stream()
+        var network = NetworkUtils.readNetwork("C:\\Users\\janek\\Documents\\work\\palm\\berlin_with_geometry_attributes\\output\\berlin-with-geometry-attributes.output_network.xml.gz");
+        var filter = ShapeFileReader.getAllFeatures("C:\\Users\\janek\\Documents\\work\\berlin-roadpricing\\berlin-epsg25833.shp").stream()
                 .limit(1)
                 .map(feature -> (Geometry) feature.getDefaultGeometry())
                 .map(prepFact::create)
@@ -52,9 +52,9 @@ public class EmissionByTime {
         var manager = EventsUtils.createEventsManager();
         var reader = new EmissionEventsReader(manager);
         manager.addHandler(handler);
-        reader.readFile("C:\\Users\\Janekdererste\\Documents\\work\\berlin-roadpricing\\output-rp-time-berlin-100\\berlin-with-geometries-rp-time-berlin-100.output_only_emission_events.xml.gz");
+        reader.readFile("C:\\Users\\janek\\Documents\\work\\palm\\berlin_with_geometry_attributes\\output\\berlin-with-geometry-attributes.output_only_emission_events.xml.gz");
 
-        Path root = Paths.get("C:\\Users\\Janekdererste\\Documents\\work\\berlin-roadpricing\\output-rp-time-berlin-100\\");
+        Path root = Paths.get("C:\\Users\\janek\\Documents\\work\\palm\\berlin_with_geometry_attributes\\output\\");
         CSVUtils.writeTable(handler.summedEmissions.getTimeBins(), root.resolve("hourly-matsim-emissions.csv"), List.of("time", "species", "sum"), (p, b) -> {
 
             var time = b.getStartTime();
@@ -65,7 +65,7 @@ public class EmissionByTime {
             }
         });
 
-        CSVUtils.writeTable(handler.summedEmissionsInFilter.getTimeBins(), root.resolve("hourly-matsim-emissions-in-filter.csv"), List.of("time", "species", "sum"), (p, b) -> {
+        CSVUtils.writeTable(handler.summedEmissionsInFilter.getTimeBins(), root.resolve("hourly-matsim-emissions-in-berlin-filter.csv"), List.of("time", "species", "sum"), (p, b) -> {
 
             var time = b.getStartTime();
             for (var e : b.getValue().object2DoubleEntrySet()) {

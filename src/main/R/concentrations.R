@@ -36,6 +36,23 @@ nox <- data_with_nox %>%
 pm <- data_with_nox %>%
   filter(species == "PM10")
 
+p <- ggplot(nox, aes(x = factor(hour), y = concentration, color = factor(species))) +
+  ylim(0, 5e-4) +
+  geom_boxplot(outlier.alpha = 0.3, outlier.shape = ".") +
+  ggtitle("PALM Concentrations [g/m3]") +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
+ggsave(plot = p, filename = "nox_box.png", width = 3200, height = 1800, units = c("px"), dpi = 300)
+
+p <- ggplot(pm, aes(x = factor(hour), y = concentration, color = factor(species))) +
+  ylim(0, 3e-5) +
+  geom_boxplot(outlier.alpha = 0.3, outlier.shape = ".") +
+  ggtitle("PALM Concentrations [g/m3]") +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
+ggsave(plot = p, filename = "pm_box.png", width = 3200, height = 1800, units = c("px"), dpi = 300)
+
+
 # apply volume to convert  from concentration [g/m3] to [g], our volumes are 10m3
 # use 1223.066 which is the highest value to set the toll to a factor of 1 for the highest value at 9am.
 gpm <- pm %>%
@@ -85,7 +102,6 @@ ggsave(plot = p, filename = "toll-over-hour.png", width = 8, height = 6)
 
 matsim_sums <- read_csv("./sums.csv")
 
-
 joined_sums_pm <- matsim_sums %>%
   filter(species == "PM10") %>%
   inner_join(gpm, by = "time", suffix = c(".matsim", ".palm")) %>%
@@ -119,17 +135,6 @@ p <- ggplot(nox_and_o3, aes(x = factor(hour), y = concentration, color = factor(
   ggtitle("PALM Concentrations [g/m3]")
 ggsave(plot = p, filename = "nox_and_o3_box.png", width = 16, height = 9)
 
-p <- ggplot(nox, aes(x = factor(hour), y = concentration, color = factor(species))) +
-  ylim(0, 1e-4) +
-  geom_boxplot(outlier.alpha = 0.3, outlier.shape = ".") +
-  ggtitle("PALM Concentrations [g/m3]")
-ggsave(plot = p, filename = "nox_box.png", width = 16, height = 9)
-
-p <- ggplot(pm, aes(x = factor(hour), y = concentration, color = factor(species))) +
-  ylim(0, 1e-5) +
-  geom_boxplot(outlier.alpha = 0.3, outlier.shape = ".") +
-  ggtitle("PALM Concentrations [g/m3]")
-ggsave(plot = p, filename = "pm_box.png", width = 16, height = 9)
 
 write_csv(data_hr_no_outlier, "C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units-no-outliers.xyt.csv")
 longer <- data_hr_no_outlier %>%

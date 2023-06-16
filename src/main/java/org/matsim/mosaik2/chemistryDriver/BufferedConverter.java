@@ -24,96 +24,96 @@ import java.util.Map;
 @Builder
 public class BufferedConverter {
 
-	private final String networkFile;
+    private final String networkFile;
 
-	private final String emissionEventsFile;
+    private final String emissionEventsFile;
 
-	private final String outputFile;
+    private final String outputFile;
 
-	private final DoubleRaster buildings;
+    private final DoubleRaster buildings;
 
-	@Builder.Default
-	private final double timeBinSize = 3600;
-	@Builder.Default
-	private final double scaleFactor = 1;
-	@Builder.Default
-	private final CoordinateTransformation transformation = new IdentityTransformation();
-	@Builder.Default
-	private final PollutantToPalmNameConverter pollutantConverter = new PollutantToPalmNameConverter();
-	@Builder.Default
-	private final LocalDateTime date = LocalDateTime.of(2017, 7, 31, 0, 0);
-	@Builder.Default
-	private final int numberOfDays = 1;
-	@Builder.Default
-	private final int utcOffset = 0;
-	@Builder.Default
-	private final double laneWidth = 5;
-	@Builder.Default
-	private final EmissionRasterer.RasterMethod rasterMethod = EmissionRasterer.RasterMethod.WithLaneWidth;
+    @Builder.Default
+    private final double timeBinSize = 3600;
+    @Builder.Default
+    private final double scaleFactor = 1;
+    @Builder.Default
+    private final CoordinateTransformation transformation = new IdentityTransformation();
+    @Builder.Default
+    private final PollutantToPalmNameConverter pollutantConverter = new PollutantToPalmNameConverter();
+    @Builder.Default
+    private final LocalDateTime date = LocalDateTime.of(2017, 7, 31, 0, 0);
+    @Builder.Default
+    private final int numberOfDays = 1;
+    @Builder.Default
+    private final int utcOffset = 0;
+    @Builder.Default
+    private final double laneWidth = 5;
+    @Builder.Default
+    private final EmissionRasterer.RasterMethod rasterMethod = EmissionRasterer.RasterMethod.WithLaneWidth;
 
-	public void write() {
+    public void write() {
 
-		var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
-				.filter(link -> FullFeaturedConverter.isCoveredBy(link, buildings.getBounds()))
-				.collect(NetworkUtils.getCollector());
+        var network = NetworkUtils.readNetwork(networkFile, ConfigUtils.createConfig().network(), transformation).getLinks().values().stream()
+                .filter(link -> FullFeaturedConverter.isCoveredBy(link, buildings.getBounds()))
+                .collect(NetworkUtils.getCollector());
 
-		log.info("Unsimplifying network");
-		var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
+        log.info("Unsimplifying network");
+        var link2Segments = NetworkUnsimplifier.unsimplifyNetwork(network, transformation);
 
-		// read the emission events
-		var manager = EventsUtils.createEventsManager();
-		var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
-		manager.addHandler(handler);
-		new EmissionEventsReader(manager).readFile(emissionEventsFile);
+        // read the emission events
+        var manager = EventsUtils.createEventsManager();
+        var handler = new AggregateEmissionsByTimeAndOrigGeometryHandler(link2Segments, pollutantConverter.getPollutants(), timeBinSize, scaleFactor);
+        manager.addHandler(handler);
+        new EmissionEventsReader(manager).readFile(emissionEventsFile);
 
-		var emissions = handler.getTimeBinMap();
-		var linksWithEmissions = handler.getLinksWithEmissions();
+        var emissions = handler.getTimeBinMap();
+        var linksWithEmissions = handler.getLinksWithEmissions();
 
-		// convert pollutants to palm names
-		var palmEmissions = pollutantConverter.convert(emissions);
+        // convert pollutants to palm names
+        var palmEmissions = pollutantConverter.convert(emissions);
 
-		log.info("Converting segment map to network");
-		var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments).getLinks().values().stream()
-				.filter(link -> linksWithEmissions.contains(link.getId()))
-				.collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
+        log.info("Converting segment map to network");
+        var segmentNetwork = NetworkUnsimplifier.segmentsToNetwork(link2Segments).getLinks().values().stream()
+                .filter(link -> linksWithEmissions.contains(link.getId()))
+                .collect(NetworkUtils.getCollector(ConfigUtils.createConfig()));
 
-		var rasteredEmissions = raster(palmEmissions, segmentNetwork);
+        var rasteredEmissions = raster(palmEmissions, segmentNetwork);
 
-		addNoIfPossible(rasteredEmissions);
+        addNoIfPossible(rasteredEmissions);
 
-		rasteredEmissions = FullFeaturedConverter.cutToFullDays(rasteredEmissions, numberOfDays, utcOffset);
+        rasteredEmissions = FullFeaturedConverter.cutToFullDays(rasteredEmissions, numberOfDays, utcOffset);
 
-		PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
-	}
+        PalmChemistryInput2.writeNetCdfFile(outputFile, rasteredEmissions, date);
+    }
 
-	private void addNoIfPossible(TimeBinMap<Map<String, DoubleRaster>> timeBinMap) {
+    private void addNoIfPossible(TimeBinMap<Map<String, DoubleRaster>> timeBinMap) {
 
-		if (pollutantConverter.getPollutants().contains(Pollutant.NO2) && pollutantConverter.getPollutants().contains(Pollutant.NOx)) {
+        if (pollutantConverter.getPollutants().contains(Pollutant.NO2) && pollutantConverter.getPollutants().contains(Pollutant.NOx)) {
 
-			for (var timeBin : timeBinMap.getTimeBins()) {
+            for (var timeBin : timeBinMap.getTimeBins()) {
 
-				var no2 = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NO2));
-				var nox = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NOx));
-				var no = new DoubleRaster(no2.getBounds(), no2.getCellSize());
+                var no2 = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NO2));
+                var nox = timeBin.getValue().get(pollutantConverter.getPalmName(Pollutant.NOx));
+                var no = new DoubleRaster(no2.getBounds(), no2.getCellSize());
 
-				nox.forEachCoordinate((x, y, noxValue) -> {
-					var no2Value = no2.getValueByCoord(x, y);
-					var noValue = noxValue - no2Value;
-					no.adjustValueForCoord(x, y, noValue);
-				});
+                nox.forEachCoordinate((x, y, noxValue) -> {
+                    var no2Value = no2.getValueByCoord(x, y);
+                    var noValue = noxValue - no2Value;
+                    no.adjustValueForCoord(x, y, noValue);
+                });
 
-				timeBin.getValue().put("NO", no);
-				timeBin.getValue().remove("NOx");
-			}
-		}
-	}
+                timeBin.getValue().put("NO", no);
+                timeBin.getValue().remove("NOx");
+            }
+        }
+    }
 
-	private TimeBinMap<Map<String, DoubleRaster>> raster(TimeBinMap<Map<String, Map<Id<Link>, Double>>> palmEmissions, Network segmentNetwork) {
+    private TimeBinMap<Map<String, DoubleRaster>> raster(TimeBinMap<Map<String, Map<Id<Link>, Double>>> palmEmissions, Network segmentNetwork) {
 
-		if (rasterMethod.equals(EmissionRasterer.RasterMethod.WithLaneWidth)) {
-			return EmissionRasterer.rasterWithSwing(palmEmissions, segmentNetwork, buildings, laneWidth);
-		} else {
-			return EmissionRasterer.raster(palmEmissions, segmentNetwork, buildings.getBounds(), laneWidth);
-		}
-	}
+        if (rasterMethod.equals(EmissionRasterer.RasterMethod.WithLaneWidth)) {
+            return EmissionRasterer.rasterWithSwing(palmEmissions, segmentNetwork, buildings, laneWidth);
+        } else {
+            return EmissionRasterer.raster(palmEmissions, segmentNetwork, buildings.getBounds(), buildings.getCellSize());
+        }
+    }
 }

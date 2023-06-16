@@ -12,7 +12,11 @@ import org.matsim.contrib.emissions.events.WarmEmissionEvent;
 import org.matsim.core.events.handler.BasicEventHandler;
 import org.matsim.core.utils.collections.Tuple;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.matsim.mosaik2.chemistryDriver.NetworkUnsimplifier.LENGTH_FRACTION_KEY;
 
@@ -51,7 +55,10 @@ public class AggregateEmissionsByTimeAndOrigGeometryHandler implements BasicEven
 
         var timeBin = timeBinMap.getTimeBin(time);
         if (!timeBin.hasValue()) {
-            timeBin.setValue(new HashMap<>());
+            // pre-populate map with keys, so that we have values for each time bin. Otherwise, we've had errors
+            Map<Pollutant, Map<Id<Link>, Double>> emptyEmissionByPollutant = this.pollutantsOfInterest.stream()
+                    .collect(Collectors.toMap(p -> p, p -> new Object2DoubleOpenHashMap<>()));
+            timeBin.setValue(emptyEmissionByPollutant);
         }
 
         var emissionByPollutant = timeBin.getValue();

@@ -1,7 +1,10 @@
 package org.matsim.mosaik2.chemistryDriver;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.network.Link;
 import org.matsim.contrib.analysis.time.TimeBinMap;
@@ -15,6 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 @RequiredArgsConstructor
+@Log4j2
 public class PollutantToPalmNameConverter {
 
     private final Map<Pollutant, String> pollutantToName;
@@ -46,6 +50,11 @@ public class PollutantToPalmNameConverter {
                 .flatMap(speciesMapping -> speciesMapping.entrySet().stream())
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
+        try {
+            log.info("Creating Name Pollutant to Species converter: " + new ObjectMapper().writeValueAsString(mapping));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
         return new PollutantToPalmNameConverter(mapping);
     }
 
@@ -57,7 +66,8 @@ public class PollutantToPalmNameConverter {
             );
             case "NO2" -> Map.of(Pollutant.NO2, "NO2");
             case "NOx" -> Map.of(Pollutant.NO2, "NO2", Pollutant.NOx, "NOx");
-            default -> throw new IllegalStateException("Unexpected value: " + speciesName);
+            case "CO" -> Map.of(Pollutant.CO, "CO");
+            default -> throw new IllegalStateException("No mapping was specified for species: " + speciesName);
         };
     }
 

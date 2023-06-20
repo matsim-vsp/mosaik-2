@@ -72,8 +72,10 @@ public class NetcdfConverters {
 
     public static <T> TimeBinMap<T> createTimeBinMap(double[] fromTimes, int fromTimeIndex) {
 
-        double endTimeFirstBin = Math.round(fromTimes[fromTimeIndex]); // assuming the list is populated
-        double interval = fromTimes.length > 1 ? Math.round(fromTimes[1]) - Math.round(fromTimes[0]) : 1;
+        // round all the values to the next 10, this means we can only process tings which are at least 10 seconds.
+        // most of the stuff we do has time bins of 3600s though.
+        double endTimeFirstBin = Math.round(fromTimes[fromTimeIndex] / 10) * 10; // assuming the list is populated
+        double interval = fromTimes.length > 1 ? Math.round((fromTimes[1] - fromTimes[0]) / 10) * 10 : 1;
 
         double startTime = endTimeFirstBin - interval;
         return new TimeBinMap<>(interval, startTime);

@@ -31,7 +31,10 @@ public class PalmMergedOutputReader {
             log.info("Merging " + emissions.getTimeBins().size() + " time bins into result map.");
             for (var bin : emissions.getTimeBins()) {
                 // this assumes that all files contain distinct time steps
-                resultMap.getTimeBin(bin.getStartTime()).setValue(bin.getValue());
+                // put +10 seconds onto the start time of the bin, because palm's time steps vary around the exact value
+                // by one second. Use 10 to make sure data lands in the correct bin. Otherwise, we were putting
+                // data for 6am into the 5am bin because the time step would be 100799.0 instead of 10800.0...
+                resultMap.getTimeBin(bin.getStartTime() + 10).setValue(bin.getValue());
             }
         }
 

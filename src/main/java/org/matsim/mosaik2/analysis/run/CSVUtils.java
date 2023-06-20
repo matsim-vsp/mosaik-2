@@ -21,6 +21,7 @@ public class CSVUtils {
 
     public static <I> void writeTable(Collection<I> data, Path path, Collection<String> headers, BiConsumer<CSVPrinter, I> printLine) {
         var format = CSVFormat.DEFAULT.builder()
+                .setDelimiter(',')
                 .setHeader(headers.toArray(new String[0]))
                 .setSkipHeaderRecord(false)
                 .build();
@@ -42,7 +43,7 @@ public class CSVUtils {
         List<T> result = new ArrayList<>();
         var csvFormat = CSVFormat.DEFAULT.builder()
                 .setSkipHeaderRecord(true)
-                .setDelimiter(';')
+                .setDelimiter(',')
                 .setHeader()
                 .build();
         try (var reader = createReader(path); var parser = CSVParser.parse(reader, csvFormat)) {

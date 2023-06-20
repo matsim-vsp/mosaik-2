@@ -52,7 +52,7 @@ public class CalculateToll {
         var secondDayEmissions = getSecondDayInLocalTime(allEmissions, inputArgs.startTime, inputArgs.utcOffset);
         convertToSiUnits(secondDayEmissions);
         writePalmOutputToCsv(getDay2CSVPath(inputArgs.root, inputArgs.palmRunId), secondDayEmissions, inputArgs.species);
-
+/*
         // calculate link contributions to pollution
         var network = Utils.loadFilteredNetwork(inputArgs.networkFile, allEmissions.getTimeBins().iterator().next().getValue().values().iterator().next().getBounds().toGeometry());
         var linkContributions = LinkContributions.calculate(secondDayEmissions, network);
@@ -71,6 +71,8 @@ public class CalculateToll {
         LinkContributions.writeToCsv(getExposureContributionsPath(inputArgs.root, inputArgs.palmRunId), exposureContributions, inputArgs.species);
         new RoadPricingWriterXMLv1(exposureScheme).writeFile(getExposureTollOutputPath(inputArgs.root, inputArgs.palmRunId).toString());
         writeTollToCsv(getExposureTollCsvOutputPath(inputArgs.root, inputArgs.palmRunId), exposureScheme, exposureContributions);
+
+ */
     }
 
     private static <T> void writeTollToCsv(Path output, RoadPricingSchemeImpl scheme, TimeBinMap<T> timeBinMap) {

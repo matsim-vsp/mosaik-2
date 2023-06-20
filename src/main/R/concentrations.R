@@ -11,8 +11,11 @@ is_outlier <- function(value, x, y) {
 }
 
 print("Start reading csv.")
-csv_data <- read_csv("C:/Users/janek/Documents/work/berlin-roadpricing/output-rp-time-hundek-100/photoshade_6km10m_hundek_av_masked_M01.day2-si-units.xyt.csv")
+csv_data <- read_csv("C:/Users/janekdererste/Documents/work/berlin-roadpricing/output-rp-time-hundek-100/photoshade_6km10m_hundek_av_masked_M01.day2-si-units.xyt.csv")
 csv_data
+
+times <- csv_data %>% select(time) %>% distinct(time) %>% mutate(hour = time / 3600)
+times
 
 filter(csv_data, time == NaN)
 print("add hour column")

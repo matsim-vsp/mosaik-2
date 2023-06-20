@@ -1,15 +1,15 @@
-library(modelr)
 library(tidyverse)
+cbPalette <- c("#4285f4", "#ea4335", "#fbbc04", "#34a853", "#ff6d01", "#46bdc6", "#7baaf7", "#f07b72", "#fcd04f", "#71c287")
 
 # read palm data
 print("read palm data")
-palm_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units-no-outliers.xyt.csv",
+palm_data <- read_csv("C:/Users/janekdererste/Documents/work/palm/berlin_with_geometry_attributes/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units-no-outliers.xyt.csv",
                       col_select = c(time, x, y, NO, NO2, PM10))
 palm_data <- mutate(palm_data, NOx = NO + NO2)
 
 # read matsim smoothing data
 print("read matsim data")
-matsim_data <- read_csv("C:/Users/janek/Documents/work/palm/berlin_with_geometry_attributes/output/berlin-with-geometry-attributes.output_smoothed_rastered.xyt.csv")
+matsim_data <- read_csv("C:/Users/janekdererste/Documents/work/palm/berlin_with_geometry_attributes/output/berlin-with-geometry-attributes.output_smoothed_rastered.xyt.csv")
 
 
 # join the data on time, x, y so that we get the following tibble | time | x | y | palm | matsim |
@@ -28,7 +28,9 @@ plot <- ggplot(data = joined_nox, mapping = aes(x = NOx_matsim, y = NOx_palm)) +
   ylim(0, 0.0005) +
   xlim(0, 0.01) +
   ggtitle("MATSim NOx Concentrations to PALM NOx Concentrations") +
-  facet_wrap(vars(time))
+  facet_wrap(vars(time)) +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
 ggsave(plot, filename = "matsim-palm-nox-concentrations.png", height = 9, width = 16)
 
 # make scatter plots by time slice
@@ -38,7 +40,9 @@ plot <- ggplot(data = joined_pm, mapping = aes(x = PM10_matsim, y = PM10_palm)) 
   ylim(0, 2.5e-5) +
   xlim(0, 0.0005) +
   ggtitle("MATSim PM10 Concentrations to PALM PM10 Concentrations") +
-  facet_wrap(vars(time))
+  facet_wrap(vars(time))  +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
 ggsave(plot, filename = "matsim-palm-pm10-concentrations.png", height = 9, width = 16)
 
 
@@ -104,10 +108,12 @@ map_plot <- ggplot(data = matsim_with_pred, aes(x, y)) +
 ggsave(map_plot, filename = "predicted-maps.png", height = 9, width = 16)
 
 # make scatter plots by time slice
-plot <- ggplot(data = joined, mapping = aes(x = matsim, y = palm)) +
+plot <- ggplot(data = joined, mapping = aes(x = PM10_matsim, y = PM10_palm)) +
   geom_point(alpha = 0.5, shape = ".") +
   geom_smooth(method = "lm") +
   ylim(0, 0.0002) +
   ggtitle("MATSim Concentrations to PALM Concentrations") +
-  facet_wrap(vars(time))
-ggsave(plot, filename = "matsim-palm-concentrations.png")
+  facet_wrap(vars(time))  +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
+ggsave(plot, filename = "matsim-palm-pm10-concentrations.png", width = 3200, height = 1800, units = c("px"), dpi = 300)

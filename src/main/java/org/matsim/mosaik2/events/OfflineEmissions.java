@@ -30,8 +30,8 @@ import java.util.function.Predicate;
 
 public class OfflineEmissions {
 
-	private static final String hbefaAverageWarm = "projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_HOT_Vehcat_2020_Average.csv";
-	private static final String hbefaAverageCold = "projects\\matsim-germany\\hbefa\\hbefa-files\\v4.1\\EFA_ColdStart_Concept_2020_detailed_perTechAverage_withHGVetc.csv";
+	private static final String hbefaAverageWarm = "projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv";
+	private static final String hbefaAverageCold = "projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_withHGVetc.csv";
 
 	private static String getOutputFile(Path outputDir, String runId, String filename) {
 		return outputDir.resolve(runId + ".output_" + filename + ".xml.gz").toString();

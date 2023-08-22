@@ -30,9 +30,15 @@ public class ComparePalmRuns {
             diffMap.merge(record.key(), record.values(), Values::substract);
         }
 
-        CSVUtils.writeTable(diffMap.entrySet(), Paths.get(input.outputFile), List.of("time", "x", "y", "PM10", "NOx"), (p, r) -> {
+        /*CSVUtils.writeTable(diffMap.entrySet(), Paths.get(input.outputFile), List.of("time", "x", "y", "PM10", "NOx"), (p, r) -> {
             var nox = r.getValue().no2 + r.getValue().no;
             CSVUtils.printRecord(p, r.getKey().time, r.getKey().x, r.getKey().y, r.getValue().pm, nox);
+        });
+
+         */
+        CSVUtils.writeTable(diffMap.entrySet(), Paths.get(input.outputFile), List.of("time", "x", "y", "value"), (p, r) -> {
+            var nox = r.getValue().no2 + r.getValue().no;
+            CSVUtils.printRecord(p, r.getKey().time, r.getKey().x, r.getKey().y, nox);
         });
     }
 

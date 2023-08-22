@@ -12,6 +12,7 @@ import org.matsim.mosaik2.raster.DoubleRaster;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,8 @@ public class PalmOutput2Csv {
 	private static final String AV_MASKED_PALM_TEMPLATE = "%s_av_masked_M01.%s.nc";
 
 	private static final String AV_MASKED_DAY2_CSV_TEMPLATE = "%s_av_masked_M01.day2-si-units.xyt.csv";
+
+	private static final String AV_MASKED_DAY2_CSV_SPECIES_TEMPLATE = "%s_av_masked_M01.%s_day2-si-units.xyt.csv";
 
 	public static void main(String[] args) {
 
@@ -40,7 +43,14 @@ public class PalmOutput2Csv {
 		// we only want the second day
 		var secondDayEmissions = getSecondDayInLocalTime(allEmissions, inputArgs.startTime, inputArgs.utcOffset);
 		convertToSiUnits(secondDayEmissions);
+		inputArgs.species = calculateNOx(secondDayEmissions, inputArgs.species);
 		writePalmOutputToCsv(getDay2CSVPath(inputArgs.root, inputArgs.palmRunId), secondDayEmissions, inputArgs.species);
+
+		if (inputArgs.filePerSpecies) {
+			for (var s : inputArgs.species) {
+				writePalmOutputToCsv(getDay2SpeciesCSVPath(inputArgs.root, inputArgs.palmRunId, s), secondDayEmissions, List.of(s));
+			}
+		}
 	}
 
 	private static void writePalmOutputToCsv(Path output, TimeBinMap<Map<String, DoubleRaster>> data, Collection<String> species) {
@@ -49,7 +59,13 @@ public class PalmOutput2Csv {
 		// assuming we have at least one time bin with one raster.
 		var rasterToIterate = data.getTimeBins().iterator().next().getValue().values().iterator().next();
 		var header = new java.util.ArrayList<>(List.of("time", "x", "y"));
-		header.addAll(species);
+
+		// hack this in here, so that things are compatible with simwrapper
+		if (species.size() == 1) {
+			header.add("value");
+		} else {
+			header.addAll(species);
+		}
 
 		CSVUtils.writeTable(data.getTimeBins(), output, header, (p, bin) -> {
 			var time = bin.getStartTime();
@@ -84,6 +100,11 @@ public class PalmOutput2Csv {
 
 	private static Path getDay2CSVPath(String root, String runId) {
 		var name = String.format(AV_MASKED_DAY2_CSV_TEMPLATE, runId);
+		return Paths.get(root).resolve(name);
+	}
+
+	private static Path getDay2SpeciesCSVPath(String root, String runId, String species) {
+		var name = String.format(AV_MASKED_DAY2_CSV_SPECIES_TEMPLATE, runId, species);
 		return Paths.get(root).resolve(name);
 	}
 
@@ -130,6 +151,30 @@ public class PalmOutput2Csv {
 		}
 	}
 
+	private static List<String> calculateNOx(TimeBinMap<Map<String, DoubleRaster>> data, List<String> species) {
+
+		var first = data.getTimeBins().iterator().next().getValue();
+		if (first.containsKey("NO") && first.containsKey("NO2")) {
+			log.info("Calculating NOx");
+			for (var bin : data.getTimeBins()) {
+				var emissions = bin.getValue();
+				var no = emissions.get("NO");
+				var no2 = emissions.get("NO2");
+				var nox = new DoubleRaster(no.getBounds(), no.getCellSize());
+				nox.setValueForEachIndex((xi, yi) -> {
+					var noVal = no.getValueByIndex(xi, yi);
+					var no2Val = no2.getValueByIndex(xi, yi);
+					return noVal + no2Val;
+				});
+				emissions.put("NOx", nox);
+			}
+			var speciesCopy = new ArrayList<>(species);
+			speciesCopy.add("NOx");
+			return speciesCopy;
+		}
+		return species;
+	}
+
 	private static DoubleToDoubleFunction getConverterFunction(String species) {
 		return switch (species) {
 			case "PM10" ->
@@ -164,5 +209,8 @@ public class PalmOutput2Csv {
 
 		@Parameter(names = "-species")
 		private List<String> species = List.of("NO2", "NO", "O3", "PM10");
+
+		@Parameter(names = "-file-per-species")
+		private boolean filePerSpecies = false;
 	}
 }

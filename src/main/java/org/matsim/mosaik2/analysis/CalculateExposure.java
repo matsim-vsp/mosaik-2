@@ -181,8 +181,21 @@ public class CalculateExposure {
 
 			resultMap.getTimeBin(startTime).setValue(exposureRaster);
 		}
-		log.info("Finished exposure calculation.");
-		XYTValueCsvData.write(outputPath, resultMap);
+		//log.info("Finished exposure calculation.");
+		//XYTValueCsvData.write(outputPath, resultMap);
+
+		log.info("write overall exposure");
+
+		TimeBinMap<DoubleRaster> overallResultMap = new TimeBinMap<>(100000, 0);
+		for (var bin : resultMap.getTimeBins()) {
+
+			var resultBin = overallResultMap.getTimeBin(0);
+			var resultRaster = resultBin.computeIfAbsent(() -> new DoubleRaster(bin.getValue().getBounds(), bin.getValue().getCellSize()));
+
+			bin.getValue().forEachIndex(resultRaster::adjustValueForIndex);
+		}
+
+		XYTValueCsvData.write(outputPath, overallResultMap);
 	}
 
 	private static class InputArgs {

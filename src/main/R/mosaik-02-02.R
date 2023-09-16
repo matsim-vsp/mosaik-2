@@ -20,7 +20,7 @@ joined_nox <- base_nox %>%
   inner_join(city_nox, by = c("hour", "x", "y"), suffix = c(".base", ".city")) %>%
   pivot_longer(cols = c(ends_with(".berlin"), ends_with(".base"), ends_with(".city")), values_to = "NOx")
 
-#----- write diff csv
+#------------------------ write diff csv ------------------------------------------------------------
 diffs_nox <- berlin_nox %>%
   inner_join(city_nox, by = c("hour", "x", "y"), suffix = c(".berlin", ".city")) %>%
   pivot_longer(cols = c(ends_with(".berlin"), ends_with(".city")), values_to = "NOx") %>%
@@ -36,3 +36,101 @@ diff_nox_city <- diffs_nox %>%
   filter(name == "NOx.city") %>%
   select(hour, x, y, diff)
 write_csv(diff_nox_city, "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/scenarios/rp-city/city-diff-nox.xyt.csv")
+
+#------------------------ create box plots for hourly emissions in base case -------------------------
+base_all_no <- palm_base %>%
+  select(hour, x, y, NO, NO2, NOx) %>%
+  pivot_longer(cols = c(NO, NO2, NOx), names_to= "species", values_to = "concentrations")
+
+p <- ggplot(base_all_no, aes(x = factor(hour), y = concentrations, color = factor(species))) +
+  geom_boxplot(outlier.shape = NaN) +
+  ylim(0, 1.5e-4) +
+  ggtitle("PALM Konzentrationen NOx [g/m3]") +
+  labs(color = "Schadstoff") +
+  xlab("Stunde") +
+  ylab("") +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-nox-base.pdf", width = 220, height = 118, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-nox-base.png", width = 220, height = 118, units = "mm", dpi = 300)
+
+base_pm <- palm_base %>%
+  pivot_longer(cols = c(PM10), names_to = "species", values_to = "concentrations")
+
+p <- ggplot(base_pm, aes(x = factor(hour), y = concentrations, color = factor(species))) +
+  geom_boxplot(outlier.shape = NaN) +
+  ylim(0, 7.5e-6) +
+  ggtitle("PALM Konzentrationen PM10 [g/m3]") +
+  labs(color = "Schadstoff") +
+  xlab("Stunde") +
+  ylab("") +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
+ggsave(
+  plot = p,
+  filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-pm-base.pdf",
+  width = 220,
+  height = 118,
+  units = "mm"
+)
+ggsave(
+  plot = p,
+  filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-pm-base.png",
+  width = 220,
+  height = 118,
+  units = "mm"
+)
+
+#------------------------ create box plots for comparison of scenarios ------------------------ 
+
+p <- ggplot(joined_nox, aes(x = factor(hour), y = NOx, color = factor(name))) +
+  geom_boxplot(outlier.shape = NaN) + 
+  ylim(0, 1.5e-4) +
+  ggtitle("NOx Konzentrationen [g/m3] - Szenariovergleich") +
+  labs(color = "Szenario") +
+  xlab("Stunde") +
+  ylab("") +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-nox-compare.pdf", width = 220, height = 118, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-nox-compare.png", width = 220, height = 118, units = "mm")
+
+#------------------------ create emission mass plot ------------------------ 
+
+base_factors <- palm_base %>%
+  select(hour, x, y, NOx, PM10) %>%
+  mutate(mass_NOx = NOx * 10 * 10 * 10, mass_PM10 = PM10 * 10 * 10 * 10) %>%
+  group_by(hour) %>% 
+  summarise(factor_NOx = sum(mass_NOx) / 26428.476, factor_PM10 = sum(mass_PM10) / 1228.3311) %>%
+  pivot_longer(cols = starts_with("factor_"), values_to = "factor", names_to = "species", names_prefix = "factor_")
+
+p <- ggplot(base_factors, aes(hour, factor, color = species)) +
+  geom_line() +
+  ggtitle("Normalisierte Schadstoffmasse") +
+  labs(color = "Schadstoff") +
+  xlab("Stunde") +
+  ylab("") +
+  scale_color_manual(values = cbPalette) +
+  theme_light()
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/line-normalized-sums.pdf", width = 220, height = 118, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/line-normalized-sums.png", width = 220, height = 118, units = "mm")
+
+#------------------------ create toll plot ------------------------ 
+
+base_toll <- palm_base %>%
+  select(hour, x, y, NOx, PM10) %>%
+  mutate(mass_NOx = NOx * 10 * 10 * 10, mass_PM10 = PM10 * 10 * 10 * 10) %>%
+  group_by(hour) %>% 
+  summarise(factor_NOx = sum(mass_NOx) / 26428.476, factor_PM10 = sum(mass_PM10) / 1228.3311) %>%
+  mutate(toll_NOx = factor_NOx * 36.8 / 1000 * 0.338/1000, toll_PM10 = factor_PM10 * 36.8 / 1000 * 0.002 / 1000) %>%
+  mutate(total_toll = toll_NOx + toll_PM10)
+
+p <- ggplot(base_toll, aes(hour, total_toll)) +
+  geom_line(color = "#4285f4") +
+  ggtitle("Erhobene Maut pro Meter") +
+  xlab("Stunde") +
+  ylab("") +
+  theme_light()
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/line-toll.pdf", width = 220, height = 118, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/line-toll.png", width = 220, height = 118, units = "mm")
+

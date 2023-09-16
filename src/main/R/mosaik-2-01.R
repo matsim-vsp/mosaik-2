@@ -8,7 +8,8 @@ palm_base <- read_csv("/Users/janek/Documents/palm/mosaik-2-01/palm-output/photo
 
 nox <- palm_base %>%
   select(hour, NO, NO2, NOx) %>%
-  pivot_longer(cols = c("NO", "NO2"), names_to = "species", values_to = "concentration")
+  pivot_longer(cols = c("NOx", "NO", "NO2" ), names_to = "species", values_to = "concentration") %>%
+  mutate(concentration = concentration * 1e6) # convert units into micro grams
 
 no_mean <- nox %>%
   filter(species == "NO") %>%
@@ -28,13 +29,14 @@ no2_mean %>% filter(avg == max(avg))
 
 p <- ggplot(nox, aes(x = factor(hour), y = concentration, color = factor(species))) +
   geom_boxplot(outlier.alpha = 0.3, outlier.shape = NA) +
-  ylim(0, 1e-4) +
+  ylim(0, 1e2) +
   ggtitle("NOx Concentrations") +
   labs(color = "Species") +
   xlab("Hour") +
-  ylab("Concentration [g/m3]") +
+  ylab("Concentration [\u00B5g/m3]") +
   scale_fill_manual(values = cbPalette) +
   scale_color_manual(values = cbPalette) +
   theme_light() +
   theme(text = element_text(size = 10))
-ggsave(plot = p, filename = "/Users/janek/Documents/palm/mosaik-2-01/palm-output/nox-aggregated.png", width = 210, height = 118, units = "mm", dpi = 300)
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-aggregated.pdf", width = 210, height = 118, units = "mm", dpi = 300)
+

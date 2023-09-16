@@ -1,0 +1,7 @@
+ll
+mosaik-02-02.R
+Rscript
+Rscript mosaik-02-02.R
+Rscript "mosaik-02-02.R"
+source("/Users/janek/projects/mosaik-2/src/main/R/mosaik-02-02.R")
+source("/Users/janek/projects/mosaik-2/src/main/R/mosaik-02-02.R")

@@ -70,7 +70,8 @@ joined_nox <- base_nox %>%
   inner_join(berlin_nox, by = c("hour", "x", "y"), suffix = c("", ".berlin")) %>%
   inner_join(city_nox, by = c("hour", "x", "y"), suffix = c(".base", ".city")) %>%
   pivot_longer(cols = c(ends_with(".berlin"), ends_with(".base"), ends_with(".city")), values_to = "NOx", ) %>%
-  mutate(scenario_name = sapply(name, get_name_1))
+  mutate(scenario_name = sapply(name, get_name_1)) %>%
+  mutate(NOx = NOx * 1e6)
 
 #------------------------ write diff csv ------------------------------------------------------------
 diffs_nox <- berlin_nox %>%
@@ -92,34 +93,38 @@ write_csv(diff_nox_city, "/Users/janek/Documents/writing/mosaik-2-02/data-files-
 #------------------------ create box plots for hourly emissions in base case -------------------------
 base_all_no <- palm_base %>%
   select(hour, x, y, NO, NO2, NOx) %>%
-  pivot_longer(cols = c(NO, NO2, NOx), names_to= "species", values_to = "concentrations")
+  pivot_longer(cols = c(NO, NO2, NOx), names_to= "species", values_to = "concentrations") %>%
+  mutate(concentrations = concentrations * 1e6)
 
 p <- ggplot(base_all_no, aes(x = factor(hour), y = concentrations, color = factor(species))) +
   geom_boxplot(outlier.shape = NaN) +
-  ylim(0, 1.5e-4) +
-  ggtitle("PALM Konzentrationen NOx [g/m3]") +
+  ylim(0, 150) +
+  ggtitle("PALM Konzentrationen NOx [\u00B5g/m3]") +
   labs(color = "Schadstoff") +
   xlab("Stunde") +
   ylab("") +
   scale_fill_manual(values = cbPalette) +
   scale_color_manual(values = cbPalette) +
   theme_light()
+p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-nox-base.pdf", width = 220, height = 118, units = "mm")
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-nox-base.png", width = 220, height = 118, units = "mm", dpi = 300)
 
 base_pm <- palm_base %>%
-  pivot_longer(cols = c(PM10), names_to = "species", values_to = "concentrations")
+  pivot_longer(cols = c(PM10), names_to = "species", values_to = "concentrations") %>%
+  mutate(concentrations = concentrations * 1e6)
 
 p <- ggplot(base_pm, aes(x = factor(hour), y = concentrations, color = factor(species))) +
   geom_boxplot(outlier.shape = NaN) +
-  ylim(0, 7.5e-6) +
-  ggtitle("PALM Konzentrationen PM10 [g/m3]") +
+  ylim(0, 7.5) +
+  ggtitle("PALM Konzentrationen PM10 [\u00B5g/m3]") +
   labs(color = "Schadstoff") +
   xlab("Stunde") +
   ylab("") +
   scale_fill_manual(values = cbPalette) +
   scale_color_manual(values = cbPalette) +
   theme_light()
+p
 ggsave(
   plot = p,
   filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-pm-base.pdf",
@@ -139,14 +144,15 @@ ggsave(
 
 p <- ggplot(joined_nox, aes(x = factor(hour), y = NOx, color = factor(scenario_name))) +
   geom_boxplot(outlier.shape = NaN) + 
-  ylim(0, 1.5e-4) +
-  ggtitle("NOx Konzentrationen [g/m3] - Szenariovergleich") +
+  ylim(0, 150) +
+  ggtitle("NOx Konzentrationen [\u00B5g/m3] - Szenariovergleich") +
   labs(color = "Szenario") +
   xlab("Stunde") +
   ylab("") +
   scale_fill_manual(values = cbPalette) +
   scale_color_manual(values = cbPalette) +
   theme_light()
+p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-nox-compare.pdf", width = 220, height = 118, units = "mm")
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/box-nox-compare.png", width = 220, height = 118, units = "mm")
 
@@ -168,6 +174,7 @@ p <- ggplot(base_factors, aes(hour, factor, color = species)) +
   scale_color_manual(values = cbPalette) +
   scale_color_manual(values = cbPalette) +
   theme_light()
+p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/line-normalized-sums.pdf", width = 220, height = 118, units = "mm")
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/line-normalized-sums.png", width = 220, height = 118, units = "mm")
 
@@ -179,14 +186,44 @@ base_toll <- palm_base %>%
   group_by(hour) %>% 
   summarise(factor_NOx = sum(mass_NOx) / 26428.476, factor_PM10 = sum(mass_PM10) / 1228.3311) %>%
   mutate(toll_NOx = factor_NOx * 36.8 / 1000 * 0.338/1000, toll_PM10 = factor_PM10 * 36.8 / 1000 * 0.002 / 1000) %>%
-  mutate(total_toll = toll_NOx + toll_PM10)
+  mutate(total_toll = toll_NOx + toll_PM10) %>%
+  mutate(total_toll = total_toll * 100)
 
 p <- ggplot(base_toll, aes(hour, total_toll)) +
   geom_line(color = "#4285f4") +
-  ggtitle("Erhobene Maut pro Meter") +
+  ggtitle("Erhobene Maut [EUR/m]") +
   xlab("Stunde") +
   ylab("") +
   theme_light()
+p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/line-toll.pdf", width = 220, height = 118, units = "mm")
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/line-toll.png", width = 220, height = 118, units = "mm")
 
+#----------------------- create linear fit plot
+# read in smoothed matsim data
+matsim_smoothed <- read_csv("/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/scenarios/base-case/berlin-with-geometry-attributes.output_smoothed_rastered.xyt.csv") %>%
+  mutate(hour = time / 3600)
+
+matsim_palm_base <- palm_base %>%
+  inner_join(matsim_smoothed, by = c("x", "y", "hour"), suffix = c(".palm", ".matsim")) %>%
+  filter(hour > 5) %>%
+  filter(hour < 18) %>%
+  mutate(NOx.matsim = NOx.matsim * 1e6) %>%
+  mutate(NOx.palm = NOx.palm * 1e6) %>%
+  select(hour, x, y, NOx.matsim, NOx.palm)
+
+#Our transformation function
+scaleFUN <- function(x) sprintf("%.2f", x)
+
+p <- ggplot(matsim_palm_base, aes(NOx.matsim, y = NOx.palm)) +
+  geom_point(shape = ".") +
+  geom_smooth(method = "lm") +
+  ylim(0, 500) +
+  xlim(0, 10000) +
+  ggtitle("NOx Konzentrationen [\u00B5g/m3] MATSim vs. PALM") +
+  facet_wrap(vars(hour)) +
+  scale_fill_manual(values = cbPalette) +
+  theme_light()
+p
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/linear-fit-nox.pdf", width = 220, height = 118, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-02/data-files-nextcloud/r-output/linear-fit-nox.png", width = 220, height = 118, units = "mm")

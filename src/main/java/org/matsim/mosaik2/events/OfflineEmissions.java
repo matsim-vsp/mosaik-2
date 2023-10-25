@@ -56,11 +56,12 @@ public class OfflineEmissions {
 		config.addModule(emissionConfigGroup);
 
 		emissionConfigGroup.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
-		emissionConfigGroup.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
+		//emissionConfigGroup.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
 		emissionConfigGroup.setAverageColdEmissionFactorsFile(sharedSvn.resolve(hbefaAverageCold).toString());
 		emissionConfigGroup.setAverageWarmEmissionFactorsFile(sharedSvn.resolve(hbefaAverageWarm).toString());
 		emissionConfigGroup.setNonScenarioVehicles(EmissionsConfigGroup.NonScenarioVehicles.ignore);
 		emissionConfigGroup.setHbefaTableConsistencyCheckingLevel(EmissionsConfigGroup.HbefaTableConsistencyCheckingLevel.none);
+		emissionConfigGroup.setEmissionsComputationMethod(EmissionsConfigGroup.EmissionsComputationMethod.StopAndGoFraction);
 
 		// we need the generated vehicles of the matsim run
 
@@ -190,9 +191,9 @@ public class OfflineEmissions {
 
 		EmissionModule emissionModule = injector.getInstance(EmissionModule.class);
 
-		var onlyEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(1.0), getOutputFile(outputDir, runId, "only_emission_events"));
-		var sample10pctEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(0.1), getOutputFile(outputDir, runId, "only_01_emission_events"));
-		var sample1pctEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(0.01), getOutputFile(outputDir, runId, "only_001_emission_events"));
+		var onlyEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(1.0), getOutputFile(outputDir, runId, "stop_and_go_only_emission_events"));
+		var sample10pctEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(0.1), getOutputFile(outputDir, runId, "stop_and_go_only_01_emission_events"));
+		var sample1pctEmissionEventsWriter = new FilterEventsWriter(new DownsamplingEmissionEventsFilter(0.01), getOutputFile(outputDir, runId, "stop_and_go_only_001_emission_events"));
 
 		emissionModule.getEmissionEventsManager().addHandler(onlyEmissionEventsWriter);
 		emissionModule.getEmissionEventsManager().addHandler(sample10pctEmissionEventsWriter);
@@ -210,10 +211,10 @@ public class OfflineEmissions {
 
 	private static class OutputArgs {
 
-		@Parameter(names = "-runId")
+		@Parameter(names = "-runId", required = true)
 		private String runId;
 
-		@Parameter(names = "-outputDir")
+		@Parameter(names = "-outputDir", required = true)
 		private String outputDir;
 	}
 

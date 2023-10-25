@@ -51,7 +51,7 @@ public class Utils {
         emissionConfig.setDetailedWarmEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
         emissionConfig.setAverageColdEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Vehcat_2020_Average_with_zeor_values_for_unknown_types.csv");
         emissionConfig.setAverageWarmEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv");
-        emissionConfig.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
+        //emissionConfig.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
         return emissionConfig;
     }
 
@@ -59,7 +59,7 @@ public class Utils {
 
 		config.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
 		config.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
-		config.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
+		//config.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
 		config.setAverageColdEmissionFactorsFile(hbefaDirectory.resolve("EFA_ColdStart_Vehcat_2020_Average.csv").toString());
 		config.setAverageWarmEmissionFactorsFile(hbefaDirectory.resolve("EFA_HOT_Vehcat_2020_Average.csv").toString());
 	}

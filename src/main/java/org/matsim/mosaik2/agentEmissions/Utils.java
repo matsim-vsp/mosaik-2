@@ -23,78 +23,78 @@ import java.util.Set;
 
 public class Utils {
 
-	static void applySnapshotSettings(Config config) {
-		// activate snapshots
-		config.qsim().setSnapshotPeriod(1);
-		config.qsim().setSnapshotStyle(QSimConfigGroup.SnapshotStyle.kinematicWaves);
-		config.qsim().setLinkWidthForVis(0);
-		config.controler().setWriteSnapshotsInterval(1);
-		config.controler().setSnapshotFormat(Set.of(ControlerConfigGroup.SnapshotFormat.positionevents));
+    static void applySnapshotSettings(Config config) {
+        // activate snapshots
+        config.qsim().setSnapshotPeriod(1);
+        config.qsim().setSnapshotStyle(QSimConfigGroup.SnapshotStyle.kinematicWaves);
+        config.qsim().setLinkWidthForVis(0);
+        config.controler().setWriteSnapshotsInterval(1);
+        config.controler().setSnapshotFormat(Set.of(ControlerConfigGroup.SnapshotFormat.positionevents));
 //        config.controler().setFirstIteration(0);
 //        config.controler().setLastIteration(0);
-		// we want simstepparalleleventsmanagerimpl
-		config.parallelEventHandling().setSynchronizeOnSimSteps(true);
-	}
+        // we want simstepparalleleventsmanagerimpl
+        config.parallelEventHandling().setSynchronizeOnSimSteps(true);
+    }
 
-	@Getter
-	public static class SharedSvnArg {
-		@Parameter(names = "-sharedSvn", required = true)
-		private String sharedSvn;
-	}
+    @Getter
+    public static class SharedSvnArg {
+        @Parameter(names = "-sharedSvn", required = true)
+        private String sharedSvn;
+    }
 
-	static EmissionsConfigGroup createUpEmissionsConfigGroup(String sharedSvn) {
-		var emissionConfig = new EmissionsConfigGroup();
-		emissionConfig.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
+    static EmissionsConfigGroup createUpEmissionsConfigGroup(String sharedSvn) {
+        var emissionConfig = new EmissionsConfigGroup();
+        emissionConfig.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
         emissionConfig.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
         // vsp default is to let shared-svn reside next to all git projects in the git directory. This should find the mosaik-2 project folder and go from there to shared-svn
-        emissionConfig.setDetailedColdEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
-        emissionConfig.setDetailedWarmEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
-        emissionConfig.setAverageColdEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Vehcat_2020_Average_with_zeor_values_for_unknown_types.csv");
-        emissionConfig.setAverageWarmEmissionFactorsFile( sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv");
+        emissionConfig.setDetailedColdEmissionFactorsFile(sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
+        emissionConfig.setDetailedWarmEmissionFactorsFile(sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Concept_2020_detailed_perTechAverage_Bln_carOnly.csv");
+        emissionConfig.setAverageColdEmissionFactorsFile(sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_ColdStart_Vehcat_2020_Average_withHGVetc.csv");
+        emissionConfig.setAverageWarmEmissionFactorsFile(sharedSvn + "/projects/matsim-germany/hbefa/hbefa-files/v4.1/EFA_HOT_Vehcat_2020_Average.csv");
         //emissionConfig.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
         return emissionConfig;
     }
 
     static void applyEmissionSettings(EmissionsConfigGroup config, Path hbefaDirectory) {
 
-		config.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
-		config.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
-		//config.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
-		config.setAverageColdEmissionFactorsFile(hbefaDirectory.resolve("EFA_ColdStart_Vehcat_2020_Average.csv").toString());
-		config.setAverageWarmEmissionFactorsFile(hbefaDirectory.resolve("EFA_HOT_Vehcat_2020_Average.csv").toString());
-	}
+        config.setHbefaVehicleDescriptionSource(EmissionsConfigGroup.HbefaVehicleDescriptionSource.asEngineInformationAttributes);
+        config.setDetailedVsAverageLookupBehavior(EmissionsConfigGroup.DetailedVsAverageLookupBehavior.directlyTryAverageTable);
+        //config.setHbefaRoadTypeSource(EmissionsConfigGroup.HbefaRoadTypeSource.fromLinkAttributes);
+        config.setAverageColdEmissionFactorsFile(hbefaDirectory.resolve("EFA_ColdStart_Vehcat_2020_Average.csv").toString());
+        config.setAverageWarmEmissionFactorsFile(hbefaDirectory.resolve("EFA_HOT_Vehcat_2020_Average.csv").toString());
+    }
 
     static PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig createNetcdfEmissionWriterConfigGroup() {
         var netcdfWriterConfig = new PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig();
-       applyNetCdfWriterConfig(netcdfWriterConfig);
-		return netcdfWriterConfig;
-	}
+        applyNetCdfWriterConfig(netcdfWriterConfig);
+        return netcdfWriterConfig;
+    }
 
-	static void applyNetCdfWriterConfig(PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig config) {
-		config.setPollutants(Map.of(
-				Pollutant.NO2, "NO2",
-				Pollutant.CO2_TOTAL, "CO2",
-				Pollutant.PM, "PM10",
-				Pollutant.CO, "CO",
-				Pollutant.NOx, "NOx"
-		));
-		config.setCalculateNOFromNOxAndNO2(true);
-	}
+    static void applyNetCdfWriterConfig(PositionEmissionNetcdfModule.NetcdfEmissionWriterConfig config) {
+        config.setPollutants(Map.of(
+                Pollutant.NO2, "NO2",
+                Pollutant.CO2_TOTAL, "CO2",
+                Pollutant.PM, "PM10",
+                Pollutant.CO, "CO",
+                Pollutant.NOx, "NOx"
+        ));
+        config.setCalculateNOFromNOxAndNO2(true);
+    }
 
-	@Getter
-	public static class PublicSvnArg {
-		@Parameter(names = "-publicSvn", required = true)
-		private String publicSvn;
-	}
+    @Getter
+    public static class PublicSvnArg {
+        @Parameter(names = "-publicSvn", required = true)
+        private String publicSvn;
+    }
 
-	static void applyNetworkAttributes(Network network) {
-		// network
-		for (Link link : network.getLinks().values()) {
+    static void applyNetworkAttributes(Network network) {
+        // network
+        for (Link link : network.getLinks().values()) {
 
-			double freespeed;
+            double freespeed;
 
-			if (link.getFreespeed() <= 13.888889) {
-				freespeed = link.getFreespeed() * 2;
+            if (link.getFreespeed() <= 13.888889) {
+                freespeed = link.getFreespeed() * 2;
                 // for non motorway roads, the free speed level was reduced
             } else {
                 freespeed = link.getFreespeed();
@@ -142,10 +142,10 @@ public class Utils {
     static void applyVehicleInformation(VehicleType vehicleType) {
 
         EngineInformation engineInformation = vehicleType.getEngineInformation();
-        VehicleUtils.setHbefaVehicleCategory( engineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
-        VehicleUtils.setHbefaTechnology( engineInformation, "average" );
-        VehicleUtils.setHbefaSizeClass( engineInformation, "average" );
-        VehicleUtils.setHbefaEmissionsConcept( engineInformation, "average" );
+        VehicleUtils.setHbefaVehicleCategory(engineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
+        VehicleUtils.setHbefaTechnology(engineInformation, "average");
+        VehicleUtils.setHbefaSizeClass(engineInformation, "average");
+        VehicleUtils.setHbefaEmissionsConcept(engineInformation, "average");
     }
 
     public static void createAndAddVehicles(Scenario scenario, VehicleType type) {

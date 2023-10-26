@@ -41,7 +41,7 @@ public class CreateColdEmissionForUnknownVehicleTypes {
                 .DEFAULT
                 .withDelimiter(';')
                 .withHeader("Case", "VehCat", "Year", "TrafficScenario", "Component", "RoadCat", "AmbientCondPattern", "EFA_weighted", "EFA_km_weighted", "EFA_WTT_weighted", "EFA_WTT_km_weighted", "EFA_WTW_weighted", "EFA_WTW_km_weighted").print(writer)) {
-            // collect the current data. Use a BOMInputStream, since the original file contains such a bom. See https://commons.apache.org/proper/commons-csv/user-guide.html#Handling_Byte_Order_Marks
+            // collect the current emissions. Use a BOMInputStream, since the original file contains such a bom. See https://commons.apache.org/proper/commons-csv/user-guide.html#Handling_Byte_Order_Marks
             try (final Reader reader = new InputStreamReader(new BOMInputStream(Paths.get(coldEmissions).toUri().toURL().openStream()), StandardCharsets.UTF_8);
                  var csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withDelimiter(';').withHeader())) {
 

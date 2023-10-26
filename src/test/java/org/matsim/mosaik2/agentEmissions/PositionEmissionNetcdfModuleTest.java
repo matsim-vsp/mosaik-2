@@ -37,9 +37,7 @@ import java.util.function.Consumer;
 import static org.junit.Assert.assertTrue;
 
 @Log4j2
-public class
-
-PositionEmissionNetcdfModuleTest {
+public class PositionEmissionNetcdfModuleTest {
 
     @Rule
     public MatsimTestUtils testUtils = new MatsimTestUtils();
@@ -47,14 +45,14 @@ PositionEmissionNetcdfModuleTest {
     @Test
     public void testSimpleSetUp() {
 
-        runTest(testUtils.getClassInputDirectory() + "config.xml", scenario -> {
+        runTest(testUtils.getClassInputDirectory() + "config.xml", testUtils, scenario -> {
 
             var defaultVehicleType = VehicleUtils.createVehicleType(Id.create(TransportMode.car, VehicleType.class));
             EngineInformation carEngineInformation = defaultVehicleType.getEngineInformation();
-            VehicleUtils.setHbefaVehicleCategory( carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
-            VehicleUtils.setHbefaTechnology( carEngineInformation, "average" );
-            VehicleUtils.setHbefaSizeClass( carEngineInformation, "average" );
-            VehicleUtils.setHbefaEmissionsConcept( carEngineInformation, "average" );
+            VehicleUtils.setHbefaVehicleCategory(carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
+            VehicleUtils.setHbefaTechnology(carEngineInformation, "average");
+            VehicleUtils.setHbefaSizeClass(carEngineInformation, "average");
+            VehicleUtils.setHbefaEmissionsConcept(carEngineInformation, "average");
 
             scenario.getVehicles().addVehicleType(defaultVehicleType);
 
@@ -68,14 +66,14 @@ PositionEmissionNetcdfModuleTest {
     @Test
     public void testEquilSetup() {
         var configPath = ExamplesUtils.getTestScenarioURL("equil") + "config.xml";
-        runTest(configPath, scenario -> {
+        runTest(configPath, testUtils, scenario -> {
 
             var defaultVehicleType = VehicleUtils.createVehicleType(Id.create(TransportMode.car, VehicleType.class));
             EngineInformation carEngineInformation = defaultVehicleType.getEngineInformation();
-            VehicleUtils.setHbefaVehicleCategory( carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
-            VehicleUtils.setHbefaTechnology( carEngineInformation, "average" );
-            VehicleUtils.setHbefaSizeClass( carEngineInformation, "average" );
-            VehicleUtils.setHbefaEmissionsConcept( carEngineInformation, "average" );
+            VehicleUtils.setHbefaVehicleCategory(carEngineInformation, HbefaVehicleCategory.PASSENGER_CAR.toString());
+            VehicleUtils.setHbefaTechnology(carEngineInformation, "average");
+            VehicleUtils.setHbefaSizeClass(carEngineInformation, "average");
+            VehicleUtils.setHbefaEmissionsConcept(carEngineInformation, "average");
 
             scenario.getVehicles().addVehicleType(defaultVehicleType);
 
@@ -94,7 +92,7 @@ PositionEmissionNetcdfModuleTest {
         });
     }
 
-    private void runTest(String configPath, Consumer<Scenario> scenarioLoaded) {
+    public static void runTest(String configPath, MatsimTestUtils testUtils, Consumer<Scenario> scenarioLoaded) {
 
         //--------------- prepare and run the set up -----------------------//
         var netCdfEmissionWriterConfigGroup = Utils.createNetcdfEmissionWriterConfigGroup();
@@ -103,7 +101,7 @@ PositionEmissionNetcdfModuleTest {
         Utils.applySnapshotSettings(config);
         config.controler().setOutputDirectory(testUtils.getOutputDirectory());
 
-       // config.controler().setLastIteration(0);
+        // config.controler().setLastIteration(0);
         config.qsim().setVehiclesSource(QSimConfigGroup.VehiclesSource.modeVehicleTypesFromVehiclesData);
 
         var scenario = ScenarioUtils.loadScenario(config);
@@ -156,7 +154,8 @@ PositionEmissionNetcdfModuleTest {
         public void handleEvent(Event event) {
             if (event.getEventType().equals(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE)) {
 
-                if (event.getAttributes().get("emissionType").equals("cold")) return; // ignore cold events for now, but think about it later
+                if (event.getAttributes().get("emissionType").equals("cold"))
+                    return; // ignore cold events for now, but think about it later
 
                 var record = "time=" + event.getTime() +
                         ",vehicleId=" + event.getAttributes().get("vehicleId") +

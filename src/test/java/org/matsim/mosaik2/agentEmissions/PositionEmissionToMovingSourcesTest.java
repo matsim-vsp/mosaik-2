@@ -23,10 +23,7 @@ import org.matsim.vehicles.VehicleUtils;
 import ucar.ma2.InvalidRangeException;
 
 import javax.inject.Singleton;
-
 import java.io.IOException;
-
-import static org.junit.Assert.*;
 
 public class PositionEmissionToMovingSourcesTest {
     @Rule
@@ -89,6 +86,7 @@ public class PositionEmissionToMovingSourcesTest {
 
         PositionEmissionToMovingSources.main(new String[]{
                 "-pee", testUtils.getOutputDirectory() + "output_events.xml.gz",
+                "-n", testUtils.getOutputDirectory() + "output_network.xml.gz",
                 "-netCdfOutput", testUtils.getOutputDirectory() + "output_positions.nc",
                 "-s", "PM10",
                 "-s", "NO"

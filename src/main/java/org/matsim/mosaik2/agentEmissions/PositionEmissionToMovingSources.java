@@ -8,22 +8,27 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import lombok.RequiredArgsConstructor;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.events.Event;
+import org.matsim.api.core.v01.events.VehicleEntersTrafficEvent;
+import org.matsim.api.core.v01.events.VehicleLeavesTrafficEvent;
 import org.matsim.contrib.emissions.Pollutant;
 import org.matsim.contrib.emissions.PositionEmissionsModule;
 import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.MatsimEventsReader;
 import org.matsim.core.events.algorithms.EventWriter;
 import org.matsim.core.events.handler.BasicEventHandler;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.vehicles.Vehicle;
 import ucar.ma2.*;
 import ucar.nc2.Attribute;
 import ucar.nc2.Dimension;
-import ucar.nc2.write.Nc4Chunking;
 import ucar.nc2.write.NetcdfFileFormat;
 import ucar.nc2.write.NetcdfFormatWriter;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class PositionEmissionToMovingSources {
 
@@ -69,15 +74,29 @@ public class PositionEmissionToMovingSources {
         @Override
         public void handleEvent(Event event) {
 
-            if (event instanceof PositionEmissionsModule.PositionEmissionEvent posEvEvent) {
-                observedVehicles.computeIfAbsent(posEvEvent.getVehicleId(), k -> new IntArrayList()).add((int) posEvEvent.getTime());
+            if (event instanceof PositionEmissionsModule.PositionEmissionEvent e) {
+                handle(e.getVehicleId(), e.getTime());
+            } else if (event instanceof VehicleEntersTrafficEvent e) {
+                handle(e.getVehicleId(), e.getTime() + 1);
+            } else if (event instanceof VehicleLeavesTrafficEvent e) {
+                handle(e.getVehicleId(), e.getTime());
             }
+        }
+
+        private void handle(Id<Vehicle> id, double time) {
+            observedVehicles.computeIfAbsent(id, k -> new IntArrayList()).add((int) time);
         }
     }
 
     private static class NetCDFWriter implements BasicEventHandler, EventWriter {
 
         private static final int FIELD_LENGTH = 29;
+        // This parameter adjusts onto how many raster tiles the emission is distributed. 1 -> Point sources, everything
+        // is released at a single point. 9 -> The position of the source and the neighbouring raster tiles. This would
+        // require smoothing the emissions onto surrounding tiles with a gauss blur for example. We have 1 now, because
+        // it is simple. If required we can increase to another number later, because having all the emissions released in
+        // one raster tile might lead to numerical artefacts in PALM.
+        private static final int NVSCRS_LENGTH = 1;
 
         private final NetcdfFormatWriter internalWriter;
 
@@ -98,6 +117,7 @@ public class PositionEmissionToMovingSources {
 
             writeMetadata(observedVehicles, species);
             this.speciesMapping = initSpeciesMapping(species);
+
         }
 
         private Object2IntMap<String> initSpeciesMapping(Collection<String> species) {
@@ -122,7 +142,7 @@ public class PositionEmissionToMovingSources {
                 // create dimensions
                 var nspeciesDim = builder.addDimension(Dimension.builder("nspecies" + id, species.size()).build());
                 var ntimeDim = builder.addDimension(Dimension.builder("ntime" + id, entry.getValue().size()).build());
-                var nvsrcDim = builder.addDimension(Dimension.builder("nvsrc" + id, 1).build()); // set this to 1 for now
+                var nvsrcDim = builder.addDimension(Dimension.builder("nvsrc" + id, NVSCRS_LENGTH).build()); // set this to 1 for now
 
                 // create variables
                 builder.addVariable("nspecies" + id, DataType.INT, List.of(nspeciesDim));
@@ -132,7 +152,7 @@ public class PositionEmissionToMovingSources {
                 builder.addVariable("timestamp" + id, DataType.CHAR, List.of(ntimeDim, fieldLengthDim));
                 builder.addVariable("vsrc" + id + "_eutm", DataType.FLOAT, List.of(ntimeDim, nvsrcDim));
                 builder.addVariable("vsrc" + id + "_nutm", DataType.FLOAT, List.of(ntimeDim, nvsrcDim));
-                // we should have vsrc<id>_zag here as well, but I don't know what that means yet.
+                builder.addVariable("vsrc" + id + "_zag", DataType.FLOAT, List.of(ntimeDim, nvsrcDim));
 
                 // add variables for all pollutants
                 for (var s : species) {
@@ -152,6 +172,7 @@ public class PositionEmissionToMovingSources {
                 internalWriter.write("nvsrc" + id, new ArrayInt.D1(1, false)); // this will probably be something else once I have understood this variable
                 internalWriter.write("species" + id, speciesArray(species));
                 internalWriter.write("timestamp" + id, timestampArray(entry.getValue()));
+                internalWriter.write("vsrc" + id + "_zag", zagArray(entry.getValue()));
             }
         }
 
@@ -194,46 +215,61 @@ public class PositionEmissionToMovingSources {
             return result;
         }
 
+        private ArrayFloat.D2 zagArray(IntArrayList times) {
+            var result = new ArrayFloat.D2(times.size(), NVSCRS_LENGTH);
+            for (var a = 0; a < times.size(); a++) {
+                for (var b = 0; b < NVSCRS_LENGTH; b++)
+                    result.set(a, b, 0.3F); // set height of sources to 30cm. Which we assume is the height of an exhaustion pipe
+            }
+            return result;
+        }
+
         @Override
         public void handleEvent(Event event) {
 
             if (event instanceof PositionEmissionsModule.PositionEmissionEvent pee) {
-                var id = pee.getVehicleId().toString();
-                var cacheItem = this.vehCache.computeIfAbsent(pee.getVehicleId(), k -> {
-
-                    var ntimeDim = internalWriter.findDimension("ntime" + id);
-                    var nvsrcDim = internalWriter.findDimension("nvsrc" + id);
-                    return VehicleCache.init(ntimeDim.getLength(), nvsrcDim.getLength(), this.speciesMapping);
-                });
-
-                cacheItem.addEasting(pee.getCoord().getX());
-                cacheItem.addNorthing(pee.getCoord().getY());
-
-                for (var s : speciesMapping.object2IntEntrySet()) {
-                    if (s.getKey().equals("NO")) {
-                        var nox = pee.getEmissions().get(Pollutant.NOx);
-                        var no2 = pee.getEmissions().get(Pollutant.NO2);
-                        var no = nox - no2;
-                        cacheItem.addEmissionValue(no, s.getIntValue());
-                    } else if (s.getKey().equals("PM10")) {
-                        var pm = pee.getEmissions().get(Pollutant.PM);
-                        var pmNonExhaust = pee.getEmissions().get(Pollutant.PM_non_exhaust);
-                        cacheItem.addEmissionValue(pm + pmNonExhaust, s.getIntValue());
-                    } else {
-                        var value = pee.getEmissions().get(Pollutant.valueOf(s.getKey()));
-                        cacheItem.addEmissionValue(value, s.getIntValue());
-                    }
-                }
+                handlePositionEmissionEvent(pee);
+            } else if (event instanceof VehicleEntersTrafficEvent e) {
+                var cacheItem = getCacheItem(e.getVehicleId());
+                cacheItem.markTripStart();
                 cacheItem.incrPosition();
-
+            } else if (event instanceof VehicleLeavesTrafficEvent e) {
+                var cacheItem = getCacheItem(e.getVehicleId());
+                var prevE = cacheItem.prevE();
+                var prevN = cacheItem.prevN();
+                cacheItem.addPosition(prevE, prevN);
+                cacheItem.incrPosition();
                 if (cacheItem.isFinished()) {
                     // remove the cache item from the map
-                    vehCache.remove(pee.getVehicleId());
+                    vehCache.remove(e.getVehicleId());
 
                     // write all values into the file
-                    write(cacheItem, pee.getVehicleId());
+                    write(cacheItem, e.getVehicleId());
                 }
             }
+        }
+
+        private void handlePositionEmissionEvent(PositionEmissionsModule.PositionEmissionEvent pee) {
+            var cacheItem = getCacheItem(pee.getVehicleId());
+
+            cacheItem.addPosition(pee.getCoord().getX(), pee.getCoord().getY());
+
+            for (var s : speciesMapping.object2IntEntrySet()) {
+                if (s.getKey().equals("NO")) {
+                    var nox = pee.getEmissions().get(Pollutant.NOx);
+                    var no2 = pee.getEmissions().get(Pollutant.NO2);
+                    var no = nox - no2;
+                    cacheItem.addEmissionValue(no, s.getIntValue());
+                } else if (s.getKey().equals("PM10")) {
+                    var pm = pee.getEmissions().get(Pollutant.PM);
+                    var pmNonExhaust = pee.getEmissions().get(Pollutant.PM_non_exhaust);
+                    cacheItem.addEmissionValue(pm + pmNonExhaust, s.getIntValue());
+                } else {
+                    var value = pee.getEmissions().get(Pollutant.valueOf(s.getKey()));
+                    cacheItem.addEmissionValue(value, s.getIntValue());
+                }
+            }
+            cacheItem.incrPosition();
         }
 
         private void write(VehicleCache cacheItem, Id<Vehicle> id) {
@@ -259,11 +295,23 @@ public class PositionEmissionToMovingSources {
                 throw new RuntimeException(e);
             }
         }
+
+        private VehicleCache getCacheItem(Id<Vehicle> id) {
+            return this.vehCache.computeIfAbsent(id, k -> {
+
+                var ntimeDim = internalWriter.findDimension("ntime" + id);
+                var nvsrcDim = internalWriter.findDimension("nvsrc" + id);
+                return VehicleCache.init(ntimeDim.getLength(), nvsrcDim.getLength(), this.speciesMapping);
+            });
+        }
     }
 
     private static class InputArgs {
         @Parameter(names = "-pee", required = true)
         private String positionEmissionEventsFile;
+
+        @Parameter(names = "-n", required = true)
+        private String networkFile;
 
         @Parameter(names = "-netCdfOutput", required = true)
         private String netCdfOutput;
@@ -283,6 +331,8 @@ public class PositionEmissionToMovingSources {
 
         int counter = 0;
 
+        boolean setPrevIndexZero = false;
+
         static VehicleCache init(int ntime, int nvsrc, Object2IntMap<String> speciesMapping) {
 
             var emissionsData = speciesMapping.keySet().stream()
@@ -300,12 +350,26 @@ public class PositionEmissionToMovingSources {
             emissions.get(index).set(counter, 0, (float) value);
         }
 
-        void addNorthing(double value) {
-            nutm.set(counter, 0, (float) value);
+        void addPosition(double e, double n) {
+            if (setPrevIndexZero) {
+                eutm.set(counter - 1, 0, (float) e);
+                nutm.set(counter - 1, 0, (float) n);
+                setPrevIndexZero = false;
+            }
+            eutm.set(counter, 0, (float) e);
+            nutm.set(counter, 0, (float) n);
         }
 
-        void addEasting(double value) {
-            eutm.set(counter, 0, (float) value);
+        float prevN() {
+            return nutm.get(counter - 1, 0);
+        }
+
+        float prevE() {
+            return eutm.get(counter - 1, 0);
+        }
+
+        void markTripStart() {
+            this.setPrevIndexZero = true;
         }
 
         void incrPosition() {
@@ -313,7 +377,7 @@ public class PositionEmissionToMovingSources {
         }
 
         boolean isFinished() {
-            return counter == length - 1;
+            return counter == length;
         }
     }
 }

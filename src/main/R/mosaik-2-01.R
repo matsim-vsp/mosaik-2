@@ -1,174 +1,105 @@
 # add tidyverse and custom color palette which looks like google spread sheets
 library(tidyverse)
-library(clock)
-cbPalette <- c("#4285f4","#fbbc04", "#ea4335",  "#34a853", "#ff6d01", "#46bdc6", "#7baaf7", "#f07b72", "#fcd04f", "#71c287")
+library(ggnewscale)
+cbPalette <- c("#4285f4", "#fbbc04", "#ea4335", "#34a853", "#ff6d01", "#46bdc6", "#7baaf7", "#f07b72", "#fcd04f", "#71c287", "#71c457", "#71c897")
 
-#read in palm data
-palm_base <- read_csv("/Users/janek/Documents/palm/mosaik-2-01/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units.xyt.csv") %>%
-  mutate(hour = time / 3600)
+# read in the simulated palm data from the base case. Make sure we have only 24 hours and select the
+# raster tile which contains monitoring station 010
+# then convert NOx from g into mikro grams
+palm_base <- read_csv("/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/palm-output/photoshade_6km10m_lod2_av_masked_M01.day2-si-units.xyt.csv") %>%
+  filter(time < 86400) %>% # filter this here, because it is difficult to do with lubridate hms format.
+  mutate(time = hms::as_hms(time)) %>%
+  select(time, x, y, NOx) %>%
+  filter(x > 388056.5 - 1 &
+           x < 388056.5 + 1 &
+           y > 5822709 - 1 &
+           y < 5822709 + 1) %>%
+  mutate(NOx = NOx * 1e6) %>%
+  mutate(name = "PALM Data")
 
-nox <- palm_base %>%
-  select(hour, NO, NO2, NOx) %>%
-  pivot_longer(cols = c("NOx", "NO", "NO2" ), names_to = "species", values_to = "concentration") %>%
-  mutate(concentration = concentration * 1e6) # convert units into micro grams
+# read in wind speeds for months june - august
+# create proper date and time columns
+wind_speeds <- read_csv(
+  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/430_wind_speeds_june-august.csv",
+  col_types = cols(Zeitstempel = col_datetime(format = "%Y-%m-%dT%H:%M:%S"))) %>%
+  mutate(
+    date = as.Date(Zeitstempel),
+    time = hms::as_hms(Zeitstempel)
+  ) %>%
+  rename(wind_speed = Wert) %>%
+  select(date, time, wind_speed)
 
-no_mean <- nox %>%
-  filter(species == "NO") %>%
-  group_by(hour) %>%
-  summarize(avg = mean(concentration))
-print("NO min and max:")
-no_mean %>% filter(avg == min(avg))
-no_mean %>% filter(avg == max(avg))
+# read in wind directions for months june - august
+# same transformations as wind speeds
+wind_directions <- read_csv(
+  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/430_wind_directions_june-august.csv",
+  col_types = cols(Zeitstempel = col_datetime(format = "%Y-%m-%dT%H:%M:%S"))
+) %>%
+  mutate(
+    date = as.Date(Zeitstempel),
+    time = hms::as_hms(Zeitstempel)
+  ) %>%
+  rename(wind_direction = Wert) %>%
+  select(date, time, wind_direction)
 
-no2_mean <- nox %>%
-  filter(species == "NO2") %>%
-  group_by(hour) %>%
-  summarize(avg = mean(concentration))
-print("NO2 min and max:")
-no2_mean %>% filter(avg == min(avg))
-no2_mean %>% filter(avg == max(avg))
+# read in air quality monitoring data for months june - august
+# apply proper date and time columns
+curb_data_010 <- read_delim(
+  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/010_air_quality_june-august.csv",
+  delim = ";",
+  col_types = list(col_datetime("%d.%m.%Y %H:%M"), col_double(), col_double(), col_double())
+) %>%
+  mutate(
+    date = as.Date(Date),
+    time = hms::as_hms(Date)
+  ) %>%
+  select(date, time, NOx)
 
-#------------ calculate these stats here, because we cite this in the paper ------------
-nox_quantiles <- nox %>%
-  filter(species == "NOx") %>%
-  filter(hour == 7) %>%
-  group_by(hour) %>%
-  reframe(qs = quantile(concentration, c(0.25, 0.50, 0.75)), prob = c(0.25, 0.50, 0.75))
+# find 5 days with lowest average wind speeds
+low_wind_speed_dates <- wind_speeds %>%
+  group_by(date) %>%
+  summarise(daily_mean = mean(wind_speed)) %>%
+  arrange(daily_mean) %>%
+  head(5) %>%
+  mutate(date_string = format(date, "%b %d"))
 
-nox_median <- nox %>%
-  filter(species == "NOx") %>%
-  group_by(hour) %>%
-  summarize(avg = median(concentration))
-print("NO2 min and max:")
-nox_median %>% filter(avg == min(avg))
-nox_median %>% filter(avg == max(avg))
+# join to get the hourly data of the lowest wind speed days
+low_wind_speeds <- left_join(low_wind_speed_dates, wind_speeds, by = join_by(date))
 
-p <- ggplot(nox, aes(x = factor(hour), y = concentration, color = factor(species))) +
-  geom_boxplot(outlier.shape = NA) +
-  ylim(0, 1e2) +
-  ggtitle("NOx Concentrations") +
-  labs(color = "Species") +
-  xlab("Hour") +
+# join to get the hourly concentrations of low wind speed days
+curb_data_010_on_low_speed_dates <- left_join(low_wind_speeds, curb_data_010, by = join_by(date, time)) %>%
+  mutate(name = "monitoring data") %>%
+  select(date_string, time, NOx, name)
+
+# plot the monitored and the simulated NOx concentrations over hours of the day
+p <- ggplot(curb_data_010_on_low_speed_dates, aes(x = time, y = NOx)) +
+  geom_line(aes(color = date_string, group = date_string), alpha = 0.9) +
+  scale_color_manual(name = "Monitored", values = c("#4285f4", "#3b77db", "#346ac3", "#2e5daa", "#274f92", "#21427a", "#1a3561")) +
+  # this command lets us use another scale for the palm data. Which gives separate legend entries
+  new_scale_color() +
+  geom_line(data = palm_base, aes(color = name), size = 1.0) +
+  scale_color_manual(name = "Simulated", values = "#ea4335") +
+  ggtitle("Monitored and simulated NOx concentrations at station 010") +
+  xlab("Time of Day") +
   ylab("Concentration [\u00B5g/m3]") +
-  scale_fill_manual(values = cbPalette) +
-  scale_color_manual(values = cbPalette) +
-  theme_light() +
-  theme(text = element_text(size = 10))
-ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-aggregated.pdf", width = 210, height = 118, units = "mm", dpi = 300)
-ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-aggregated.png", width = 210, height = 118, units = "mm", dpi = 300)
+  theme_light()
+p
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-comparison.png", width = 220, height = 118, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-comparison.png", width = 220, height = 118, units = "mm")
 
-#-------------- plot curb data ----------------
-curb_data_115 <- read_delim(c(
-  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/ber_mc115_20170710-20170714.csv",
-  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/ber_mc115_20170717-20170721.csv",
-  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/ber_mc115_20170724-20170728.csv"
-), delim = ";", col_types = list(col_datetime("%d.%m.%Y %H:%M"), col_double(), col_double(), col_double())) %>%
-  mutate(hour = get_hour(Date)) %>%
-  pivot_longer(cols = c("NOx", "NO", "NO2" ), names_to = "species", values_to = "concentration")
-
-curb_data_010 <- read_delim(c(
-  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/ber_mc010_20170710-20170714.csv",
-  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/ber_mc010_20170717-20170721.csv",
-  "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/monitoring-stations/ber_mc010_20170724-20170728.csv"
-), delim = ";", col_types = list(col_datetime("%d.%m.%Y %H:%M"), col_double(), col_double(), col_double())) %>%
-  mutate(hour = get_hour(Date)) %>%
-  pivot_longer(cols = c("NOx", "NO", "NO2", "PM10"), names_to = "species", values_to = "concentration")
-
-p <- ggplot(curb_data_115, aes(x = factor(hour), y = concentration, color = factor(species))) +
-  geom_boxplot() +
-  ggtitle("Nitrogen Concentrations 115") +
-  theme_light() +
-  scale_fill_manual(values = cbPalette) +
-  scale_color_manual(values = cbPalette) +
-  theme_light() +
-  theme(text = element_text(size = 10))
+# Here we have plots for wind speeds and wind directions for the selected low wind speed days. We don't use them in our
+# paper but I used them to verify wind is mainly from western directions and at what times we have which wind speeds.
+p <- ggplot(low_wind_speeds, aes(x = time, y = wind_speed)) +
+  geom_line(aes(color = date, group = date)) +
+  theme_light()
 p
 
-p <- ggplot(curb_data_010, aes(x = factor(hour), y = concentration, color = factor(species))) +
-  geom_boxplot() +
-  ggtitle("Nitrogen Concentrations 010") +
-  theme_light() +
-  scale_fill_manual(values = cbPalette) +
-  scale_color_manual(values = cbPalette) +
-  theme_light() +
-  theme(text = element_text(size = 10))
+wind_directions_on_low_speed_dates <- left_join(low_wind_speed_dates, wind_directions, by = join_by(date)) %>%
+  select(date, time, wind_direction)
+
+p <- ggplot(wind_directions_on_low_speed_dates, aes(x = time, y = wind_direction)) +
+  geom_line(aes(color = date, group = date)) +
+  geom_hline(yintercept = 230, color = "red") +
+  geom_hline(yintercept = 310, color = "red") +
+  theme_light()
 p
-
-#-------------- plot joined nox data ----------------
-curb_nox_010 <- curb_data_010 %>%
-  select(hour, species, concentration) %>%
-  filter(species == "NOx") %>%
-  mutate(name = "010 (north)")
-curb_nox_115 <- curb_data_115 %>%
-  select(hour, species, concentration) %>%
-  filter(species == "NOx") %>%
-  mutate(name = "115 (south)")
-palm_nox_115 <- palm_base %>%
-  select(hour, x, y, NOx) %>%
-  pivot_longer(cols = "NOx", names_to = "species", values_to = "concentration") %>%
-  filter(x > 386854 - 50 & x < 386854 + 50 & y > 5818691 - 50 & y < 5818691 + 50) %>%
-  filter(hour < 24) %>%
-  select(hour, species, concentration) %>%
-  mutate(concentration = concentration * 1e6)%>%
-  mutate(name = "115 simulated")
-palm_nox_010 <- palm_base %>%
-  select(hour, x, y, NOx) %>%
-  pivot_longer(cols = "NOx", names_to = "species", values_to = "concentration") %>%
-  filter(x > 388055 - 50 & x < 388055 + 50 & y > 5822705 - 50 & y < 5822705 + 50) %>%
-  filter(hour < 24) %>%
-  select(hour, species, concentration) %>%
-  mutate(concentration = concentration * 1e6)%>%
-  mutate(name = "010 simulated")
-palm_nox <- palm_base %>%
-  select(hour, x, y, NOx) %>%
-  pivot_longer(cols = "NOx", names_to = "species", values_to = "concentration") %>%
-  #filter(x > 388055 - 50 & x < 388055 + 50 & y > 5822705 - 50 & y < 5822705 + 50) %>%
-  filter(hour < 24) %>%
-  select(hour, species, concentration) %>%
-  mutate(concentration = concentration * 1e6)%>%
-  mutate(name = "all simulated")
-joined_nox <- palm_nox_115 %>% full_join(palm_nox_010) %>% full_join(curb_nox_010) %>% full_join(curb_nox_115) %>% full_join(palm_nox)
-
-p <- ggplot(joined_nox, aes(x = factor(hour), y = concentration, color = factor(name))) +
-  geom_boxplot(outlier.shape = NA) +
-  ylim(0, 3e2) +
-  ggtitle("NOx concentrations at monitoring stations and in simulation") +
-  labs(color = "Series") +
-  xlab("Hour") +
-  ylab("Concentration [\u00B5g/m3]") +
-  theme_light() +
-  scale_fill_manual(values = cbPalette) +
-  scale_color_manual(values = cbPalette) +
-  theme_light() +
-  theme(text = element_text(size = 10))
-p
-ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-comparison.png", width = 210, height = 118, units = "mm", dpi = 300)
-ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-comparison.pdf", width = 210, height = 118, units = "mm", dpi = 300)
-
-curb_pm10 <- curb_data_010 %>%
-  select(hour, species, concentration) %>%
-  filter(species == "PM10") %>%
-  mutate(name = "010")
-palm_pm10 <- palm_base %>%
-  select(hour, x, y, PM10) %>%
-  pivot_longer(cols = "PM10", names_to = "species", values_to = "concentration") %>%
-  #filter(x > 386854 - 100 & x < 386854 + 100 & y > 5818691 - 100 & y < 5818691 + 100) %>%
-  filter(hour < 24) %>%
-  select(hour, species, concentration) %>%
-  mutate(concentration = concentration * 1e6)%>%
-  mutate(name = "simulated")
-joined_pm10 <- palm_pm10 %>% full_join(curb_pm10)
-
-p <- ggplot(joined_pm10, aes(x = factor(hour), y = concentration, color = factor(name))) +
-  geom_boxplot(outlier.shape = NA) +
-  ylim(0, 50) +
-  ggtitle("PM10 Concentrations - Comparision Montoring Station and Simulation") +
-  theme_light() +
-  scale_fill_manual(values = cbPalette) +
-  scale_color_manual(values = cbPalette) +
-  theme_light() +
-  theme(text = element_text(size = 10))
-p
-
-
-

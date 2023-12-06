@@ -50,8 +50,10 @@ public class PalmMergedOutputReader {
             // get the vars
             var timeVar = file.findVariable("time");
             // x and y are supposed to be in the correct coordinate system. For Berlin those should be in UTM-33
-            var xVar = file.findVariable("E_UTM");
-            var yVar = file.findVariable("N_UTM");
+            //var xVar = file.findVariable("E_UTM");
+            //var yVar = file.findVariable("N_UTM");
+            var xVar = file.findVariable("x");
+            var yVar = file.findVariable("y");
 
             // get the actual values
             var times = NetcdfConverters.toDoubleArray(Objects.requireNonNull(timeVar));

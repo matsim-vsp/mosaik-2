@@ -85,7 +85,7 @@ p <- ggplot(curb_data_010_on_low_speed_dates, aes(x = time, y = NOx)) +
   theme_light()
 p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-comparison.png", width = 220, height = 118, units = "mm")
-ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-comparison.png", width = 220, height = 118, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/r-output/nox-comparison.pdf", width = 220, height = 118, units = "mm")
 
 # Here we have plots for wind speeds and wind directions for the selected low wind speed days. We don't use them in our
 # paper but I used them to verify wind is mainly from western directions and at what times we have which wind speeds.

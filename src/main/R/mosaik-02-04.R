@@ -187,11 +187,11 @@ base_toll <- palm_base %>%
   summarise(factor_NOx = sum(mass_NOx) / 26428.476, factor_PM10 = sum(mass_PM10) / 1228.3311) %>%
   mutate(toll_NOx = factor_NOx * 36.8 / 1000 * 0.338 / 1000, toll_PM10 = factor_PM10 * 36.8 / 1000 * 0.002 / 1000) %>%
   mutate(total_toll = toll_NOx + toll_PM10) %>%
-  mutate(total_toll = total_toll * 100)
+  mutate(total_toll = total_toll * 100000)
 
 p <- ggplot(base_toll, aes(hour, total_toll)) +
   geom_line(color = "#4285f4") +
-  ggtitle("Toll rates of one day [EUR/m]") +
+  ggtitle("Toll rates of one day [EUR/km]") +
   xlab("Hour") +
   ylab("") +
   theme_light()

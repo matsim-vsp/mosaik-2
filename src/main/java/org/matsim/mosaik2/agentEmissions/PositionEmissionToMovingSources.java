@@ -6,6 +6,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.log4j.Log4j2;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.events.Event;
 import org.matsim.api.core.v01.events.VehicleEntersTrafficEvent;
@@ -16,7 +17,6 @@ import org.matsim.core.events.EventsUtils;
 import org.matsim.core.events.MatsimEventsReader;
 import org.matsim.core.events.algorithms.EventWriter;
 import org.matsim.core.events.handler.BasicEventHandler;
-import org.matsim.core.network.NetworkUtils;
 import org.matsim.vehicles.Vehicle;
 import ucar.ma2.*;
 import ucar.nc2.Attribute;
@@ -25,6 +25,8 @@ import ucar.nc2.write.NetcdfFileFormat;
 import ucar.nc2.write.NetcdfFormatWriter;
 
 import java.io.IOException;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -38,7 +40,6 @@ public class PositionEmissionToMovingSources {
         JCommander.newBuilder().addObject(inArgs).build().parse(args);
 
         run(inArgs);
-
     }
 
     private static void run(InputArgs inputArgs) throws InvalidRangeException, IOException {
@@ -56,7 +57,14 @@ public class PositionEmissionToMovingSources {
         reader.addCustomEventMapper(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE, PositionEmissionsModule.PositionEmissionEvent.getEventMapper());
         reader.readFile(inputArgs.positionEmissionEventsFile);
 
-        return new NetCDFWriter(inputArgs.netCdfOutput, metadata.observedVehicles, inputArgs.species);
+        var localDate = LocalDate.parse(inputArgs.date);
+        var localTime = LocalTime.of(0, 0, 0);
+        var localDateTime = LocalDateTime.of(localDate, localTime);
+
+        var zoneId = ZoneId.of(inputArgs.zone);
+        var zoneOffset = zoneId.getRules().getOffset(localDateTime);
+        var utcDateTime = localDateTime.atOffset(zoneOffset);
+        return new NetCDFWriter(inputArgs.netCdfOutput, metadata.observedVehicles, metadata.orig2Num, inputArgs.species, utcDateTime);
     }
 
     private static void readSecondPass(InputArgs inputArgs, NetCDFWriter writer) {
@@ -70,6 +78,8 @@ public class PositionEmissionToMovingSources {
     private static class MetadataCollector implements BasicEventHandler {
 
         private final Map<Id<Vehicle>, IntArrayList> observedVehicles = new HashMap<>();
+        private final Map<Id<Vehicle>, Id<Vehicle>> numToOriginalId = new HashMap<>();
+        private final Map<Id<Vehicle>, Id<Vehicle>> orig2Num = new HashMap<>();
 
         @Override
         public void handleEvent(Event event) {
@@ -84,10 +94,14 @@ public class PositionEmissionToMovingSources {
         }
 
         private void handle(Id<Vehicle> id, double time) {
-            observedVehicles.computeIfAbsent(id, k -> new IntArrayList()).add((int) time);
+            // netcdf treats / and . as special characters. Just use clean numbers as id.
+            var numId = orig2Num.computeIfAbsent(id, k -> Id.createVehicleId(observedVehicles.size()));
+            numToOriginalId.putIfAbsent(numId, id);
+            observedVehicles.computeIfAbsent(numId, k -> new IntArrayList()).add((int) time);
         }
     }
 
+    @Log4j2
     private static class NetCDFWriter implements BasicEventHandler, EventWriter {
 
         private static final int FIELD_LENGTH = 29;
@@ -104,7 +118,12 @@ public class PositionEmissionToMovingSources {
 
         private final Object2IntMap<String> speciesMapping;
 
-        NetCDFWriter(String outputFile, Map<Id<Vehicle>, IntArrayList> observedVehicles, Collection<String> species) throws IOException, InvalidRangeException {
+        private final Map<Id<Vehicle>, Id<Vehicle>> orig2num;
+
+        NetCDFWriter(String outputFile, Map<Id<Vehicle>, IntArrayList> observedVehicles, Map<Id<Vehicle>, Id<Vehicle>> orig2num, Collection<String> species, OffsetDateTime utcDate) throws IOException, InvalidRangeException {
+
+            this.orig2num = orig2num;
+
             var builder = NetcdfFormatWriter.builder()
                     .setFormat(NetcdfFileFormat.NETCDF3)
                     .setLocation(outputFile)
@@ -115,9 +134,8 @@ public class PositionEmissionToMovingSources {
             reserveVehicleData(builder, observedVehicles, species);
             this.internalWriter = builder.build();
 
-            writeMetadata(observedVehicles, species);
+            writeMetadata(observedVehicles, species, utcDate);
             this.speciesMapping = initSpeciesMapping(species);
-
         }
 
         private Object2IntMap<String> initSpeciesMapping(Collection<String> species) {
@@ -132,8 +150,9 @@ public class PositionEmissionToMovingSources {
             return result;
         }
 
-        private void reserveVehicleData(NetcdfFormatWriter.Builder builder, Map<Id<Vehicle>, IntArrayList> observedVehicles, Collection<String> species) {
+        private static void reserveVehicleData(NetcdfFormatWriter.Builder builder, Map<Id<Vehicle>, IntArrayList> observedVehicles, Collection<String> species) {
 
+            log.info("Create NetCDF file and reserve space for all vehicles observed in first pass of events file.");
             var fieldLengthDim = builder.addDimension(Dimension.builder("field_length", FIELD_LENGTH).build());
 
             for (var entry : observedVehicles.entrySet()) {
@@ -161,18 +180,23 @@ public class PositionEmissionToMovingSources {
             }
         }
 
-        private void writeMetadata(Map<Id<Vehicle>, IntArrayList> observedVehicles, Collection<String> species) throws InvalidRangeException, IOException {
+        private void writeMetadata(Map<Id<Vehicle>, IntArrayList> observedVehicles, Collection<String> species, OffsetDateTime utcDate) {
 
+            log.info("Starting to write metadata.");
             for (var entry : observedVehicles.entrySet()) {
 
                 var id = entry.getKey().toString();
-
-                internalWriter.write("nspecies" + id, nSpeciesArray(species.size()));
-                internalWriter.write("ntime" + id, timesArray(entry.getValue()));
-                internalWriter.write("nvsrc" + id, new ArrayInt.D1(1, false)); // this will probably be something else once I have understood this variable
-                internalWriter.write("species" + id, speciesArray(species));
-                internalWriter.write("timestamp" + id, timestampArray(entry.getValue()));
-                internalWriter.write("vsrc" + id + "_zag", zagArray(entry.getValue()));
+                try {
+                    internalWriter.write("nspecies" + id, nSpeciesArray(species.size()));
+                    internalWriter.write("ntime" + id, timesArray(entry.getValue()));
+                    internalWriter.write("nvsrc" + id, new ArrayInt.D1(NVSCRS_LENGTH, false)); // this will probably be something else once I have understood this variable
+                    internalWriter.write("species" + id, speciesArray(species));
+                    internalWriter.write("timestamp" + id, timestampArray(entry.getValue(), utcDate));
+                    internalWriter.write("vsrc" + id + "_zag", zagArray(entry.getValue()));
+                } catch (IOException | NullPointerException | InvalidRangeException e) {
+                    log.error(e);
+                    throw new RuntimeException("Error while writing id: " + id);
+                }
             }
         }
 
@@ -206,11 +230,12 @@ public class PositionEmissionToMovingSources {
             return result;
         }
 
-        private ArrayChar.D2 timestampArray(IntArrayList times) {
+        private static ArrayChar.D2 timestampArray(IntArrayList times, OffsetDateTime utcDate) {
 
             var result = new ArrayChar.D2(times.size(), FIELD_LENGTH);
             for (var i = 0; i < times.size(); i++) {
-                result.setString(i, "Dummy Timestamp");
+                var adjustedTime = utcDate.plusSeconds(times.getInt(i));
+                result.setString(i, adjustedTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
             }
             return result;
         }
@@ -230,27 +255,29 @@ public class PositionEmissionToMovingSources {
             if (event instanceof PositionEmissionsModule.PositionEmissionEvent pee) {
                 handlePositionEmissionEvent(pee);
             } else if (event instanceof VehicleEntersTrafficEvent e) {
-                var cacheItem = getCacheItem(e.getVehicleId());
+                var cacheItem = getCacheItem(orig2num.get(e.getVehicleId()));
                 cacheItem.markTripStart();
                 cacheItem.incrPosition();
             } else if (event instanceof VehicleLeavesTrafficEvent e) {
-                var cacheItem = getCacheItem(e.getVehicleId());
+                var id = orig2num.get(e.getVehicleId());
+                var cacheItem = getCacheItem(id);
                 var prevE = cacheItem.prevE();
                 var prevN = cacheItem.prevN();
                 cacheItem.addPosition(prevE, prevN);
                 cacheItem.incrPosition();
                 if (cacheItem.isFinished()) {
                     // remove the cache item from the map
-                    vehCache.remove(e.getVehicleId());
+                    vehCache.remove(id);
 
                     // write all values into the file
-                    write(cacheItem, e.getVehicleId());
+                    write(cacheItem, id);
                 }
             }
         }
 
         private void handlePositionEmissionEvent(PositionEmissionsModule.PositionEmissionEvent pee) {
-            var cacheItem = getCacheItem(pee.getVehicleId());
+            var id = orig2num.get(pee.getVehicleId());
+            var cacheItem = getCacheItem(id);
 
             cacheItem.addPosition(pee.getCoord().getX(), pee.getCoord().getY());
 
@@ -307,18 +334,20 @@ public class PositionEmissionToMovingSources {
     }
 
     private static class InputArgs {
-        @Parameter(names = "-pee", required = true)
+        @Parameter(names = {"-positionEmissions", "-p"}, required = true)
         private String positionEmissionEventsFile;
 
-        @Parameter(names = "-n", required = true)
-        private String networkFile;
-
-        @Parameter(names = "-netCdfOutput", required = true)
+        @Parameter(names = {"-netCdfOutput", "-o"}, required = true)
         private String netCdfOutput;
 
         @Parameter(names = {"-species", "-s"})
         private List<String> species = List.of("NO", "NO2", "PM10");
 
+        @Parameter(names = {"-date", "-d"}, description = "Date of the simulation run in the format of 'yyyy-mm-dd' (ISO-8601)", required = true)
+        private String date;
+
+        @Parameter(names = {"-timeZone", "-z"}, description = "Time Zone for example 'Europe/Paris'")
+        private String zone;
     }
 
     @RequiredArgsConstructor

@@ -2,7 +2,6 @@ package org.matsim.mosaik2.agentEmissions;
 
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.Parameter;
-import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import lombok.RequiredArgsConstructor;
@@ -27,10 +26,7 @@ import ucar.nc2.write.NetcdfFormatWriter;
 import java.io.IOException;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class PositionEmissionToMovingSources {
 
@@ -42,20 +38,23 @@ public class PositionEmissionToMovingSources {
         run(inArgs);
     }
 
-    private static void run(InputArgs inputArgs) throws InvalidRangeException, IOException {
+    private static void run(InputArgs inputArgs) throws IOException {
 
         // split this into two methods so that the metadata collector goes out of scope.
         var netcdfWriter = readFirstPass(inputArgs);
         readSecondPass(inputArgs, netcdfWriter);
     }
 
-    private static NetCDFWriter readFirstPass(InputArgs inputArgs) throws InvalidRangeException, IOException {
+    private static NetCDFWriter readFirstPass(InputArgs inputArgs) throws IOException {
         var manager = EventsUtils.createEventsManager();
         var metadata = new MetadataCollector();
         manager.addHandler(metadata);
         var reader = new MatsimEventsReader(manager);
         reader.addCustomEventMapper(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE, PositionEmissionsModule.PositionEmissionEvent.getEventMapper());
         reader.readFile(inputArgs.positionEmissionEventsFile);
+
+        metadata.observedVehicles.values().removeIf(List::isEmpty);
+        metadata.orig2Num.values().removeIf(v -> !metadata.observedVehicles.containsKey(v));
 
         var localDate = LocalDate.parse(inputArgs.date);
         var localTime = LocalTime.of(0, 0, 0);
@@ -75,9 +74,14 @@ public class PositionEmissionToMovingSources {
         reader.readFile(inputArgs.positionEmissionEventsFile);
     }
 
+    private enum ObservationType {Position, VehicleEnter, VehicleLeaves}
+
+    private record VehicleObservation(ObservationType type, int time) {
+    }
+
     private static class MetadataCollector implements BasicEventHandler {
 
-        private final Map<Id<Vehicle>, IntArrayList> observedVehicles = new HashMap<>();
+        private final Map<Id<Vehicle>, List<VehicleObservation>> observedVehicles = new HashMap<>();
         private final Map<Id<Vehicle>, Id<Vehicle>> numToOriginalId = new HashMap<>();
         private final Map<Id<Vehicle>, Id<Vehicle>> orig2Num = new HashMap<>();
 
@@ -85,19 +89,25 @@ public class PositionEmissionToMovingSources {
         public void handleEvent(Event event) {
 
             if (event instanceof PositionEmissionsModule.PositionEmissionEvent e) {
-                handle(e.getVehicleId(), e.getTime());
-            } else if (event instanceof VehicleEntersTrafficEvent e) {
-                handle(e.getVehicleId(), e.getTime() + 1);
-            } else if (event instanceof VehicleLeavesTrafficEvent e) {
-                handle(e.getVehicleId(), e.getTime());
-            }
-        }
 
-        private void handle(Id<Vehicle> id, double time) {
-            // netcdf treats / and . as special characters. Just use clean numbers as id.
-            var numId = orig2Num.computeIfAbsent(id, k -> Id.createVehicleId(observedVehicles.size()));
-            numToOriginalId.putIfAbsent(numId, id);
-            observedVehicles.computeIfAbsent(numId, k -> new IntArrayList()).add((int) time);
+                var numId = orig2Num.get(e.getVehicleId());
+                observedVehicles.get(numId).add(new VehicleObservation(ObservationType.Position, (int) e.getTime()));
+            } else if (event instanceof VehicleEntersTrafficEvent e) {
+                // netcdf treats / and . as special characters. Just use clean numbers as id.
+                var numId = orig2Num.computeIfAbsent(e.getVehicleId(), k -> Id.createVehicleId(observedVehicles.size()));
+                numToOriginalId.putIfAbsent(numId, e.getVehicleId());
+                observedVehicles.computeIfAbsent(numId, k -> new ArrayList<>()).add(new VehicleObservation(ObservationType.VehicleEnter, (int) e.getTime()));
+            } else if (event instanceof VehicleLeavesTrafficEvent e) {
+                var numId = orig2Num.get(e.getVehicleId());
+                var trajectory = observedVehicles.get(numId);
+
+                // remove the trajectory, in case we have just recorded the vehicle enters traffic event so far.
+                if (trajectory.get(trajectory.size() - 1).type.equals(ObservationType.VehicleEnter)) {
+                    trajectory.remove(trajectory.size() - 1);
+                } else {
+                    trajectory.add(new VehicleObservation(ObservationType.VehicleLeaves, (int) e.getTime()));
+                }
+            }
         }
     }
 
@@ -120,7 +130,7 @@ public class PositionEmissionToMovingSources {
 
         private final Map<Id<Vehicle>, Id<Vehicle>> orig2num;
 
-        NetCDFWriter(String outputFile, Map<Id<Vehicle>, IntArrayList> observedVehicles, Map<Id<Vehicle>, Id<Vehicle>> orig2num, Collection<String> species, OffsetDateTime utcDate) throws IOException, InvalidRangeException {
+        NetCDFWriter(String outputFile, Map<Id<Vehicle>, List<VehicleObservation>> observedVehicles, Map<Id<Vehicle>, Id<Vehicle>> orig2num, Collection<String> species, OffsetDateTime utcDate) throws IOException {
 
             this.orig2num = orig2num;
 
@@ -132,6 +142,7 @@ public class PositionEmissionToMovingSources {
                     .addAttribute(new Attribute("num_emission_path", (double) observedVehicles.size()));
 
             reserveVehicleData(builder, observedVehicles, species);
+            log.info("Calling builder.build()");
             this.internalWriter = builder.build();
 
             writeMetadata(observedVehicles, species, utcDate);
@@ -150,12 +161,22 @@ public class PositionEmissionToMovingSources {
             return result;
         }
 
-        private static void reserveVehicleData(NetcdfFormatWriter.Builder builder, Map<Id<Vehicle>, IntArrayList> observedVehicles, Collection<String> species) {
+        private static void reserveVehicleData(NetcdfFormatWriter.Builder builder, Map<Id<Vehicle>, List<VehicleObservation>> observedVehicles, Collection<String> species) {
 
             log.info("Create NetCDF file and reserve space for all vehicles observed in first pass of events file.");
             var fieldLengthDim = builder.addDimension(Dimension.builder("field_length", FIELD_LENGTH).build());
 
+            var counter = 0;
+
             for (var entry : observedVehicles.entrySet()) {
+
+                if (entry.getValue().isEmpty()) {
+                    continue; // don't reserve space for empty trajectories
+                }
+
+                if (counter % observedVehicles.size() == 1000) {
+                    log.info("Reserving vehicle data: " + counter + "/" + observedVehicles.size());
+                }
 
                 var id = entry.getKey().toString();
                 // create dimensions
@@ -177,13 +198,22 @@ public class PositionEmissionToMovingSources {
                 for (var s : species) {
                     builder.addVariable("vsrc" + id + "_" + s, DataType.FLOAT, List.of(ntimeDim, nvsrcDim));
                 }
+
+                counter++;
             }
         }
 
-        private void writeMetadata(Map<Id<Vehicle>, IntArrayList> observedVehicles, Collection<String> species, OffsetDateTime utcDate) {
+        private void writeMetadata(Map<Id<Vehicle>, List<VehicleObservation>> observedVehicles, Collection<String> species, OffsetDateTime utcDate) {
 
             log.info("Starting to write metadata.");
+            var counter = 0;
             for (var entry : observedVehicles.entrySet()) {
+
+                if (entry.getValue().isEmpty()) continue; // don't write metadata for empty trajectories
+
+                if (counter % observedVehicles.size() == 1000) {
+                    log.info("Writing metadata: " + counter + "/" + observedVehicles.size());
+                }
 
                 var id = entry.getKey().toString();
                 try {
@@ -197,6 +227,7 @@ public class PositionEmissionToMovingSources {
                     log.error(e);
                     throw new RuntimeException("Error while writing id: " + id);
                 }
+                counter++;
             }
         }
 
@@ -208,10 +239,10 @@ public class PositionEmissionToMovingSources {
             return result;
         }
 
-        private ArrayInt.D1 timesArray(IntArrayList ints) {
-            var result = new ArrayInt.D1(ints.size(), false);
-            for (var i = 0; i < ints.size(); i++) {
-                result.set(i, ints.getInt(i));
+        private ArrayInt.D1 timesArray(List<VehicleObservation> vehicleObservations) {
+            var result = new ArrayInt.D1(vehicleObservations.size(), false);
+            for (var i = 0; i < vehicleObservations.size(); i++) {
+                result.set(i, vehicleObservations.get(i).time());
             }
             return result;
         }
@@ -230,19 +261,19 @@ public class PositionEmissionToMovingSources {
             return result;
         }
 
-        private static ArrayChar.D2 timestampArray(IntArrayList times, OffsetDateTime utcDate) {
+        private static ArrayChar.D2 timestampArray(List<VehicleObservation> vehicleObservations, OffsetDateTime utcDate) {
 
-            var result = new ArrayChar.D2(times.size(), FIELD_LENGTH);
-            for (var i = 0; i < times.size(); i++) {
-                var adjustedTime = utcDate.plusSeconds(times.getInt(i));
+            var result = new ArrayChar.D2(vehicleObservations.size(), FIELD_LENGTH);
+            for (var i = 0; i < vehicleObservations.size(); i++) {
+                var adjustedTime = utcDate.plusSeconds(vehicleObservations.get(i).time());
                 result.setString(i, adjustedTime.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME));
             }
             return result;
         }
 
-        private ArrayFloat.D2 zagArray(IntArrayList times) {
-            var result = new ArrayFloat.D2(times.size(), NVSCRS_LENGTH);
-            for (var a = 0; a < times.size(); a++) {
+        private ArrayFloat.D2 zagArray(List<VehicleObservation> vehicleObservations) {
+            var result = new ArrayFloat.D2(vehicleObservations.size(), NVSCRS_LENGTH);
+            for (var a = 0; a < vehicleObservations.size(); a++) {
                 for (var b = 0; b < NVSCRS_LENGTH; b++)
                     result.set(a, b, 0.3F); // set height of sources to 30cm. Which we assume is the height of an exhaustion pipe
             }
@@ -255,23 +286,35 @@ public class PositionEmissionToMovingSources {
             if (event instanceof PositionEmissionsModule.PositionEmissionEvent pee) {
                 handlePositionEmissionEvent(pee);
             } else if (event instanceof VehicleEntersTrafficEvent e) {
-                var cacheItem = getCacheItem(orig2num.get(e.getVehicleId()));
-                cacheItem.markTripStart();
-                cacheItem.incrPosition();
+                handleVehicleEntersTraffic(e);
             } else if (event instanceof VehicleLeavesTrafficEvent e) {
-                var id = orig2num.get(e.getVehicleId());
-                var cacheItem = getCacheItem(id);
-                var prevE = cacheItem.prevE();
-                var prevN = cacheItem.prevN();
-                cacheItem.addPosition(prevE, prevN);
-                cacheItem.incrPosition();
-                if (cacheItem.isFinished()) {
-                    // remove the cache item from the map
-                    vehCache.remove(id);
+                handleVehicleLeavesTraffic(e);
+            }
+        }
 
-                    // write all values into the file
-                    write(cacheItem, id);
-                }
+        private void handleVehicleEntersTraffic(VehicleEntersTrafficEvent e) {
+            if (!orig2num.containsKey(e.getVehicleId())) return;
+
+            var cacheItem = getCacheItem(orig2num.get(e.getVehicleId()));
+            cacheItem.markTripStart();
+            cacheItem.incrPosition();
+        }
+
+        private void handleVehicleLeavesTraffic(VehicleLeavesTrafficEvent e) {
+            if (!orig2num.containsKey(e.getVehicleId())) return;
+
+            var id = orig2num.get(e.getVehicleId());
+            var cacheItem = getCacheItem(id);
+            var prevE = cacheItem.prevE();
+            var prevN = cacheItem.prevN();
+            cacheItem.addPosition(prevE, prevN);
+            cacheItem.incrPosition();
+            if (cacheItem.isFinished()) {
+                // remove the cache item from the map
+                vehCache.remove(id);
+
+                // write all values into the file
+                write(cacheItem, id);
             }
         }
 
@@ -326,9 +369,13 @@ public class PositionEmissionToMovingSources {
         private VehicleCache getCacheItem(Id<Vehicle> id) {
             return this.vehCache.computeIfAbsent(id, k -> {
 
-                var ntimeDim = internalWriter.findDimension("ntime" + id);
-                var nvsrcDim = internalWriter.findDimension("nvsrc" + id);
-                return VehicleCache.init(ntimeDim.getLength(), nvsrcDim.getLength(), this.speciesMapping);
+                try {
+                    var ntimeDim = internalWriter.findDimension("ntime" + id);
+                    var nvsrcDim = internalWriter.findDimension("nvsrc" + id);
+                    return VehicleCache.init(ntimeDim.getLength(), nvsrcDim.getLength(), this.speciesMapping);
+                } catch (NullPointerException e) {
+                    throw new RuntimeException(e);
+                }
             });
         }
     }
@@ -385,8 +432,13 @@ public class PositionEmissionToMovingSources {
                 nutm.set(counter - 1, 0, (float) n);
                 setPrevIndexZero = false;
             }
-            eutm.set(counter, 0, (float) e);
-            nutm.set(counter, 0, (float) n);
+            try {
+                eutm.set(counter, 0, (float) e);
+                nutm.set(counter, 0, (float) n);
+            } catch (Exception ex) {
+                //TODO investigate order in which this is called
+                throw new RuntimeException(ex);
+            }
         }
 
         float prevN() {

@@ -72,6 +72,7 @@ public class PositionEmissionToMovingSources {
         var reader = new MatsimEventsReader(manager);
         reader.addCustomEventMapper(PositionEmissionsModule.PositionEmissionEvent.EVENT_TYPE, PositionEmissionsModule.PositionEmissionEvent.getEventMapper());
         reader.readFile(inputArgs.positionEmissionEventsFile);
+        writer.closeFile();
     }
 
     private enum ObservationType {Position, VehicleEnter, VehicleLeaves}
@@ -296,8 +297,7 @@ public class PositionEmissionToMovingSources {
             if (!orig2num.containsKey(e.getVehicleId())) return;
 
             var cacheItem = getCacheItem(orig2num.get(e.getVehicleId()));
-            cacheItem.markTripStart();
-            cacheItem.incrPosition();
+            cacheItem.startTrajectory();
         }
 
         private void handleVehicleLeavesTraffic(VehicleLeavesTrafficEvent e) {
@@ -305,13 +305,13 @@ public class PositionEmissionToMovingSources {
 
             var id = orig2num.get(e.getVehicleId());
             var cacheItem = getCacheItem(id);
-            var prevE = cacheItem.prevE();
-            var prevN = cacheItem.prevN();
-            cacheItem.addPosition(prevE, prevN);
-            cacheItem.incrPosition();
+            cacheItem.finishTrajectory();
+
             if (cacheItem.isFinished()) {
                 // remove the cache item from the map
                 vehCache.remove(id);
+                // assuming we have seen all events, also remove the vehicle from the orig2num map
+                orig2num.remove(e.getVehicleId());
 
                 // write all values into the file
                 write(cacheItem, id);
@@ -339,7 +339,7 @@ public class PositionEmissionToMovingSources {
                     cacheItem.addEmissionValue(value, s.getIntValue());
                 }
             }
-            cacheItem.incrPosition();
+            cacheItem.incrCurrentIndex();
         }
 
         private void write(VehicleCache cacheItem, Id<Vehicle> id) {
@@ -400,14 +400,15 @@ public class PositionEmissionToMovingSources {
     @RequiredArgsConstructor
     private static class VehicleCache {
 
+        enum TrajectoryState {STARTED, RECEIVED_POSITION, ENDED}
+
         final List<ArrayFloat.D2> emissions;
         final ArrayFloat.D2 eutm;
         final ArrayFloat.D2 nutm;
         final int length;
 
-        int counter = 0;
-
-        boolean setPrevIndexZero = false;
+        int curr_index = 0;
+        TrajectoryState state = TrajectoryState.ENDED;
 
         static VehicleCache init(int ntime, int nvsrc, Object2IntMap<String> speciesMapping) {
 
@@ -423,42 +424,53 @@ public class PositionEmissionToMovingSources {
         }
 
         void addEmissionValue(double value, int index) {
-            emissions.get(index).set(counter, 0, (float) value);
+            emissions.get(index).set(curr_index, 0, (float) value);
         }
 
         void addPosition(double e, double n) {
-            if (setPrevIndexZero) {
-                eutm.set(counter - 1, 0, (float) e);
-                nutm.set(counter - 1, 0, (float) n);
-                setPrevIndexZero = false;
+            if (this.state.equals(TrajectoryState.STARTED)) {
+                eutm.set(curr_index - 1, 0, (float) e);
+                nutm.set(curr_index - 1, 0, (float) n);
+                this.state = TrajectoryState.RECEIVED_POSITION;
             }
-            try {
-                eutm.set(counter, 0, (float) e);
-                nutm.set(counter, 0, (float) n);
-            } catch (Exception ex) {
-                //TODO investigate order in which this is called
-                throw new RuntimeException(ex);
-            }
+            eutm.set(curr_index, 0, (float) e);
+            nutm.set(curr_index, 0, (float) n);
         }
 
         float prevN() {
-            return nutm.get(counter - 1, 0);
+            return nutm.get(curr_index - 1, 0);
         }
 
         float prevE() {
-            return eutm.get(counter - 1, 0);
+            return eutm.get(curr_index - 1, 0);
         }
 
-        void markTripStart() {
-            this.setPrevIndexZero = true;
+        void startTrajectory() {
+            this.state = TrajectoryState.STARTED;
+            this.incrCurrentIndex();
         }
 
-        void incrPosition() {
-            counter++;
+        void finishTrajectory() {
+            if (this.state.equals(TrajectoryState.STARTED)) {
+                // no positions were written. This trajectory was outside the filter.
+                // don't write anything, reset the cursor to the before the trajectory
+                // started
+                this.curr_index--;
+            } else if (this.state.equals(TrajectoryState.RECEIVED_POSITION)) {
+                // We have had some positions. Set the last position of this trajectory
+                // to the same position we've seen last.
+                this.addPosition(this.prevE(), this.prevN());
+                this.incrCurrentIndex();
+                this.state = TrajectoryState.ENDED;
+            }
+        }
+
+        void incrCurrentIndex() {
+            curr_index++;
         }
 
         boolean isFinished() {
-            return counter == length;
+            return curr_index == length;
         }
     }
 }

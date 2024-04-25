@@ -83,7 +83,10 @@ public class PositionEmissionToMovingSources {
     private static class MetadataCollector implements BasicEventHandler {
 
         private final Map<Id<Vehicle>, List<VehicleObservation>> observedVehicles = new HashMap<>();
-        private final Map<Id<Vehicle>, Id<Vehicle>> numToOriginalId = new HashMap<>();
+        // initially, we thought it might make sense to keep track of original matsim vehicle ids, and map them to
+        // the numbered ids in palm. We are currently not using this feature. Keep this here, so that we remember
+        // that we already had this idea.
+        //private final Map<Id<Vehicle>, Id<Vehicle>> numToOriginalId = new HashMap<>();
         private final Map<Id<Vehicle>, Id<Vehicle>> orig2Num = new HashMap<>();
 
         @Override
@@ -96,7 +99,7 @@ public class PositionEmissionToMovingSources {
             } else if (event instanceof VehicleEntersTrafficEvent e) {
                 // netcdf treats / and . as special characters. Just use clean numbers as id.
                 var numId = orig2Num.computeIfAbsent(e.getVehicleId(), k -> Id.createVehicleId(observedVehicles.size()));
-                numToOriginalId.putIfAbsent(numId, e.getVehicleId());
+                //numToOriginalId.putIfAbsent(numId, e.getVehicleId());
                 observedVehicles.computeIfAbsent(numId, k -> new ArrayList<>()).add(new VehicleObservation(ObservationType.VehicleEnter, (int) e.getTime()));
             } else if (event instanceof VehicleLeavesTrafficEvent e) {
                 var numId = orig2Num.get(e.getVehicleId());

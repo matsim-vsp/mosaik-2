@@ -1,6 +1,8 @@
 # add tidyverse and custom color palette which looks like google spread sheets
 library(tidyverse)
 library(ggnewscale)
+library(ncdf4)
+
 cbPalette <- c("#4285f4", "#fbbc04", "#ea4335", "#34a853", "#ff6d01", "#46bdc6", "#7baaf7", "#f07b72", "#fcd04f", "#71c287", "#71c457", "#71c897")
 
 # read in the simulated palm data from the base case. Make sure we have only 24 hours and select the
@@ -15,7 +17,7 @@ palm_base <- read_csv("/Users/janek/Documents/writing/mosaik-2-01/data-files-nex
            y > 5822709 - 1 &
            y < 5822709 + 1) %>%
   mutate(NOx = NOx * 1e6) %>%
-  mutate(name = "PALM Data")
+  mutate(name = "NOx Concentration")
 
 # read in wind speeds for months june - august
 # create proper date and time columns
@@ -55,6 +57,47 @@ curb_data_010 <- read_delim(
   ) %>%
   select(date, time, NOx)
 
+chemistry <- nc_open("/Users/janek/Documents/writing/mosaik-2-01/data-files-nextcloud/matsim-output/berlin-with-geometry-attributes.output_emission_raster.nc")
+species <- ncvar_get(chemistry, "emission_name")
+print(species)
+emission_values <- ncvar_get(chemistry, "emission_values")
+print(dim(emission_values))
+
+# Define the coordinate ranges
+x_range <- 520:530
+y_range <- 570:580
+species_range <- 1:2
+total_hours <- dim(emission_values)[4]
+hour_range <- (total_hours - 23):total_hours
+
+# Select the NO and NO2 species, specific coordinate ranges, and the last 24 hours
+no_no2_last_24_hours <- emission_values[species_range, y_range, x_range, hour_range]
+
+# Sum NO and NO2 per coordinate (x, y) for each hour
+nox_last_24_hours <- apply(no_no2_last_24_hours, c(2, 3, 4), sum)
+
+# Calculate the average NOx over all coordinates (x and y) within the specified ranges for each of the last 24 hours
+average_nox_each_hour <- apply(nox_last_24_hours, 3, mean)
+
+time_objects <- hms::as_hms(seq(0, by = 3600, length.out = 24))
+
+nox_scaling_factor <- 5.0e4
+
+# Create a data frame for plotting
+data <- tibble(
+  hour = time_objects,
+  avg_NOx = average_nox_each_hour,
+) %>%
+  mutate(avg_NOx_scaled = avg_NOx * nox_scaling_factor)
+
+# Plot using ggplot
+ggplot(data, aes(x = hour, y = avg_NOx)) +
+  geom_line(color = "blue") +
+  geom_point(color = "blue") +
+  labs(title = "Hourly Average NOx Emissions Over the Last 24 Hours (Filtered Coordinates)",
+       x = "Hour",
+       y = "Average NOx Emissions") +
+  theme_minimal()
 # find 5 days with lowest average wind speeds
 low_wind_speed_dates <- wind_speeds %>%
   group_by(date) %>%
@@ -73,13 +116,29 @@ curb_data_010_on_low_speed_dates <- left_join(low_wind_speeds, curb_data_010, by
 
 # plot the monitored and the simulated NOx concentrations over hours of the day
 p <- ggplot(curb_data_010_on_low_speed_dates, aes(x = time, y = NOx)) +
+
+  # Add the inflow of emissions as separate scale
+  geom_line(data = data, aes(x = hour, y = avg_NOx_scaled, color = "NOx Inflow"), size =0.75) +
+  scale_color_manual(name = "PALM Input", values = "#fbbc04") +
+  # add the low wind speed day concentrations
+
+  new_scale_color() +
   geom_line(aes(color = date_string, group = date_string), alpha = 0.9) +
   scale_color_manual(name = "Monitored", values = c("#4285f4", "#3b77db", "#346ac3", "#2e5daa", "#274f92", "#21427a", "#1a3561")) +
-  # this command lets us use another scale for the palm data. Which gives separate legend entries
+
+  # Add the simulated concentrations as separate scale
   new_scale_color() +
-  geom_line(data = palm_base, aes(color = name), size = 1.0) +
-  scale_color_manual(name = "Simulated", values = "#ea4335") +
-  ggtitle("Monitored and simulated NOx concentrations at station 010") +
+  geom_line(data = palm_base, aes(color = "NOx Concentration"), size = 1.0) +
+  scale_color_manual(name = "PALM Output", values = "#ea4335") +
+
+  # add a secondary y-axis for the emission values
+  scale_y_continuous(
+    name = "Concentration [\u00B5g/m3]",  # Primary y-axis
+    sec.axis = sec_axis(~ ./(nox_scaling_factor / 1000), name = "Inflow [mg/m2]", )#breaks = c(0, 0.33, 0.66, 1.0))  # Secondary y-axis
+  ) +
+
+  # Formatting
+  ggtitle("Monitored and simulated NOx concentrations at station 010 and NOx inflow ") +
   xlab("Time of Day") +
   ylab("Concentration [\u00B5g/m3]") +
   theme_light()

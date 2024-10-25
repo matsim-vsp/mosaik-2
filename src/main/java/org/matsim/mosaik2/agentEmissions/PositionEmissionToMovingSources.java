@@ -5,6 +5,7 @@ import com.beust.jcommander.Parameter;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.java.Log;
 import lombok.extern.log4j.Log4j2;
 import org.matsim.api.core.v01.Id;
 import org.matsim.api.core.v01.events.Event;
@@ -28,10 +29,12 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+@Log4j2
 public class PositionEmissionToMovingSources {
 
     public static void main(String[] args) throws InvalidRangeException, IOException {
 
+        log.info("Starting PositionEmissionToMovingSources version 0.0.1");
         var inArgs = new InputArgs();
         JCommander.newBuilder().addObject(inArgs).build().parse(args);
 
@@ -205,6 +208,8 @@ public class PositionEmissionToMovingSources {
 
                 counter++;
             }
+
+            log.info("Reserved vehicle data for: " + counter + " vehicles. ");
         }
 
         private void writeMetadata(Map<Id<Vehicle>, List<VehicleObservation>> observedVehicles, Collection<String> species, OffsetDateTime utcDate) {
@@ -233,6 +238,8 @@ public class PositionEmissionToMovingSources {
                 }
                 counter++;
             }
+
+            log.info("Wrote Metadata for " + counter + " vehicles");
         }
 
         private ArrayInt.D1 nSpeciesArray(int size) {
@@ -401,6 +408,7 @@ public class PositionEmissionToMovingSources {
     }
 
     @RequiredArgsConstructor
+    @Log4j2
     private static class VehicleCache {
 
         enum TrajectoryState {STARTED, RECEIVED_POSITION, ENDED}
@@ -431,13 +439,19 @@ public class PositionEmissionToMovingSources {
         }
 
         void addPosition(double e, double n) {
-            if (this.state.equals(TrajectoryState.STARTED)) {
-                eutm.set(curr_index - 1, 0, (float) e);
-                nutm.set(curr_index - 1, 0, (float) n);
-                this.state = TrajectoryState.RECEIVED_POSITION;
+            try {
+                if (this.state.equals(TrajectoryState.STARTED)) {
+                    eutm.set(curr_index - 1, 0, (float) e);
+                    nutm.set(curr_index - 1, 0, (float) n);
+                    this.state = TrajectoryState.RECEIVED_POSITION;
+                }
+                eutm.set(curr_index, 0, (float) e);
+                nutm.set(curr_index, 0, (float) n);
+            } catch (ArrayIndexOutOfBoundsException exception) {
+                log.error("Failed to add position for ({},{})", e,n);
+                log.error("State of the cache item: Index: {}/{}, Trajectory state: {}", this.curr_index,this.length, this.state);
+                throw new RuntimeException(exception);
             }
-            eutm.set(curr_index, 0, (float) e);
-            nutm.set(curr_index, 0, (float) n);
         }
 
         float prevN() {

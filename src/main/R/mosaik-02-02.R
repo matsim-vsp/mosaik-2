@@ -340,3 +340,13 @@ p <- ggplot(matsim_palm_base, aes(NOx.matsim, y = NOx.palm)) +
 p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/linear-fit-nox.pdf", width = 183, height = 103, units = "mm")
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/linear-fit-nox.png", width = 183, height = 103, units = "mm")
+
+# ------------------------ Tolls charged
+
+tolls_charged <- read_csv("/Users/janek/Documents/berlin_roadpricing/sum-hour.csv")
+
+ggplot(tolls_charged, aes(x = time, y = sum * -1, color = name)) +
+  geom_line() +
+  geom_point() +
+  theme_light()
+

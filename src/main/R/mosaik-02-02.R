@@ -1,6 +1,7 @@
 # add tidyverse and custom color palette which looks like google spread sheets
 library(tidyverse)
 library(patchwork)
+library(scales)
 
 cbPalette <- c("#4285f4", "#ea4335", "#fbbc04", "#34a853", "#ff6d01", "#46bdc6", "#7baaf7", "#f07b72", "#fcd04f", "#71c287")
 scenario_color_palette <- c(
@@ -117,11 +118,14 @@ p <- ggplot(base_all_no, aes(x = factor(hour), y = concentrations, color = facto
   ylab("") +
   scale_y_continuous(
     limits = c(0, 120),
-    name = "NOx concentrations [\u00B5g/m3]",
-    sec.axis = sec_axis(~. / pm_factor, name = "PM concentrations [\u00B5g/m3]")
+    name = bquote("NO"[x] ~ "concentrations [\u00B5" * g / m^3 * "]"),
+    sec.axis = sec_axis(~. / pm_factor, name = bquote("PM concentrations [\u00B5" * g / m^3 * "]"))
   ) +
   scale_fill_manual(values = cbPalette) +
-  scale_color_manual(values = cbPalette) +
+  scale_color_manual(
+    values = cbPalette,
+    labels = c("NO", expression(NO[2]), expression(NO[x]), "PM")
+  ) +
   theme_light(base_size = 8)
 p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/box-base.pdf", width = 183, height = 80, units = "mm")
@@ -132,7 +136,8 @@ ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-fil
 p <- ggplot(joined_nox, aes(x = factor(hour), y = NOx, color = factor(scenario_name))) +
   geom_boxplot(outlier.shape = NaN) +
   ylim(0, 125) +
-  ggtitle("NOx concentrations [\u00B5g/m3] by scenario") +
+  ggtitle(expression(NO[x] ~ "concentrations [\u00B5g/m"^3 *
+    "] by scenario")) +
   labs(color = "Scenario") +
   xlab("Hour") +
   ylab("") +
@@ -145,8 +150,8 @@ ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-fil
 
 p <- ggplot(joined_no2, aes(x = factor(hour), y = NO2, color = factor(scenario_name))) +
   geom_boxplot(outlier.shape = NaN) +
-  ylim(0, 125) +
-  ggtitle("NO2 concentrations [\u00B5g/m3] by scenario") +
+  ylim(0, 100) +
+  ggtitle(bquote(NO[2] ~ "concentrations [\u00B5" * g / m^3 * "] by scenario")) +
   labs(color = "Scenario") +
   xlab("Hour") +
   ylab("") +
@@ -260,7 +265,7 @@ p_toll <- ggplot(base_toll, aes(hour, total_toll)) +
   geom_point(color = "#4285f4", size = 0.75) +
   ggtitle("Charged toll by the hour [EUR/km]") +
   xlab("Hour") +
-  ylab("") +
+  ylab("EUR/km") +
   theme_light(base_size = 8)
 p_toll
 # ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/line-toll.pdf", width = 140, height = 79, units = "mm")
@@ -281,7 +286,8 @@ p_modal_share <- ggplot(only_car, aes(x = hour, y = value, color = scenario_name
   ggtitle("Car trips within Berlin City Center") +
   labs(color = "Scenario") +
   xlab("Hour") +
-  ylab("") +
+  ylab("Number of Trips") +
+  scale_y_continuous(labels = label_comma()) +
   scale_color_manual(values = scenario_color_palette) +
   theme_light(base_size = 8)
 p_modal_share

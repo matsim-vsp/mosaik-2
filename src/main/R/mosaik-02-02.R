@@ -129,7 +129,8 @@ p <- ggplot(base_all_no, aes(x = factor(hour), y = concentrations, color = facto
   theme_light(base_size = 8)
 p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/box-base.pdf", width = 183, height = 80, units = "mm")
-ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/box-base.png", width = 183, height = 80, units = "mm", dpi = 600)
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/box-base.png", width = 150, height = 80, units = "mm", dpi = 1200)
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/box-base-presentation.png", width = 1999, height = 1124, units = "px")
 
 #------------------------ create box plots for comparison of scenarios ------------------------ 
 
@@ -159,8 +160,10 @@ p <- ggplot(joined_no2, aes(x = factor(hour), y = NO2, color = factor(scenario_n
   scale_color_manual(values = scenario_color_palette) +
   theme_light(base_size = 8)
 p
+
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/box-no2-compare.pdf", width = 183, height = 80, units = "mm")
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/box-no2-compare.png", width = 183, height = 80, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/box-no2-compare-presentation.png", width = 1999, height = 1124, units = "px")
 
 p <- ggplot(joined_pm, aes(x = factor(hour), y = PM, color = factor(scenario_name))) +
   geom_boxplot(outlier.shape = NaN) +
@@ -269,7 +272,7 @@ p_toll <- ggplot(base_toll, aes(hour, total_toll)) +
   theme_light(base_size = 8)
 p_toll
 # ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/line-toll.pdf", width = 140, height = 79, units = "mm")
-# ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/line-toll.png", width = 140, height = 79, units = "mm")
+ggsave(plot = p_toll, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/line-toll-presentation.png", width = 1000, height = 1125, units = "px")
 
 # ------------------ Print modal shares for different scenarios ---------------
 share_by_hour <- read_csv("/Users/janek/Documents/berlin_roadpricing/modal-split-hour.csv")
@@ -299,11 +302,10 @@ ggsave(p_combined, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-f
 # Include diff plots of the car trips, to retreive numbers for the written report
 car_diffs_relative <- only_car %>%
   pivot_wider(id_cols = c("time", "hour"), names_from = scenario_name, values_from = value) %>%
-  mutate(diff_scenario_c = `Scenario C` / `Base case`) %>%
   mutate(diff_scenario_b = `Scenario B` / `Base case`) %>%
   mutate(diff_scenario_a = `Scenario A` / `Base case`) %>%
-  select(time, hour, diff_scenario_a, diff_scenario_b, diff_scenario_c) %>%
-  pivot_longer(cols = c("diff_scenario_a", "diff_scenario_b", "diff_scenario_c"), names_to = "name", values_to = "value")
+  select(time, hour, diff_scenario_a, diff_scenario_b) %>%
+  pivot_longer(cols = c("diff_scenario_a", "diff_scenario_b"), names_to = "name", values_to = "value")
 
 p <- ggplot(car_diffs_relative, aes(x = hour, y = value, color = name)) +
   geom_line() +
@@ -312,11 +314,10 @@ p
 
 car_diffs_absolute <- only_car %>%
   pivot_wider(id_cols = c("time", "hour"), names_from = scenario_name, values_from = value) %>%
-  mutate(diff_scenario_c = `Base case` - `Scenario C`) %>%
   mutate(diff_scenario_b = `Base case` - `Scenario B`) %>%
   mutate(diff_scenario_a = `Base case` - `Scenario A`) %>%
-  select(time, hour, diff_scenario_a, diff_scenario_b, diff_scenario_c) %>%
-  pivot_longer(cols = c("diff_scenario_a", "diff_scenario_b", "diff_scenario_c"), names_to = "name", values_to = "value")
+  select(time, hour, diff_scenario_a, diff_scenario_b) %>%
+  pivot_longer(cols = c("diff_scenario_a", "diff_scenario_b"), names_to = "name", values_to = "value")
 
 p <- ggplot(car_diffs_absolute, aes(x = hour, y = value, color = name)) +
   geom_line() +
@@ -357,7 +358,8 @@ p <- ggplot(matsim_palm_base, aes(NOx.matsim, y = NOx.palm)) +
   )
 #p
 ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/linear-fit-nox.pdf", width = 183, height = 103, units = "mm")
-ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/linear-fit-nox.png", width = 183, height = 103, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/linear-fit-nox.png", width = 183, height = 103, dpi = 300, units = "mm")
+ggsave(plot = p, filename = "/Users/janek/Documents/writing/mosaik-2-05/data-files/r-output/linear-fit-nox-presentation.png", width = 150, height = 110, dpi = 1200, units = "mm")
 
 # ------------------------ Tolls charged
 
